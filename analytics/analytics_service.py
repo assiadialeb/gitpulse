@@ -7,6 +7,7 @@ from collections import defaultdict, Counter
 import re
 
 from .models import Commit, RepositoryStats
+from .developer_grouping_service import DeveloperGroupingService
 from applications.models import Application
 
 
@@ -16,10 +17,11 @@ class AnalyticsService:
     def __init__(self, application_id: int):
         self.application_id = application_id
         self.commits = Commit.objects.filter(application_id=application_id)
+        self.grouping_service = DeveloperGroupingService(application_id)
     
     def get_developer_activity(self, days: int = 30) -> Dict:
         """
-        Get developer activity metrics
+        Get developer activity metrics with grouped developers
         
         Args:
             days: Number of days to analyze (default: 30)
@@ -30,27 +32,65 @@ class AnalyticsService:
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
-        # Commits per developer
-        commits_per_dev = {}
-        for commit in recent_commits:
-            dev_key = f"{commit.author_name} ({commit.author_email})"
-            if dev_key not in commits_per_dev:
-                commits_per_dev[dev_key] = {
-                    'name': commit.author_name,
-                    'email': commit.author_email,
-                    'commits': 0,
-                    'additions': 0,
-                    'deletions': 0,
-                    'files_changed': 0
-                }
-            
-            commits_per_dev[dev_key]['commits'] += 1
-            commits_per_dev[dev_key]['additions'] += commit.additions
-            commits_per_dev[dev_key]['deletions'] += commit.deletions
-            commits_per_dev[dev_key]['files_changed'] += len(commit.files_changed)
+        # Get grouped developers
+        grouped_developers = self.grouping_service.get_grouped_developers()
         
-        # Sort by commits count
-        sorted_devs = sorted(commits_per_dev.values(), key=lambda x: x['commits'], reverse=True)
+        # Create mapping from email to group
+        email_to_group = {}
+        for group in grouped_developers:
+            for alias in group['aliases']:
+                email_to_group[alias['email']] = group
+        
+        # Commits per developer group
+        commits_per_group = {}
+        for commit in recent_commits:
+            # Find the group for this commit's author
+            group = email_to_group.get(commit.author_email)
+            
+            if group:
+                group_id = group['group_id']
+                if group_id not in commits_per_group:
+                    commits_per_group[group_id] = {
+                        'name': group['primary_name'],
+                        'email': group['primary_email'],
+                        'group_id': group_id,
+                        'confidence_score': group['confidence_score'],
+                        'aliases_count': len(group['aliases']),
+                        'commits': 0,
+                        'additions': 0,
+                        'deletions': 0,
+                        'files_changed': 0,
+                        'aliases': group['aliases']
+                    }
+                
+                commits_per_group[group_id]['commits'] += 1
+                commits_per_group[group_id]['additions'] += commit.additions
+                commits_per_group[group_id]['deletions'] += commit.deletions
+                commits_per_group[group_id]['files_changed'] += len(commit.files_changed)
+            else:
+                # Fallback for ungrouped developers
+                dev_key = f"{commit.author_name} ({commit.author_email})"
+                if dev_key not in commits_per_group:
+                    commits_per_group[dev_key] = {
+                        'name': commit.author_name,
+                        'email': commit.author_email,
+                        'group_id': None,
+                        'confidence_score': 100,
+                        'aliases_count': 1,
+                        'commits': 0,
+                        'additions': 0,
+                        'deletions': 0,
+                        'files_changed': 0,
+                        'aliases': [{'name': commit.author_name, 'email': commit.author_email}]
+                    }
+                
+                commits_per_group[dev_key]['commits'] += 1
+                commits_per_group[dev_key]['additions'] += commit.additions
+                commits_per_group[dev_key]['deletions'] += commit.deletions
+                commits_per_group[dev_key]['files_changed'] += len(commit.files_changed)
+        
+        # Sort by name (case-insensitive), then by commits count
+        sorted_devs = sorted(commits_per_group.values(), key=lambda x: (x['name'].lower(), -x['commits']))
         
         return {
             'period_days': days,
@@ -100,17 +140,35 @@ class AnalyticsService:
     
     def get_code_distribution(self) -> Dict:
         """
-        Get code distribution by author
+        Get code distribution by author with grouped developers
         
         Returns:
             Dictionary with code distribution metrics
         """
-        # Calculate total lines per author
+        # Get grouped developers
+        grouped_developers = self.grouping_service.get_grouped_developers()
+        
+        # Create mapping from email to group
+        email_to_group = {}
+        for group in grouped_developers:
+            for alias in group['aliases']:
+                email_to_group[alias['email']] = group
+        
+        # Calculate total lines per author group
         author_stats = defaultdict(lambda: {'additions': 0, 'deletions': 0, 'commits': 0})
         
         commits = self.commits.all()
         for commit in commits:
-            author_key = f"{commit.author_name} ({commit.author_email})"
+            # Find the group for this commit's author
+            group = email_to_group.get(commit.author_email)
+            
+            if group:
+                group_id = group['group_id']
+                author_key = f"{group['primary_name']} ({group['primary_email']})"
+            else:
+                # Fallback for ungrouped developers
+                author_key = f"{commit.author_name} ({commit.author_email})"
+            
             author_stats[author_key]['additions'] += commit.additions
             author_stats[author_key]['deletions'] += commit.deletions
             author_stats[author_key]['commits'] += 1
@@ -141,8 +199,8 @@ class AnalyticsService:
                 'net_lines': stats['additions'] - stats['deletions']
             })
         
-        # Sort by additions percentage
-        distribution.sort(key=lambda x: x['additions_percentage'], reverse=True)
+        # Sort by name (case-insensitive), then by additions percentage
+        distribution.sort(key=lambda x: (x['author'].lower(), -x['additions_percentage']))
         
         return {
             'total_additions': total_additions,
@@ -204,7 +262,7 @@ class AnalyticsService:
     
     def get_overall_stats(self) -> Dict:
         """
-        Get overall application statistics
+        Get overall application statistics with grouped developers
         
         Returns:
             Dictionary with overall stats
@@ -231,8 +289,9 @@ class AnalyticsService:
         total_additions = sum(commit.additions for commit in commits)
         total_deletions = sum(commit.deletions for commit in commits)
         
-        # Count unique authors
-        unique_authors = len(self.commits.distinct('author_email'))
+        # Count unique authors using grouped developers
+        grouped_developers = self.grouping_service.get_grouped_developers()
+        unique_authors = len(grouped_developers)
         
         # Calculate average commits per day
         if first_commit and last_commit:
@@ -249,4 +308,82 @@ class AnalyticsService:
             'first_commit_date': first_commit.authored_date if first_commit else None,
             'last_commit_date': last_commit.authored_date if last_commit else None,
             'avg_commits_per_day': round(avg_commits_per_day, 2)
-        } 
+        }
+    
+    def group_developers(self) -> Dict:
+        """
+        Group developers using the grouping service
+        
+        Returns:
+            Dictionary with grouping results
+        """
+        return self.grouping_service.group_developers()
+    
+    def get_grouped_developers(self) -> List[Dict]:
+        """
+        Get all grouped developers
+        
+        Returns:
+            List of grouped developers
+        """
+        return self.grouping_service.get_grouped_developers()
+    
+    def get_individual_developers(self) -> List[Dict]:
+        """
+        Get all individual developers (ungrouped) for manual grouping
+        
+        Returns:
+            List of individual developers with their commit data
+        """
+        commits = self.commits.all()
+        developers = {}
+        
+        # Get all grouped aliases for this application
+        from .models import DeveloperAlias, DeveloperGroup
+        grouped_aliases = set()
+        for group in DeveloperGroup.objects.filter(application_id=self.application_id):
+            for alias in DeveloperAlias.objects.filter(group=group):
+                grouped_aliases.add((alias.name, alias.email))
+        
+        for commit in commits:
+            dev_key = f"{commit.author_name}|{commit.author_email}"
+            if dev_key not in developers:
+                developers[dev_key] = {
+                    'name': commit.author_name,
+                    'email': commit.author_email,
+                    'first_seen': commit.authored_date,
+                    'last_seen': commit.authored_date,
+                    'commit_count': 0,
+                    'total_additions': 0,
+                    'total_deletions': 0,
+                    'is_grouped': (commit.author_name, commit.author_email) in grouped_aliases
+                }
+            
+            developers[dev_key]['commit_count'] += 1
+            developers[dev_key]['total_additions'] += commit.additions
+            developers[dev_key]['total_deletions'] += commit.deletions
+            developers[dev_key]['last_seen'] = max(
+                developers[dev_key]['last_seen'], 
+                commit.authored_date
+            )
+        
+        # Sort by name (case-insensitive), then by commit count
+        sorted_devs = sorted(developers.values(), key=lambda x: (x['name'].lower(), -x['commit_count']))
+        return sorted_devs
+    
+    def manually_group_developers(self, group_data: Dict) -> Dict:
+        """
+        Manually group developers based on user selection
+        
+        Args:
+            group_data: Dictionary with group information
+                {
+                    'primary_name': str,
+                    'primary_email': str,
+                    'developer_ids': List[str]  # List of developer keys to group
+                }
+        
+        Returns:
+            Dictionary with grouping results
+        """
+        return self.grouping_service.manually_group_developers(group_data) 

@@ -16,6 +16,69 @@ class FileChange(EmbeddedDocument):
     patch = fields.StringField()  # Optional patch content
 
 
+class DeveloperGroup(Document):
+    """MongoDB document for grouping developers with multiple usernames/emails"""
+    # Primary identifier
+    primary_name = fields.StringField(required=True)
+    primary_email = fields.StringField(required=True)
+    github_id = fields.StringField()  # GitHub user ID if available
+    
+    # Application context
+    application_id = fields.IntField(required=True)
+    
+    # Group metadata
+    created_at = fields.DateTimeField(default=datetime.utcnow)
+    updated_at = fields.DateTimeField(default=datetime.utcnow)
+    is_auto_grouped = fields.BooleanField(default=True)  # True if auto-detected, False if manual
+    
+    # Grouping confidence score (0-100)
+    confidence_score = fields.IntField(default=0)
+    
+    # MongoDB settings
+    meta = {
+        'collection': 'developer_groups',
+        'indexes': [
+            'application_id',
+            'primary_email',
+            'github_id',
+            ('application_id', 'primary_email'),
+            ('application_id', 'github_id'),
+        ]
+    }
+    
+    def __str__(self):
+        return f"{self.primary_name} ({self.primary_email})"
+
+
+class DeveloperAlias(Document):
+    """MongoDB document for storing developer aliases/identities"""
+    # Link to developer group
+    group = fields.ReferenceField(DeveloperGroup, required=True)
+    
+    # Identity information
+    name = fields.StringField(required=True)
+    email = fields.StringField(required=True)
+    
+    # Source information
+    first_seen = fields.DateTimeField(default=datetime.utcnow)
+    last_seen = fields.DateTimeField(default=datetime.utcnow)
+    commit_count = fields.IntField(default=0)
+    
+    # MongoDB settings
+    meta = {
+        'collection': 'developer_aliases',
+        'indexes': [
+            'group',
+            'email',
+            'name',
+            ('email', 'name'),
+        ]
+    }
+    
+    def __str__(self):
+        return f"{self.name} ({self.email})"
+
+
 class Commit(Document):
     """MongoDB document for storing commit data"""
     # Unique identifier
