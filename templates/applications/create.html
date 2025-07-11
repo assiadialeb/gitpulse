@@ -1,0 +1,115 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Create Application - GitPulse{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+    <!-- Header Hero Section -->
+    <div class="text-center py-12">
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-primary-green to-primary-blue rounded-2xl shadow-glow mb-6">
+            <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+        </div>
+        <h1 class="text-4xl font-bold gradient-text mb-4">Create New Application</h1>
+        <p class="text-xl text-medium-gray">Set up a new multi-repository application</p>
+    </div>
+
+    <!-- Application Form -->
+    <div class="card-modern p-8">
+        <div class="flex items-center mb-6">
+            <div class="w-12 h-12 bg-gradient-to-r from-primary-green to-primary-blue rounded-xl flex items-center justify-center mr-4">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold text-dark-gray">Application Details</h2>
+                <p class="text-medium-gray">Enter the basic information for your application</p>
+            </div>
+        </div>
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            {% if form.non_field_errors %}
+            <div class="alert alert-error bg-red-50 border border-red-200 rounded-xl p-4">
+                <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-red-800">{{ form.non_field_errors.0 }}</span>
+            </div>
+            {% endif %}
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-semibold text-dark-gray text-lg">{{ form.name.label }}</span>
+                </label>
+                {{ form.name }}
+                {% if form.name.errors %}
+                <label class="label">
+                    <span class="label-text-alt text-error">{{ form.name.errors.0 }}</span>
+                </label>
+                {% endif %}
+                <label class="label">
+                    <span class="label-text-alt text-medium-gray">Choose a unique name for your application</span>
+                </label>
+            </div>
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-semibold text-dark-gray text-lg">{{ form.description.label }}</span>
+                </label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                <label class="label">
+                    <span class="label-text-alt text-error">{{ form.description.errors.0 }}</span>
+                </label>
+                {% endif %}
+                <label class="label">
+                    <span class="label-text-alt text-medium-gray">Describe what this application is about</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end pt-4 space-x-4">
+                <a href="{% url 'applications:list' %}" class="btn btn-ghost rounded-xl px-6 py-3">Cancel</a>
+                <button type="submit" class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-8 py-3 font-semibold shadow-soft hover:shadow-glow transition-all duration-300 transform hover:scale-105">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Create Application
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Next Steps Info -->
+    <div class="bg-gradient-to-r from-primary-blue/10 to-primary-green/10 rounded-2xl p-6 border border-primary-blue/20">
+        <div class="flex items-start">
+            <div class="w-10 h-10 bg-primary-blue rounded-xl flex items-center justify-center mr-4 mt-1">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-semibold text-dark-gray mb-2">Next Steps</h3>
+                <p class="text-medium-gray mb-3">After creating your application, you'll be able to:</p>
+                <ul class="space-y-2 text-medium-gray text-sm">
+                    <li class="flex items-center">
+                        <span class="w-1.5 h-1.5 bg-primary-green rounded-full mr-3"></span>
+                        Add GitHub repositories from your connected account
+                    </li>
+                    <li class="flex items-center">
+                        <span class="w-1.5 h-1.5 bg-primary-green rounded-full mr-3"></span>
+                        Organize repositories into logical groups
+                    </li>
+                    <li class="flex items-center">
+                        <span class="w-1.5 h-1.5 bg-primary-green rounded-full mr-3"></span>
+                        Monitor analytics across all repositories
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

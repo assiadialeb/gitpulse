@@ -1,0 +1,163 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Add Repositories - {{ application.name }} - GitPulse{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+    <!-- Header Hero Section -->
+    <div class="text-center py-12">
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-primary-green to-primary-blue rounded-2xl shadow-glow mb-6">
+            <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+        </div>
+        <h1 class="text-4xl font-bold gradient-text mb-4">Add Repositories</h1>
+        <p class="text-xl text-medium-gray">Add GitHub repositories to <strong>{{ application.name }}</strong></p>
+    </div>
+
+    <!-- Add Repositories Form -->
+    <div class="card-modern p-8">
+        <div class="flex items-center mb-6">
+            <div class="w-12 h-12 bg-gradient-to-r from-primary-green to-primary-blue rounded-xl flex items-center justify-center mr-4">
+                <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold text-dark-gray">Select GitHub Repositories</h2>
+                <p class="text-medium-gray">Choose repositories from your GitHub account to add to this application</p>
+            </div>
+        </div>
+
+        <!-- Debug: {{ choices|length }} choices available -->
+        <!-- Debug: First few choices: {{ choices|slice:":3" }} -->
+        {% if choices|length > 0 %}
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            {% if form.non_field_errors %}
+            <div class="alert alert-error bg-red-50 border border-red-200 rounded-xl p-4">
+                <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-red-800">{{ form.non_field_errors.0 }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Search Bar -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-semibold text-dark-gray text-lg">{{ form.search_query.label }}</span>
+                </label>
+                <div class="flex space-x-2">
+                    {{ form.search_query }}
+                    <button type="submit" name="search" class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-6 py-3 font-semibold shadow-soft hover:shadow-glow transition-all duration-300">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        Search
+                    </button>
+                </div>
+                <label class="label">
+                    <span class="label-text-alt text-medium-gray">Search by repository name or description</span>
+                </label>
+            </div>
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-semibold text-dark-gray text-lg">Available Repositories</span>
+                    <span class="label-text-alt text-medium-gray">{{ choices|length }} repositories available</span>
+                </label>
+                <!-- DEBUG: {{ form.repositories.choices }} -->
+                <!-- DEBUG: Choices count: {{ form.repositories.choices|length }} -->
+                <!-- DEBUG: First choice: {{ form.repositories.choices.0 }} -->
+                <div class="space-y-3 max-h-96 overflow-y-auto border border-gray-200 rounded-xl p-4 bg-light-gray">
+                    {% for choice_value, choice_label in choices %}
+                    <!-- DEBUG LOOP: Processing {{ choice_value }} -->
+                    <label class="cursor-pointer">
+                        <div class="flex items-center p-4 bg-white rounded-xl border border-gray-100 hover:shadow-soft transition-all duration-300">
+                            <input type="checkbox" name="repositories" value="{{ choice_value }}" class="checkbox checkbox-primary mr-4">
+                            <div class="flex-1">
+                                <div class="flex items-center mb-2">
+                                    <svg class="w-5 h-5 text-dark-gray mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                    </svg>
+                                    <span class="font-semibold text-dark-gray">{{ choice_value }}</span>
+                                </div>
+                                <p class="text-sm text-medium-gray">{{ choice_label|slice:"20:" }}</p>
+                            </div>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% if form.repositories.errors %}
+                <label class="label">
+                    <span class="label-text-alt text-error">{{ form.repositories.errors.0 }}</span>
+                </label>
+                {% endif %}
+            </div>
+
+            <div class="flex justify-end pt-4 space-x-4">
+                <a href="{% url 'applications:detail' application.pk %}" class="btn btn-ghost rounded-xl px-6 py-3">Cancel</a>
+                <button type="submit" class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-8 py-3 font-semibold shadow-soft hover:shadow-glow transition-all duration-300 transform hover:scale-105">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Add Selected Repositories
+                </button>
+            </div>
+        </form>
+        {% else %}
+        <!-- No Available Repositories -->
+        <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gradient-to-r from-primary-green/20 to-primary-blue/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <svg class="w-8 h-8 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-dark-gray mb-4">No Available Repositories</h3>
+            <p class="text-medium-gray mb-6 max-w-md mx-auto">
+                All your GitHub repositories have already been added to this application, or you don't have any repositories yet.
+            </p>
+            <div class="space-x-4">
+                <a href="{% url 'applications:detail' application.pk %}" class="btn btn-outline border-gray-300 text-dark-gray hover:bg-gray-50 rounded-xl">
+                    Back to Application
+                </a>
+                <a href="https://github.com/new" target="_blank" class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-6 py-3 font-semibold shadow-soft hover:shadow-glow transition-all duration-300 transform hover:scale-105">
+                    Create New Repository
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Info Section -->
+    <div class="bg-gradient-to-r from-primary-blue/10 to-primary-green/10 rounded-2xl p-6 border border-primary-blue/20">
+        <div class="flex items-start">
+            <div class="w-10 h-10 bg-primary-blue rounded-xl flex items-center justify-center mr-4 mt-1">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-semibold text-dark-gray mb-2">About Repository Selection</h3>
+                <p class="text-medium-gray mb-3">When you add repositories to your application:</p>
+                <ul class="space-y-2 text-medium-gray text-sm">
+                    <li class="flex items-center">
+                        <span class="w-1.5 h-1.5 bg-primary-green rounded-full mr-3"></span>
+                        Repository information is synced from GitHub
+                    </li>
+                    <li class="flex items-center">
+                        <span class="w-1.5 h-1.5 bg-primary-green rounded-full mr-3"></span>
+                        Analytics will be available across all repositories
+                    </li>
+                    <li class="flex items-center">
+                        <span class="w-1.5 h-1.5 bg-primary-green rounded-full mr-3"></span>
+                        You can remove repositories anytime
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -24,4 +24,5 @@ urlpatterns = [
     path('dashboard/', dashboard_view, name='dashboard'),
     path('users/', include('users.urls')),
     path('github/', include('github.urls')),
+    path('applications/', include('applications.urls')),
 ]
