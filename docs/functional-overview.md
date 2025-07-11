@@ -18,7 +18,7 @@ The platform connects to a GitHub organization via OAuth2, collects commit and p
 | **Storage**      | Commits, PRs, and user activity in MongoDB |
 | **API**          | GitHub REST API v3                         |
 | **Infra**        | Docker-based local setup                   |
-
+| **Front**        | Django template, DaisyUI                   |
 ---
 
 ## 🔐 Features

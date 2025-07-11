@@ -1,0 +1,82 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Dashboard - GitPulse{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-8">
+    <!-- Header Hero Section -->
+    <div class="text-center py-12">
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-primary-green to-primary-blue rounded-2xl shadow-glow mb-6">
+            <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+            </svg>
+        </div>
+        <h1 class="text-4xl font-bold gradient-text mb-4">GitPulse Dashboard</h1>
+        <p class="text-xl text-medium-gray">Welcome, {{ user.username }}!</p>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid md:grid-cols-3 gap-6">
+        <div class="card-modern p-6">
+            <div class="flex items-center mb-4">
+                <div class="w-12 h-12 bg-gradient-to-r from-primary-green to-primary-blue rounded-xl flex items-center justify-center mr-4">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-dark-gray">Repositories</h3>
+                    <p class="text-medium-gray text-sm">Total analyzed</p>
+                </div>
+            </div>
+            <div class="text-3xl font-bold text-primary-green">0</div>
+        </div>
+
+        <div class="card-modern p-6">
+            <div class="flex items-center mb-4">
+                <div class="w-12 h-12 bg-gradient-to-r from-primary-blue to-primary-green rounded-xl flex items-center justify-center mr-4">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-dark-gray">Commits</h3>
+                    <p class="text-medium-gray text-sm">Total analyzed</p>
+                </div>
+            </div>
+            <div class="text-3xl font-bold text-primary-blue">0</div>
+        </div>
+
+        <div class="card-modern p-6">
+            <div class="flex items-center mb-4">
+                <div class="w-12 h-12 bg-gradient-to-r from-medium-gray to-primary-green rounded-xl flex items-center justify-center mr-4">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-dark-gray">Pull Requests</h3>
+                    <p class="text-medium-gray text-sm">Total analyzed</p>
+                </div>
+            </div>
+            <div class="text-3xl font-bold text-medium-gray">0</div>
+        </div>
+    </div>
+
+    <!-- Welcome Message -->
+    <div class="card-modern p-8">
+        <div class="text-center">
+            <div class="w-16 h-16 bg-gradient-to-r from-primary-green/20 to-primary-blue/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <svg class="w-8 h-8 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-dark-gray mb-4">Welcome to GitPulse</h2>
+            <p class="text-medium-gray text-lg mb-6 max-w-2xl mx-auto">
+                Your GitHub analytics dashboard is under development. 
+                Repository, commit, and pull request analysis features will be available soon.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %} 
