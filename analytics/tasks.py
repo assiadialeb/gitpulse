@@ -8,6 +8,7 @@ from django_q.models import Schedule
 
 from .sync_service import SyncService
 from .services import RateLimitService
+from .github_service import GitHubRateLimitError
 from applications.models import Application, ApplicationRepository
 from github.models import GitHubToken
 

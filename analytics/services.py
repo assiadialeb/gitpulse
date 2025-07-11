@@ -59,7 +59,6 @@ from typing import Dict, Optional, Any
 from django_q.tasks import async_task, Schedule
 from django_q.models import Schedule as ScheduleModel
 
-from .models import RateLimitReset
 from .github_service import GitHubRateLimitError
 from github.models import GitHubToken
 
@@ -88,6 +87,9 @@ class RateLimitService:
             Dictionary with restart information
         """
         try:
+            # Import here to avoid circular import
+            from .models import RateLimitReset
+            
             # Parse reset time from error message
             reset_time = RateLimitService._parse_reset_time_from_error(error)
             
@@ -146,7 +148,7 @@ class RateLimitService:
         return datetime.utcnow() + timedelta(hours=1)
     
     @staticmethod
-    def _schedule_restart(rate_limit_reset: RateLimitReset) -> bool:
+    def _schedule_restart(rate_limit_reset) -> bool:
         """
         Schedule automatic restart of the task
         
@@ -211,7 +213,7 @@ class RateLimitService:
         return task_map.get(task_type, 'analytics.tasks.background_indexing_task')
     
     @staticmethod
-    def _restart_task(rate_limit_reset: RateLimitReset) -> bool:
+    def _restart_task(rate_limit_reset) -> bool:
         """
         Restart a rate-limited task
         
@@ -293,6 +295,9 @@ def restart_rate_limited_task(rate_limit_reset_id: str) -> Dict[str, Any]:
         Dictionary with restart results
     """
     try:
+        # Import here to avoid circular import
+        from .models import RateLimitReset
+        
         rate_limit_reset = RateLimitReset.objects.get(id=rate_limit_reset_id)
         
         # Check if it's time to restart
@@ -344,6 +349,9 @@ def process_pending_rate_limit_restarts():
     This can be called periodically to check for tasks that need restarting
     """
     try:
+        # Import here to avoid circular import
+        from .models import RateLimitReset
+        
         # Find all pending rate limit resets that are ready to restart
         pending_resets = RateLimitReset.objects.filter(
             status='pending',
@@ -388,6 +396,9 @@ def cleanup_old_rate_limit_resets():
     Django-Q task to clean up old rate limit resets (older than 7 days)
     """
     try:
+        # Import here to avoid circular import
+        from .models import RateLimitReset
+        
         cutoff_date = datetime.utcnow() - timedelta(days=7)
         
         # Find old rate limit resets
