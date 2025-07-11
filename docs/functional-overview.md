@@ -76,10 +76,22 @@ gitpulse/
 ## 🧭 Roadmap (Upcoming Features)
 
 - GitHub webhook support for real-time updates
-- Scheduled background jobs to sync commits
 - Export dashboards as CSV/PDF
 - Integration with Slack or email for notifications
 - Tagging of commits (e.g., feature, bugfix, refactor)
+
+---
+
+## ✅ Implemented Features
+
+### Automatic Daily Indexing
+- **Scheduled background jobs** to sync commits automatically
+- **Daily indexing** at configurable times (default: 2 AM UTC)
+- **Rate limit handling** with automatic restart scheduling
+- **No manual intervention** required after initial setup
+- **Scalable** for any number of applications
+
+See [Automatic Daily Indexing](./automatic-indexing.md) for detailed documentation.
 
 ---
 
