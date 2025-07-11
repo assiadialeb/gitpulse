@@ -10,6 +10,7 @@ from mongoengine import Q
 
 from .models import Commit, SyncLog, RepositoryStats
 from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
+from .services import RateLimitService
 from applications.models import Application, ApplicationRepository
 from github.models import GitHubToken
 
@@ -208,8 +209,50 @@ class SyncService:
             logger.info(f"Successfully synced {repo_full_name}: {results}")
             return results
             
-        except (GitHubAPIError, GitHubRateLimitError) as e:
-            # Handle GitHub API errors
+        except GitHubRateLimitError as e:
+            # Handle rate limit errors with automatic restart
+            sync_log.status = 'failed'
+            sync_log.completed_at = datetime.utcnow()
+            sync_log.error_message = str(e)
+            sync_log.save()
+            
+            logger.error(f"Rate limit exceeded syncing {repo_full_name}: {e}")
+            
+            # Get user's GitHub username for rate limit service
+            try:
+                github_token = GitHubToken.objects.get(user_id=self.user_id)
+                github_username = github_token.github_username
+            except GitHubToken.DoesNotExist:
+                github_username = f"user_{self.user_id}"
+            
+            # Handle rate limit with automatic restart
+            task_data = {
+                'application_id': application_id,
+                'user_id': self.user_id,
+                'sync_type': sync_type
+            }
+            
+            restart_info = RateLimitService.handle_rate_limit_error(
+                user_id=self.user_id,
+                github_username=github_username,
+                error=e,
+                task_type='sync',
+                task_data=task_data
+            )
+            
+            # Return restart information instead of raising
+            return {
+                'commits_new': 0,
+                'commits_updated': 0,
+                'commits_processed': 0,
+                'commits_skipped': 0,
+                'api_calls': 0,
+                'rate_limit_hit': True,
+                'restart_info': restart_info
+            }
+            
+        except GitHubAPIError as e:
+            # Handle other GitHub API errors
             sync_log.status = 'failed'
             sync_log.completed_at = datetime.utcnow()
             sync_log.error_message = str(e)

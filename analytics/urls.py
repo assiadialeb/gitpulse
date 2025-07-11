@@ -23,4 +23,8 @@ urlpatterns = [
     path('application/<int:application_id>/indexing-progress/', views.get_indexing_progress, name='get_indexing_progress'),
     path('application/<int:application_id>/group/<str:group_id>/delete/', views.delete_group, name='delete_group'),
     path('application/<int:application_id>/group/<str:group_id>/rename/', views.rename_group, name='rename_group'),
+    
+    # Rate limit management
+    path('api/rate-limit-status/', views.get_rate_limit_status, name='get_rate_limit_status'),
+    path('api/rate-limit-restart/<str:reset_id>/cancel/', views.cancel_rate_limit_restart, name='cancel_rate_limit_restart'),
 ] 

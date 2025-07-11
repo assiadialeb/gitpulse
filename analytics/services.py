@@ -48,3 +48,367 @@ def cleanup_application_data(application_id: int) -> Dict:
         # Return error information
         results['error'] = str(e)
         return results 
+
+"""
+Rate limit management service for handling GitHub API rate limits
+"""
+import time
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, Optional, Any
+from django_q.tasks import async_task, Schedule
+from django_q.models import Schedule as ScheduleModel
+
+from .models import RateLimitReset
+from .github_service import GitHubRateLimitError
+from github.models import GitHubToken
+
+logger = logging.getLogger(__name__)
+
+
+class RateLimitService:
+    """Service for managing GitHub API rate limits and automatic task restarts"""
+    
+    @staticmethod
+    def handle_rate_limit_error(user_id: int, github_username: str, error: GitHubRateLimitError, 
+                              task_type: str, task_data: Dict[str, Any], 
+                              original_task_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Handle a rate limit error by scheduling automatic restart
+        
+        Args:
+            user_id: User ID
+            github_username: GitHub username
+            error: The rate limit error
+            task_type: Type of task ('indexing', 'sync', 'background')
+            task_data: Task parameters
+            original_task_id: Original task ID if applicable
+            
+        Returns:
+            Dictionary with restart information
+        """
+        try:
+            # Parse reset time from error message
+            reset_time = RateLimitService._parse_reset_time_from_error(error)
+            
+            # Create rate limit reset record
+            rate_limit_reset = RateLimitReset(
+                user_id=user_id,
+                github_username=github_username,
+                rate_limit_reset_time=reset_time,
+                rate_limit_remaining=0,
+                pending_task_type=task_type,
+                pending_task_data=task_data,
+                original_task_id=original_task_id,
+                status='pending'
+            )
+            rate_limit_reset.save()
+            
+            # Schedule automatic restart
+            restart_scheduled = RateLimitService._schedule_restart(rate_limit_reset)
+            
+            logger.info(f"Rate limit hit for user {github_username}. Restart scheduled for {reset_time}")
+            
+            return {
+                'success': True,
+                'rate_limit_reset_id': str(rate_limit_reset.id),
+                'reset_time': reset_time.isoformat(),
+                'restart_scheduled': restart_scheduled,
+                'time_until_reset': rate_limit_reset.time_until_reset,
+                'message': f"Rate limit exceeded. Task will automatically restart at {reset_time.strftime('%Y-%m-%d %H:%M:%S')} UTC"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to handle rate limit error: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'message': "Rate limit exceeded but failed to schedule automatic restart"
+            }
+    
+    @staticmethod
+    def _parse_reset_time_from_error(error: GitHubRateLimitError) -> datetime:
+        """Parse reset time from rate limit error message"""
+        error_msg = str(error)
+        
+        # Try to extract seconds from error message
+        if "Retry after" in error_msg:
+            try:
+                # Extract seconds from "Retry after X seconds"
+                seconds_str = error_msg.split("Retry after")[1].split("seconds")[0].strip()
+                wait_seconds = int(seconds_str)
+                return datetime.utcnow() + timedelta(seconds=wait_seconds)
+            except (ValueError, IndexError):
+                pass
+        
+        # Default: wait 1 hour if we can't parse the time
+        logger.warning(f"Could not parse reset time from error: {error_msg}. Using 1 hour default.")
+        return datetime.utcnow() + timedelta(hours=1)
+    
+    @staticmethod
+    def _schedule_restart(rate_limit_reset: RateLimitReset) -> bool:
+        """
+        Schedule automatic restart of the task
+        
+        Args:
+            rate_limit_reset: RateLimitReset document
+            
+        Returns:
+            True if restart was scheduled successfully
+        """
+        try:
+            # Calculate delay until restart
+            delay_seconds = rate_limit_reset.time_until_reset + 60  # Add 1 minute buffer
+            
+            if delay_seconds <= 0:
+                # Reset time has passed, restart immediately
+                RateLimitService._restart_task(rate_limit_reset)
+                return True
+            
+            # Schedule restart using Django-Q
+            task_name = RateLimitService._get_task_name(rate_limit_reset.pending_task_type)
+            
+            # Schedule the restart task
+            schedule_time = datetime.utcnow() + timedelta(seconds=delay_seconds)
+            
+            # Create Django-Q schedule
+            schedule, created = ScheduleModel.objects.get_or_create(
+                name=f"rate_limit_restart_{rate_limit_reset.id}",
+                defaults={
+                    'func': 'analytics.services.restart_rate_limited_task',
+                    'args': [str(rate_limit_reset.id)],
+                    'schedule_type': ScheduleModel.ONCE,
+                    'next_run': schedule_time,
+                    'repeats': 1
+                }
+            )
+            
+            if not created:
+                # Update existing schedule
+                schedule.next_run = schedule_time
+                schedule.save()
+            
+            # Update rate limit reset status
+            rate_limit_reset.status = 'scheduled'
+            rate_limit_reset.scheduled_at = datetime.utcnow()
+            rate_limit_reset.save()
+            
+            logger.info(f"Scheduled restart for {rate_limit_reset.pending_task_type} task at {schedule_time}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to schedule restart: {e}")
+            return False
+    
+    @staticmethod
+    def _get_task_name(task_type: str) -> str:
+        """Get the task function name based on task type"""
+        task_map = {
+            'indexing': 'analytics.tasks.background_indexing_task',
+            'sync': 'analytics.tasks.sync_application_task',
+            'background': 'analytics.tasks.background_indexing_task'
+        }
+        return task_map.get(task_type, 'analytics.tasks.background_indexing_task')
+    
+    @staticmethod
+    def _restart_task(rate_limit_reset: RateLimitReset) -> bool:
+        """
+        Restart a rate-limited task
+        
+        Args:
+            rate_limit_reset: RateLimitReset document
+            
+        Returns:
+            True if restart was successful
+        """
+        try:
+            task_data = rate_limit_reset.pending_task_data
+            task_name = RateLimitService._get_task_name(rate_limit_reset.pending_task_type)
+            
+            # Extract task parameters
+            if rate_limit_reset.pending_task_type == 'indexing':
+                application_id = task_data.get('application_id')
+                user_id = task_data.get('user_id')
+                task_id = task_data.get('task_id')
+                
+                # Start the background indexing task
+                new_task_id = async_task(
+                    task_name,
+                    application_id,
+                    user_id,
+                    task_id,
+                    group=f'rate_limit_restart_{rate_limit_reset.id}',
+                    timeout=7200  # 2 hour timeout
+                )
+                
+            elif rate_limit_reset.pending_task_type == 'sync':
+                application_id = task_data.get('application_id')
+                user_id = task_data.get('user_id')
+                sync_type = task_data.get('sync_type', 'incremental')
+                
+                # Start the sync task
+                new_task_id = async_task(
+                    task_name,
+                    application_id,
+                    user_id,
+                    sync_type,
+                    group=f'rate_limit_restart_{rate_limit_reset.id}',
+                    timeout=3600  # 1 hour timeout
+                )
+            
+            else:
+                # Generic task restart
+                new_task_id = async_task(
+                    task_name,
+                    **task_data,
+                    group=f'rate_limit_restart_{rate_limit_reset.id}',
+                    timeout=3600
+                )
+            
+            # Update rate limit reset status
+            rate_limit_reset.status = 'completed'
+            rate_limit_reset.completed_at = datetime.utcnow()
+            rate_limit_reset.save()
+            
+            logger.info(f"Successfully restarted {rate_limit_reset.pending_task_type} task with ID {new_task_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to restart task: {e}")
+            rate_limit_reset.status = 'failed'
+            rate_limit_reset.error_message = str(e)
+            rate_limit_reset.retry_count += 1
+            rate_limit_reset.save()
+            return False
+
+
+def restart_rate_limited_task(rate_limit_reset_id: str) -> Dict[str, Any]:
+    """
+    Django-Q task to restart a rate-limited task
+    
+    Args:
+        rate_limit_reset_id: RateLimitReset document ID
+        
+    Returns:
+        Dictionary with restart results
+    """
+    try:
+        rate_limit_reset = RateLimitReset.objects.get(id=rate_limit_reset_id)
+        
+        # Check if it's time to restart
+        if not rate_limit_reset.is_ready_to_restart:
+            # Reschedule for later
+            delay_seconds = rate_limit_reset.time_until_reset + 60
+            schedule_time = datetime.utcnow() + timedelta(seconds=delay_seconds)
+            
+            # Update schedule
+            try:
+                schedule = ScheduleModel.objects.get(name=f"rate_limit_restart_{rate_limit_reset_id}")
+                schedule.next_run = schedule_time
+                schedule.save()
+            except ScheduleModel.DoesNotExist:
+                pass
+            
+            return {
+                'success': False,
+                'message': f"Not yet time to restart. Rescheduled for {schedule_time}"
+            }
+        
+        # Restart the task
+        success = RateLimitService._restart_task(rate_limit_reset)
+        
+        return {
+            'success': success,
+            'rate_limit_reset_id': rate_limit_reset_id,
+            'task_type': rate_limit_reset.pending_task_type,
+            'message': "Task restarted successfully" if success else "Failed to restart task"
+        }
+        
+    except RateLimitReset.DoesNotExist:
+        logger.error(f"RateLimitReset {rate_limit_reset_id} not found")
+        return {
+            'success': False,
+            'error': 'RateLimitReset not found'
+        }
+    except Exception as e:
+        logger.error(f"Error restarting rate-limited task: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+def process_pending_rate_limit_restarts():
+    """
+    Django-Q task to process all pending rate limit restarts
+    This can be called periodically to check for tasks that need restarting
+    """
+    try:
+        # Find all pending rate limit resets that are ready to restart
+        pending_resets = RateLimitReset.objects.filter(
+            status='pending',
+            rate_limit_reset_time__lte=datetime.utcnow()
+        )
+        
+        results = {
+            'processed': 0,
+            'successful': 0,
+            'failed': 0,
+            'errors': []
+        }
+        
+        for rate_limit_reset in pending_resets:
+            try:
+                success = RateLimitService._restart_task(rate_limit_reset)
+                results['processed'] += 1
+                
+                if success:
+                    results['successful'] += 1
+                else:
+                    results['failed'] += 1
+                    
+            except Exception as e:
+                results['processed'] += 1
+                results['failed'] += 1
+                results['errors'].append(f"Error processing {rate_limit_reset.id}: {e}")
+        
+        logger.info(f"Processed {results['processed']} pending rate limit restarts: {results}")
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error processing pending rate limit restarts: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+def cleanup_old_rate_limit_resets():
+    """
+    Django-Q task to clean up old rate limit resets (older than 7 days)
+    """
+    try:
+        cutoff_date = datetime.utcnow() - timedelta(days=7)
+        
+        # Find old rate limit resets
+        old_resets = RateLimitReset.objects.filter(
+            created_at__lt=cutoff_date,
+            status__in=['completed', 'failed', 'cancelled']
+        )
+        
+        count = old_resets.count()
+        old_resets.delete()
+        
+        logger.info(f"Cleaned up {count} old rate limit resets")
+        
+        return {
+            'success': True,
+            'cleaned_up': count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error cleaning up old rate limit resets: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        } 

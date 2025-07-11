@@ -7,11 +7,15 @@ from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import csrf_exempt
 import json
+import logging
 
 from applications.models import Application
+
+logger = logging.getLogger(__name__)
 from .analytics_service import AnalyticsService
 from analytics.sync_service import SyncService
 from analytics.models import DeveloperGroup, DeveloperAlias
+from github.models import GitHubToken
 
 
 @login_required
@@ -142,13 +146,123 @@ def start_indexing(request, application_id):
     """
     application = get_object_or_404(Application, id=application_id, owner=request.user)
     
-    # Initialize sync service
-    sync_service = SyncService(user_id=request.user.id)
-    
-    # Start indexing
-    result = sync_service.sync_application_repositories_with_progress(application_id)
-    
-    return JsonResponse(result)
+    try:
+        # Start background indexing task
+        from django_q.tasks import async_task
+        from .tasks import background_indexing_task
+        
+        task_id = async_task(
+            'analytics.tasks.background_indexing_task',
+            application_id,
+            request.user.id,
+            None,  # task_id will be generated
+            group=f'indexing_{application_id}_{request.user.id}',
+            timeout=7200  # 2 hour timeout
+        )
+        
+        logger.info(f"Started background indexing task {task_id} for application {application_id}")
+        
+        return JsonResponse({
+            'success': True,
+            'task_id': task_id,
+            'message': 'Indexing started successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to start indexing for application {application_id}: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@login_required
+def get_rate_limit_status(request):
+    """
+    Get current rate limit status for the user
+    """
+    try:
+        # Get user's GitHub token
+        github_token = GitHubToken.objects.get(user_id=request.user.id)
+        
+        # Get pending rate limit resets
+        from .models import RateLimitReset
+        pending_resets = RateLimitReset.objects.filter(
+            user_id=request.user.id,
+            status__in=['pending', 'scheduled']
+        ).order_by('rate_limit_reset_time')
+        
+        reset_info = []
+        for reset in pending_resets:
+            reset_info.append({
+                'id': str(reset.id),
+                'task_type': reset.pending_task_type,
+                'reset_time': reset.rate_limit_reset_time.isoformat(),
+                'time_until_reset': reset.time_until_reset,
+                'status': reset.status,
+                'original_task_id': reset.original_task_id
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'github_username': github_token.github_username,
+            'pending_resets': reset_info,
+            'total_pending': len(reset_info)
+        })
+        
+    except GitHubToken.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'No GitHub token found for user'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@login_required
+def cancel_rate_limit_restart(request, reset_id):
+    """
+    Cancel a pending rate limit restart
+    """
+    try:
+        from .models import RateLimitReset
+        from django_q.models import Schedule as ScheduleModel
+        
+        # Get the rate limit reset
+        rate_limit_reset = RateLimitReset.objects.get(
+            id=reset_id,
+            user_id=request.user.id
+        )
+        
+        # Cancel the scheduled restart
+        try:
+            schedule = ScheduleModel.objects.get(name=f"rate_limit_restart_{reset_id}")
+            schedule.delete()
+        except ScheduleModel.DoesNotExist:
+            pass
+        
+        # Update status
+        rate_limit_reset.status = 'cancelled'
+        rate_limit_reset.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Rate limit restart cancelled successfully'
+        })
+        
+    except RateLimitReset.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Rate limit reset not found'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 
 @login_required
@@ -158,15 +272,56 @@ def get_indexing_progress(request, application_id):
     """
     application = get_object_or_404(Application, id=application_id, owner=request.user)
     
-    # For now, return a simple response since get_sync_progress doesn't exist
-    # This can be implemented later if needed
-    return JsonResponse({
-        'success': True,
-        'progress': {
-            'percentage': 0,
-            'status': 'Progress tracking not implemented yet'
-        }
-    }) 
+    task_id = request.GET.get('task_id')
+    if not task_id:
+        return JsonResponse({
+            'success': False,
+            'error': 'Task ID is required'
+        })
+    
+    try:
+        from django_q.models import Success, Failure
+        from django_q.tasks import fetch
+        
+        # Try to get the task result
+        result = fetch(task_id)
+        
+        if result is None:
+            # Task is still running
+            return JsonResponse({
+                'success': True,
+                'progress': {
+                    'percentage': 50,  # Default progress
+                    'status': 'Indexing in progress...',
+                    'is_running': True,
+                    'is_complete': False
+                }
+            })
+        
+        # Task completed
+        if result.success:
+            return JsonResponse({
+                'success': True,
+                'progress': {
+                    'percentage': 100,
+                    'status': 'Indexing completed!',
+                    'is_running': False,
+                    'is_complete': True,
+                    'result': result.result
+                }
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'Task failed: {result.result}'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error checking progress for task {task_id}: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Error checking progress: {str(e)}'
+        }) 
 
 @login_required
 @require_POST

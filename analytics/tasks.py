@@ -7,6 +7,7 @@ from django_q.tasks import async_task, schedule
 from django_q.models import Schedule
 
 from .sync_service import SyncService
+from .services import RateLimitService
 from applications.models import Application, ApplicationRepository
 from github.models import GitHubToken
 
@@ -350,6 +351,42 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                     application_id,
                     'full'  # Always do full sync for indexing
                 )
+                
+                # Check if rate limit was hit
+                if repo_result.get('rate_limit_hit'):
+                    logger.warning(f"Rate limit hit during indexing of {app_repo.github_repo_name}")
+                    
+                    # Get user's GitHub username for rate limit service
+                    try:
+                        github_token = GitHubToken.objects.get(user_id=user_id)
+                        github_username = github_token.github_username
+                    except GitHubToken.DoesNotExist:
+                        github_username = f"user_{user_id}"
+                    
+                    # Handle rate limit with automatic restart
+                    task_data = {
+                        'application_id': application_id,
+                        'user_id': user_id,
+                        'task_id': task_id
+                    }
+                    
+                    restart_info = RateLimitService.handle_rate_limit_error(
+                        user_id=user_id,
+                        github_username=github_username,
+                        error=GitHubRateLimitError("Rate limit exceeded during indexing"),
+                        task_type='indexing',
+                        task_data=task_data,
+                        original_task_id=task_id
+                    )
+                    
+                    # Return restart information
+                    results['rate_limit_hit'] = True
+                    results['restart_info'] = restart_info
+                    results['completed_at'] = datetime.utcnow().isoformat()
+                    results['success'] = False
+                    
+                    logger.info(f"Rate limit hit during indexing. Restart scheduled: {restart_info}")
+                    return results
                 
                 results['repositories_synced'] += 1
                 results['total_commits_new'] += repo_result['commits_new']

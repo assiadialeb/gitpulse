@@ -217,4 +217,66 @@ class RepositoryStats(Document):
     }
     
     def __str__(self):
-        return f"{self.repository_full_name} - {self.total_commits} commits" 
+        return f"{self.repository_full_name} - {self.total_commits} commits"
+
+
+class RateLimitReset(Document):
+    """MongoDB document for tracking rate limit resets and pending task restarts"""
+    # User information
+    user_id = fields.IntField(required=True)
+    github_username = fields.StringField(required=True)
+    
+    # Rate limit information
+    rate_limit_reset_time = fields.DateTimeField(required=True)
+    rate_limit_remaining = fields.IntField(default=0)
+    rate_limit_limit = fields.IntField(default=5000)
+    
+    # Pending restart information
+    pending_task_type = fields.StringField(choices=['indexing', 'sync', 'background'], required=True)
+    pending_task_data = fields.DictField(required=True)  # Task parameters
+    original_task_id = fields.StringField(max_length=100)  # Original task ID if applicable
+    
+    # Status
+    status = fields.StringField(choices=['pending', 'scheduled', 'completed', 'failed', 'cancelled'], default='pending')
+    
+    # Timestamps
+    created_at = fields.DateTimeField(required=True, default=datetime.utcnow)
+    scheduled_at = fields.DateTimeField()
+    completed_at = fields.DateTimeField()
+    
+    # Error handling
+    error_message = fields.StringField()
+    retry_count = fields.IntField(default=0)
+    max_retries = fields.IntField(default=3)
+    
+    # MongoDB settings
+    meta = {
+        'collection': 'rate_limit_resets',
+        'indexes': [
+            'user_id',
+            'rate_limit_reset_time',
+            'status',
+            'pending_task_type',
+            ('user_id', 'status'),
+            ('rate_limit_reset_time', 'status'),
+        ]
+    }
+    
+    def __str__(self):
+        return f"{self.github_username} - {self.pending_task_type} - {self.status}"
+    
+    @property
+    def is_ready_to_restart(self):
+        """Check if enough time has passed to restart the task"""
+        current_time = datetime.utcnow()
+        reset_time = self.rate_limit_reset_time
+        return current_time >= reset_time
+    
+    @property
+    def time_until_reset(self):
+        """Time until rate limit resets in seconds"""
+        if self.is_ready_to_restart:
+            return 0
+        current_time = datetime.utcnow()
+        reset_time = self.rate_limit_reset_time
+        return int((reset_time - current_time).total_seconds()) 

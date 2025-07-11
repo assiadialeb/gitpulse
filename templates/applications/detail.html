@@ -402,6 +402,23 @@
             </div>
         </div>
 
+        <!-- Rate Limit Status -->
+        <div id="rate-limit-status" class="fixed bottom-4 right-4 z-50 hidden">
+            <div class="bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-w-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-sm font-semibold text-gray-800">GitHub Rate Limit Status</h4>
+                    <button onclick="hideRateLimitStatus()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="rate-limit-content" class="text-xs text-gray-600">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
         <!-- Backdrop -->
         <div id="slideover-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
     </div>
@@ -563,5 +580,90 @@ function pollProgress(applicationId, taskId, button, originalText) {
         alert('Progress monitoring stopped. Check the application later for completion status.');
     }, 1800000); // 30 minutes
 }
+
+// Rate limit status functions
+function showRateLimitStatus() {
+    const statusDiv = document.getElementById('rate-limit-status');
+    statusDiv.classList.remove('hidden');
+    
+    // Fetch current rate limit status
+    fetch('/analytics/api/rate-limit-status/')
+        .then(response => response.json())
+        .then(data => {
+            const contentDiv = document.getElementById('rate-limit-content');
+            
+            if (data.success) {
+                if (data.total_pending > 0) {
+                    let html = `<div class="mb-2">
+                        <p class="font-medium text-orange-600">Rate limit exceeded!</p>
+                        <p class="text-xs">You have ${data.total_pending} pending restart(s).</p>
+                    </div>`;
+                    
+                    data.pending_resets.forEach(reset => {
+                        const resetTime = new Date(reset.reset_time);
+                        const timeUntil = Math.max(0, Math.floor((resetTime - new Date()) / 1000));
+                        const minutes = Math.floor(timeUntil / 60);
+                        const seconds = timeUntil % 60;
+                        
+                        html += `<div class="border-t pt-2 mt-2">
+                            <p class="font-medium text-xs">${reset.task_type} task</p>
+                            <p class="text-xs">Restart in: ${minutes}m ${seconds}s</p>
+                            <button onclick="cancelRateLimitRestart('${reset.id}')" 
+                                    class="text-xs text-red-500 hover:text-red-700 mt-1">
+                                Cancel restart
+                            </button>
+                        </div>`;
+                    });
+                    
+                    contentDiv.innerHTML = html;
+                } else {
+                    contentDiv.innerHTML = '<p class="text-green-600">No rate limit issues detected.</p>';
+                }
+            } else {
+                contentDiv.innerHTML = `<p class="text-red-600">Error: ${data.error}</p>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching rate limit status:', error);
+            document.getElementById('rate-limit-content').innerHTML = 
+                '<p class="text-red-600">Error fetching rate limit status.</p>';
+        });
+}
+
+function hideRateLimitStatus() {
+    document.getElementById('rate-limit-status').classList.add('hidden');
+}
+
+function cancelRateLimitRestart(resetId) {
+    if (confirm('Are you sure you want to cancel this restart?')) {
+        fetch(`/analytics/api/rate-limit-restart/${resetId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showRateLimitStatus(); // Refresh the status
+            } else {
+                alert('Error cancelling restart: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error cancelling restart:', error);
+            alert('Error cancelling restart. Please try again.');
+        });
+    }
+}
+
+// Check rate limit status periodically
+setInterval(showRateLimitStatus, 30000); // Check every 30 seconds
+
+// Show rate limit status on page load
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(showRateLimitStatus, 2000); // Show after 2 seconds
+});
 </script>
 {% endblock %} 

@@ -4,10 +4,15 @@ Tests for analytics functionality
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from datetime import datetime, timedelta
+from django.utils import timezone
 
 from applications.models import Application
 from analytics.models import Commit, DeveloperGroup, DeveloperAlias
 from analytics.developer_grouping_service import DeveloperGroupingService
+from github.models import GitHubToken
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class DeveloperGroupingTestCase(TestCase):
@@ -195,3 +200,108 @@ class DeveloperGroupingTestCase(TestCase):
         
         # Should not match (different GitHub IDs)
         self.assertFalse(grouping_service._github_id_match(dev1, dev2)) 
+
+
+class RateLimitServiceTests(TestCase):
+    """Tests for rate limit service functionality"""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.github_token = GitHubToken.objects.create(
+            user=self.user,
+            access_token='test_token',
+            token_type='bearer',
+            scope='repo',
+            expires_at=timezone.now() + timedelta(days=1),
+            github_user_id=12345,
+            github_username='testuser',
+            github_email='test@example.com'
+        )
+    
+    def test_handle_rate_limit_error(self):
+        """Test handling rate limit errors"""
+        from .services import RateLimitService
+        from .github_service import GitHubRateLimitError
+        
+        error = GitHubRateLimitError("Rate limit exceeded. Retry after 3600 seconds")
+        task_data = {
+            'application_id': 1,
+            'user_id': self.user.id,
+            'sync_type': 'full'
+        }
+        
+        result = RateLimitService.handle_rate_limit_error(
+            user_id=self.user.id,
+            github_username='testuser',
+            error=error,
+            task_type='sync',
+            task_data=task_data
+        )
+        
+        self.assertTrue(result['success'])
+        self.assertIn('rate_limit_reset_id', result)
+        self.assertIn('reset_time', result)
+        self.assertIn('restart_scheduled', result)
+    
+    def test_parse_reset_time_from_error(self):
+        """Test parsing reset time from error message"""
+        from .services import RateLimitService
+        from .github_service import GitHubRateLimitError
+        
+        # Test with valid error message
+        error = GitHubRateLimitError("Rate limit exceeded. Retry after 3600 seconds")
+        reset_time = RateLimitService._parse_reset_time_from_error(error)
+        
+        # Should be approximately 1 hour from now
+        expected_time = timezone.now() + timedelta(seconds=3600)
+        self.assertAlmostEqual(
+            reset_time.timestamp(),
+            expected_time.timestamp(),
+            delta=10  # Allow 10 second difference
+        )
+        
+        # Test with invalid error message
+        error = GitHubRateLimitError("Rate limit exceeded")
+        reset_time = RateLimitService._parse_reset_time_from_error(error)
+        
+        # Should default to 1 hour from now
+        expected_time = timezone.now() + timedelta(hours=1)
+        self.assertAlmostEqual(
+            reset_time.timestamp(),
+            expected_time.timestamp(),
+            delta=60  # Allow 1 minute difference for default case
+        )
+    
+    def test_rate_limit_reset_model(self):
+        """Test RateLimitReset model"""
+        from .models import RateLimitReset
+        
+        reset = RateLimitReset(
+            user_id=self.user.id,
+            github_username='testuser',
+            rate_limit_reset_time=timezone.now() + timedelta(hours=1),
+            pending_task_type='indexing',
+            pending_task_data={'application_id': 1, 'user_id': self.user.id},
+            status='pending'
+        )
+        reset.save()
+        
+        self.assertEqual(reset.user_id, self.user.id)
+        self.assertEqual(reset.github_username, 'testuser')
+        self.assertEqual(reset.pending_task_type, 'indexing')
+        self.assertEqual(reset.status, 'pending')
+        
+        # Test properties
+        self.assertFalse(reset.is_ready_to_restart)
+        self.assertGreater(reset.time_until_reset, 0)
+        
+        # Test when ready to restart
+        reset.rate_limit_reset_time = timezone.now() - timedelta(minutes=1)
+        reset.save()
+        
+        self.assertTrue(reset.is_ready_to_restart)
+        self.assertEqual(reset.time_until_reset, 0) 
