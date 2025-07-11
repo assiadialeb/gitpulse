@@ -297,4 +297,83 @@ def manual_sync_application(application_id: int, sync_type: str = 'incremental')
         raise ValueError(f"Application {application_id} not found")
     except Exception as e:
         logger.error(f"Failed to manually trigger sync for application {application_id}: {e}")
-        raise 
+        raise
+
+
+def background_indexing_task(application_id: int, user_id: int, task_id: str = None):
+    """
+    Background task for indexing with progress tracking
+    
+    Args:
+        application_id: Application ID to index
+        user_id: User ID who owns the application
+        task_id: Optional task ID for progress tracking
+    """
+    logger.info(f"Starting background indexing for application {application_id}, user {user_id}")
+    
+    try:
+        # Get application and repositories
+        application = Application.objects.get(id=application_id, owner_id=user_id)
+        repositories = application.repositories.all()
+        total_repos = repositories.count()
+        
+        if total_repos == 0:
+            logger.warning(f"No repositories found for application {application_id}")
+            return {
+                'success': False,
+                'error': 'No repositories found for this application',
+                'task_id': task_id
+            }
+        
+        # Initialize sync service
+        sync_service = SyncService(user_id)
+        
+        results = {
+            'application_id': application_id,
+            'repositories_synced': 0,
+            'total_commits_new': 0,
+            'total_commits_updated': 0,
+            'total_api_calls': 0,
+            'errors': [],
+            'total_repositories': total_repos,
+            'task_id': task_id,
+            'started_at': datetime.utcnow().isoformat()
+        }
+        
+        # Process each repository
+        for i, app_repo in enumerate(repositories, 1):
+            try:
+                logger.info(f"Indexing repository {i}/{total_repos}: {app_repo.github_repo_name}")
+                
+                repo_result = sync_service.sync_repository(
+                    app_repo.github_repo_name,
+                    application_id,
+                    'full'  # Always do full sync for indexing
+                )
+                
+                results['repositories_synced'] += 1
+                results['total_commits_new'] += repo_result['commits_new']
+                results['total_commits_updated'] += repo_result['commits_updated']
+                results['total_api_calls'] += repo_result['api_calls']
+                
+                logger.info(f"Completed {i}/{total_repos} repositories")
+                
+            except Exception as e:
+                error_msg = f"Failed to index repository {app_repo.github_repo_name}: {str(e)}"
+                logger.error(error_msg)
+                results['errors'].append(error_msg)
+        
+        results['completed_at'] = datetime.utcnow().isoformat()
+        results['success'] = True
+        
+        logger.info(f"Background indexing completed for application {application_id}: {results}")
+        return results
+        
+    except Exception as e:
+        error_msg = f"Background indexing failed for application {application_id}: {str(e)}"
+        logger.error(error_msg)
+        return {
+            'success': False,
+            'error': error_msg,
+            'task_id': task_id
+        } 

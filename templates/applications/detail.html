@@ -431,14 +431,20 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function startIndexing(applicationId) {
-    if (confirm('Are you sure you want to start indexing? This will fetch and sync all commits from the repositories.')) {
+    const button = event.target;
+    
+    // Prevent multiple clicks
+    if (button.disabled) {
+        return;
+    }
+    
+    if (confirm('Are you sure you want to start indexing? This will fetch and sync all commits from the repositories in the background.')) {
         // Show loading state with progress bar
-        const button = event.target;
         const originalText = button.innerHTML;
         button.innerHTML = `
             <div class="w-full">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium">Indexing...</span>
+                    <span class="text-sm font-medium">Starting...</span>
                     <span class="text-sm font-bold">0%</span>
                 </div>
                 <div class="w-full bg-white bg-opacity-30 rounded-full h-2">
@@ -448,7 +454,7 @@ function startIndexing(applicationId) {
         `;
         button.disabled = true;
         
-        // Make API call to start indexing
+        // Make API call to start background indexing
         fetch(`/analytics/application/${applicationId}/start-indexing/`, {
             method: 'POST',
             headers: {
@@ -459,8 +465,8 @@ function startIndexing(applicationId) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Start polling for progress
-                pollProgress(applicationId, button, originalText);
+                // Start polling for progress with task ID
+                pollProgress(applicationId, data.task_id, button, originalText);
             } else {
                 alert('Error starting indexing: ' + (data.error || 'Unknown error'));
                 button.innerHTML = originalText;
@@ -476,54 +482,76 @@ function startIndexing(applicationId) {
     }
 }
 
-function pollProgress(applicationId, button, originalText) {
+function pollProgress(applicationId, taskId, button, originalText) {
+    let pollCount = 0;
+    const maxPolls = 600; // 30 minutes with 3-second intervals
+    
     const progressInterval = setInterval(() => {
-        fetch(`/analytics/application/${applicationId}/indexing-progress/`)
+        pollCount++;
+        
+        fetch(`/analytics/application/${applicationId}/indexing-progress/?task_id=${taskId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     const progress = data.progress;
                     const percentage = progress.percentage;
                     
+                    // Log debug information
+                    if (progress.debug) {
+                        console.log('Progress Debug Info:', progress.debug);
+                    }
+                    
                     // Update progress bar
                     const progressBar = button.querySelector('.bg-white.h-2');
                     const percentageText = button.querySelector('.text-sm.font-bold');
                     const statusText = button.querySelector('.text-sm.font-medium');
                     
-                    progressBar.style.width = percentage + '%';
-                    percentageText.textContent = Math.round(percentage) + '%';
-                    
-                    if (progress.is_complete) {
-                        statusText.textContent = 'Complete!';
-                        clearInterval(progressInterval);
-                        setTimeout(() => {
-                            button.innerHTML = originalText;
-                            button.disabled = false;
-                            alert(`Indexing completed! Synced ${progress.completed_repos} repositories.`);
-                        }, 1000);
-                    } else if (progress.is_running) {
-                        statusText.textContent = `Indexing... (${progress.completed_repos}/${progress.total_repos})`;
-                    } else {
-                        statusText.textContent = 'Starting...';
+                    if (progressBar && percentageText && statusText) {
+                        progressBar.style.width = percentage + '%';
+                        percentageText.textContent = Math.round(percentage) + '%';
+                        
+                        if (progress.is_complete) {
+                            statusText.textContent = 'Complete!';
+                            clearInterval(progressInterval);
+                            setTimeout(() => {
+                                button.innerHTML = originalText;
+                                button.disabled = false;
+                                if (progress.result) {
+                                    const result = progress.result;
+                                    alert(`Indexing completed! Synced ${result.repositories_synced} repositories with ${result.total_commits_new} new commits.`);
+                                } else {
+                                    alert(`Indexing completed! Synced ${progress.completed_repos} repositories.`);
+                                }
+                            }, 1000);
+                        } else if (progress.is_running) {
+                            statusText.textContent = progress.status || `Indexing... (${progress.completed_repos}/${progress.total_repos})`;
+                        } else {
+                            statusText.textContent = 'Starting...';
+                        }
                     }
                 } else {
                     console.error('Error fetching progress:', data.error);
+                    if (data.error && (data.error.includes('Task failed') || data.error.includes('not found'))) {
+                        clearInterval(progressInterval);
+                        button.innerHTML = originalText;
+                        button.disabled = false;
+                        alert('Indexing failed: ' + data.error);
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error polling progress:', error);
-                clearInterval(progressInterval);
-                button.innerHTML = originalText;
-                button.disabled = false;
+                // Don't stop polling on network errors, just log them
             });
-    }, 2000); // Poll every 2 seconds
+    }, 3000); // Poll every 3 seconds for background tasks
     
-    // Stop polling after 10 minutes
+    // Stop polling after max time
     setTimeout(() => {
         clearInterval(progressInterval);
         button.innerHTML = originalText;
         button.disabled = false;
-    }, 600000);
+        alert('Progress monitoring stopped. Check the application later for completion status.');
+    }, 1800000); // 30 minutes
 }
 </script>
 {% endblock %} 
