@@ -39,14 +39,48 @@ def application_create(request):
 
 @login_required
 def application_detail(request, pk):
-    """Display application details and repositories"""
+    """Display application details and repositories with analytics dashboard"""
     application = get_object_or_404(Application, pk=pk, owner=request.user)
     repositories = application.repositories.all()
     
-    return render(request, 'applications/detail.html', {
-        'application': application,
-        'repositories': repositories
-    })
+    # Get analytics data
+    try:
+        from analytics.analytics_service import AnalyticsService
+        analytics = AnalyticsService(pk)
+        
+        context = {
+            'application': application,
+            'repositories': repositories,
+            'overall_stats': analytics.get_overall_stats(),
+            'developer_activity': analytics.get_developer_activity(days=30),
+            'activity_heatmap': analytics.get_activity_heatmap(days=90),
+            'code_distribution': analytics.get_code_distribution(),
+            'commit_quality': analytics.get_commit_quality_metrics(),
+        }
+    except ImportError:
+        # If analytics app is not available, provide empty data
+        context = {
+            'application': application,
+            'repositories': repositories,
+            'overall_stats': {'total_commits': 0, 'total_authors': 0, 'total_additions': 0, 'total_deletions': 0},
+            'developer_activity': {'developers': []},
+            'activity_heatmap': {'daily_activity': []},
+            'code_distribution': {'distribution': []},
+            'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
+        }
+    except Exception as e:
+        # If analytics service fails, provide empty data
+        context = {
+            'application': application,
+            'repositories': repositories,
+            'overall_stats': {'total_commits': 0, 'total_authors': 0, 'total_additions': 0, 'total_deletions': 0},
+            'developer_activity': {'developers': []},
+            'activity_heatmap': {'daily_activity': []},
+            'code_distribution': {'distribution': []},
+            'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
+        }
+    
+    return render(request, 'applications/detail.html', context)
 
 
 @login_required

@@ -15,4 +15,8 @@ urlpatterns = [
     path('api/application/<int:application_id>/activity-heatmap/', views.api_activity_heatmap, name='api_activity_heatmap'),
     path('api/application/<int:application_id>/code-distribution/', views.api_code_distribution, name='api_code_distribution'),
     path('api/application/<int:application_id>/commit-quality/', views.api_commit_quality, name='api_commit_quality'),
+    
+    # Indexing endpoints
+    path('application/<int:application_id>/start-indexing/', views.start_indexing, name='start_indexing'),
+    path('application/<int:application_id>/indexing-progress/', views.get_indexing_progress, name='get_indexing_progress'),
 ] 

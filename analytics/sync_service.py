@@ -49,7 +49,7 @@ class SyncService:
         except Application.DoesNotExist:
             raise ValueError(f"Application {application_id} not found for user {self.user_id}")
         
-        repositories = ApplicationRepository.objects.filter(application=application)
+        repositories = application.repositories.all()
         
         results = {
             'application_id': application_id,
@@ -71,6 +71,58 @@ class SyncService:
                 results['total_commits_new'] += repo_result['commits_new']
                 results['total_commits_updated'] += repo_result['commits_updated']
                 results['total_api_calls'] += repo_result['api_calls']
+                
+            except Exception as e:
+                error_msg = f"Failed to sync repository {app_repo.github_repo_name}: {str(e)}"
+                logger.error(error_msg)
+                results['errors'].append(error_msg)
+        
+        return results
+
+    def sync_application_repositories_with_progress(self, application_id: int, sync_type: str = 'incremental') -> Dict:
+        """
+        Sync all repositories for an application with progress tracking
+        
+        Args:
+            application_id: Application ID to sync
+            sync_type: 'full' or 'incremental'
+            
+        Returns:
+            Dictionary with sync results
+        """
+        try:
+            application = Application.objects.get(id=application_id, owner_id=self.user_id)
+        except Application.DoesNotExist:
+            raise ValueError(f"Application {application_id} not found for user {self.user_id}")
+        
+        repositories = application.repositories.all()
+        total_repos = repositories.count()
+        
+        results = {
+            'application_id': application_id,
+            'repositories_synced': 0,
+            'total_commits_new': 0,
+            'total_commits_updated': 0,
+            'total_api_calls': 0,
+            'errors': [],
+            'total_repositories': total_repos
+        }
+        
+        for i, app_repo in enumerate(repositories, 1):
+            try:
+                logger.info(f"Syncing repository {i}/{total_repos}: {app_repo.github_repo_name}")
+                
+                repo_result = self.sync_repository(
+                    app_repo.github_repo_name,
+                    application_id,
+                    sync_type
+                )
+                results['repositories_synced'] += 1
+                results['total_commits_new'] += repo_result['commits_new']
+                results['total_commits_updated'] += repo_result['commits_updated']
+                results['total_api_calls'] += repo_result['api_calls']
+                
+                logger.info(f"Completed {i}/{total_repos} repositories")
                 
             except Exception as e:
                 error_msg = f"Failed to sync repository {app_repo.github_repo_name}: {str(e)}"
