@@ -138,6 +138,57 @@ class AnalyticsService:
             'max_commits_per_day': max(daily_activity.values()) if daily_activity else 0
         }
     
+    def get_bubble_chart_data(self, days: int = 30) -> Dict:
+        """
+        Get bubble chart data for commit activity over time and hours
+        
+        Args:
+            days: Number of days to analyze (default: 30)
+            
+        Returns:
+            Dictionary with bubble chart data
+        """
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
+        
+        # Group commits by date and hour
+        bubble_data = []
+        
+        for commit in recent_commits:
+            date = commit.authored_date.date()
+            hour = commit.authored_date.hour
+            
+            # Find existing bubble for this date/hour combination
+            existing_bubble = None
+            for bubble in bubble_data:
+                if bubble['date'] == date and bubble['hour'] == hour:
+                    existing_bubble = bubble
+                    break
+            
+            if existing_bubble:
+                existing_bubble['commits'] += 1
+            else:
+                bubble_data.append({
+                    'date': date,
+                    'hour': hour,
+                    'commits': 1
+                })
+        
+        # Convert to Chart.js format
+        chart_data = []
+        for bubble in bubble_data:
+            chart_data.append({
+                'x': (datetime.utcnow().date() - bubble['date']).days,  # Days ago
+                'y': bubble['hour'],  # Hour of day (0-23)
+                'r': min(bubble['commits'] * 3, 20),  # Bubble radius based on commits
+                'commits': bubble['commits']
+            })
+        
+        return {
+            'bubbles': chart_data,
+            'max_commits': max([b['commits'] for b in bubble_data]) if bubble_data else 0
+        }
+    
     def get_code_distribution(self) -> Dict:
         """
         Get code distribution by author with grouped developers

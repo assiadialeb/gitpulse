@@ -164,26 +164,68 @@
                         <h3 class="text-xl font-semibold text-dark-gray mb-6">📊 Code Distribution by Author</h3>
                         {% if code_distribution.distribution %}
                         <div class="overflow-x-auto">
-                            <table class="table w-full">
+                            <table class="table w-full" id="code-distribution-table">
                                 <thead>
                                     <tr>
-                                        <th class="text-left">Developer</th>
-                                        <th class="text-center">Commits</th>
-                                        <th class="text-center">Lines Added</th>
-                                        <th class="text-center">Lines Deleted</th>
-                                        <th class="text-center">% of Additions</th>
-                                        <th class="text-center">Net Lines</th>
+                                        <th class="text-left cursor-pointer hover:bg-gray-100" onclick="sortTable(0)">
+                                            <div class="flex items-center">
+                                                Developer
+                                                <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                                </svg>
+                                            </div>
+                                        </th>
+                                        <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(1)">
+                                            <div class="flex items-center justify-center">
+                                                Commits
+                                                <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                                </svg>
+                                            </div>
+                                        </th>
+                                        <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(2)">
+                                            <div class="flex items-center justify-center">
+                                                Lines Added
+                                                <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                                </svg>
+                                            </div>
+                                        </th>
+                                        <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(3)">
+                                            <div class="flex items-center justify-center">
+                                                Lines Deleted
+                                                <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                                </svg>
+                                            </div>
+                                        </th>
+                                        <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(4)">
+                                            <div class="flex items-center justify-center">
+                                                % of Additions
+                                                <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                                </svg>
+                                            </div>
+                                        </th>
+                                        <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(5)">
+                                            <div class="flex items-center justify-center">
+                                                Net Lines
+                                                <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                                </svg>
+                                            </div>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for dev in code_distribution.distribution|slice:":10" %}
                                     <tr class="hover:bg-light-gray">
                                         <td class="font-medium">{{ dev.author|truncatechars:30 }}</td>
-                                        <td class="text-center">{{ dev.commits }}</td>
-                                        <td class="text-center text-green-600">+{{ dev.additions }}</td>
-                                        <td class="text-center text-red-600">-{{ dev.deletions }}</td>
-                                        <td class="text-center">{{ dev.additions_percentage }}%</td>
-                                        <td class="text-center font-bold {% if dev.net_lines > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                        <td class="text-center" data-sort="{{ dev.commits }}">{{ dev.commits }}</td>
+                                        <td class="text-center text-green-600" data-sort="{{ dev.additions }}">+{{ dev.additions }}</td>
+                                        <td class="text-center text-red-600" data-sort="{{ dev.deletions }}">-{{ dev.deletions }}</td>
+                                        <td class="text-center" data-sort="{{ dev.additions_percentage }}">{{ dev.additions_percentage }}%</td>
+                                        <td class="text-center font-bold {% if dev.net_lines > 0 %}text-green-600{% else %}text-red-600{% endif %}" data-sort="{{ dev.net_lines }}">
                                             {% if dev.net_lines > 0 %}+{% endif %}{{ dev.net_lines }}
                                         </td>
                                     </tr>
@@ -198,26 +240,21 @@
                         {% endif %}
                     </div>
 
-                    <!-- Activity Heatmap -->
+
+
+                    <!-- Commit Activity Bubble Chart -->
                     <div class="card-modern p-6">
-                        <h3 class="text-xl font-semibold text-dark-gray mb-6">📅 Activity Heatmap (Last 90 Days)</h3>
-                        {% if activity_heatmap.daily_activity %}
-                        <div class="grid grid-cols-7 gap-1 mb-4">
-                            {% for day in activity_heatmap.daily_activity|slice:":35" %}
-                            <div class="aspect-square rounded-sm border border-gray-200 flex items-center justify-center text-xs"
-                                 style="background-color: rgba(16, 185, 129, {{ day.intensity }});">
-                                {% if day.commits > 0 %}
-                                <span class="text-white font-bold">{{ day.commits }}</span>
-                                {% endif %}
-                            </div>
-                            {% endfor %}
+                        <h3 class="text-xl font-semibold text-dark-gray mb-6">🕐 Commit Activity by Hour (Last 30 Days)</h3>
+                        {% if bubble_chart.bubbles %}
+                        <div class="relative" style="height: 500px;">
+                            <canvas id="bubbleChart" width="400" height="500"></canvas>
                         </div>
-                        <p class="text-sm text-medium-gray text-center">
-                            Showing last 35 days. Darker squares = more commits.
+                        <p class="text-sm text-medium-gray text-center mt-4">
+                            X-axis: Days ago, Y-axis: Hour of day (0-23), Bubble size: Number of commits
                         </p>
                         {% else %}
                         <div class="text-center py-8">
-                            <p class="text-medium-gray">No activity data available</p>
+                            <p class="text-medium-gray">No commit activity data available</p>
                         </div>
                         {% endif %}
                     </div>
@@ -424,8 +461,81 @@
     </div>
 </div>
 
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <!-- JavaScript for Slide-over -->
 <script>
+// Table sorting functionality
+let currentSortColumn = -1;
+let currentSortDirection = 'asc';
+
+function sortTable(columnIndex) {
+    const table = document.getElementById('code-distribution-table');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Determine sort direction
+    let sortDirection = 'asc';
+    if (currentSortColumn === columnIndex) {
+        sortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    }
+    
+    // Update sort state
+    currentSortColumn = columnIndex;
+    currentSortDirection = sortDirection;
+    
+    // Update sort icons
+    updateSortIcons(columnIndex, sortDirection);
+    
+    // Sort the rows
+    rows.sort((a, b) => {
+        let aValue, bValue;
+        
+        if (columnIndex === 0) {
+            // Sort by developer name (text)
+            aValue = a.cells[columnIndex].textContent.trim().toLowerCase();
+            bValue = b.cells[columnIndex].textContent.trim().toLowerCase();
+        } else {
+            // Sort by numeric values
+            aValue = parseFloat(a.cells[columnIndex].getAttribute('data-sort') || '0');
+            bValue = parseFloat(b.cells[columnIndex].getAttribute('data-sort') || '0');
+        }
+        
+        if (sortDirection === 'asc') {
+            return aValue > bValue ? 1 : -1;
+        } else {
+            return aValue < bValue ? 1 : -1;
+        }
+    });
+    
+    // Reorder the rows in the table
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+function updateSortIcons(activeColumn, direction) {
+    const headers = document.querySelectorAll('#code-distribution-table th');
+    
+    headers.forEach((header, index) => {
+        const icon = header.querySelector('.sort-icon');
+        if (icon) {
+            if (index === activeColumn) {
+                // Show active sort direction
+                if (direction === 'asc') {
+                    icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>';
+                } else {
+                    icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>';
+                }
+                icon.classList.add('text-primary-green');
+            } else {
+                // Reset to default icon
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>';
+                icon.classList.remove('text-primary-green');
+            }
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const toggle = document.getElementById('slideover-toggle');
     const panel = document.getElementById('slideover-panel');
@@ -543,12 +653,6 @@ function pollProgress(applicationId, taskId, button, originalText) {
                             setTimeout(() => {
                                 button.innerHTML = originalText;
                                 button.disabled = false;
-                                if (progress.result) {
-                                    const result = progress.result;
-                                    alert(`Indexing completed! Synced ${result.repositories_synced} repositories with ${result.total_commits_new} new commits.`);
-                                } else {
-                                    alert(`Indexing completed! Synced ${progress.completed_repos} repositories.`);
-                                }
                             }, 1000);
                         } else if (progress.is_running) {
                             statusText.textContent = progress.status || `Indexing... (${progress.completed_repos}/${progress.total_repos})`;
@@ -671,6 +775,76 @@ setInterval(showRateLimitStatus, 30000); // Check every 30 seconds
 // Show rate limit status on page load
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(showRateLimitStatus, 2000); // Show after 2 seconds
+    
+    // Initialize bubble chart if data is available
+    {% if bubble_chart.bubbles %}
+    initializeBubbleChart();
+    {% endif %}
 });
+
+// Bubble chart initialization
+function initializeBubbleChart() {
+    const ctx = document.getElementById('bubbleChart');
+    if (!ctx) return;
+    
+    const bubbleData = {{ bubble_chart.bubbles|safe }};
+    
+    new Chart(ctx, {
+        type: 'bubble',
+        data: {
+            datasets: [{
+                label: 'Commits',
+                data: bubbleData,
+                backgroundColor: 'rgba(16, 185, 129, 0.6)',
+                borderColor: 'rgba(16, 185, 129, 1)',
+                borderWidth: 1,
+                hoverBackgroundColor: 'rgba(16, 185, 129, 0.8)',
+                hoverBorderColor: 'rgba(16, 185, 129, 1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Commits: ${context.raw.commits}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'bottom',
+                    title: {
+                        display: true,
+                        text: 'Days Ago'
+                    },
+                    reverse: true,
+                    min: 0,
+                    max: 30
+                },
+                y: {
+                    type: 'linear',
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Hour of Day'
+                    },
+                    min: 0,
+                    max: 23,
+                    ticks: {
+                        stepSize: 6
+                    }
+                }
+            }
+        }
+    });
+}
 </script>
 {% endblock %} 

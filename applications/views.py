@@ -54,6 +54,7 @@ def application_detail(request, pk):
             'overall_stats': analytics.get_overall_stats(),
             'developer_activity': analytics.get_developer_activity(days=30),
             'activity_heatmap': analytics.get_activity_heatmap(days=90),
+            'bubble_chart': analytics.get_bubble_chart_data(days=30),
             'code_distribution': analytics.get_code_distribution(),
             'commit_quality': analytics.get_commit_quality_metrics(),
         }
@@ -65,6 +66,7 @@ def application_detail(request, pk):
             'overall_stats': {'total_commits': 0, 'total_authors': 0, 'total_additions': 0, 'total_deletions': 0},
             'developer_activity': {'developers': []},
             'activity_heatmap': {'daily_activity': []},
+            'bubble_chart': {'bubbles': [], 'max_commits': 0},
             'code_distribution': {'distribution': []},
             'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
         }
@@ -76,6 +78,7 @@ def application_detail(request, pk):
             'overall_stats': {'total_commits': 0, 'total_authors': 0, 'total_additions': 0, 'total_deletions': 0},
             'developer_activity': {'developers': []},
             'activity_heatmap': {'daily_activity': []},
+            'bubble_chart': {'bubbles': [], 'max_commits': 0},
             'code_distribution': {'distribution': []},
             'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
         }
