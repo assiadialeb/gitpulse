@@ -583,17 +583,18 @@ function pollProgress(applicationId, taskId, button, originalText) {
 
 // Rate limit status functions
 function showRateLimitStatus() {
-    const statusDiv = document.getElementById('rate-limit-status');
-    statusDiv.classList.remove('hidden');
-    
     // Fetch current rate limit status
     fetch('/analytics/api/rate-limit-status/')
         .then(response => response.json())
         .then(data => {
+            const statusDiv = document.getElementById('rate-limit-status');
             const contentDiv = document.getElementById('rate-limit-content');
             
             if (data.success) {
                 if (data.total_pending > 0) {
+                    // Show the toast only when there are pending resets
+                    statusDiv.classList.remove('hidden');
+                    
                     let html = `<div class="mb-2">
                         <p class="font-medium text-orange-600">Rate limit exceeded!</p>
                         <p class="text-xs">You have ${data.total_pending} pending restart(s).</p>
@@ -617,16 +618,22 @@ function showRateLimitStatus() {
                     
                     contentDiv.innerHTML = html;
                 } else {
-                    contentDiv.innerHTML = '<p class="text-green-600">No rate limit issues detected.</p>';
+                    // Hide the toast when there are no issues
+                    statusDiv.classList.add('hidden');
                 }
             } else {
-                contentDiv.innerHTML = `<p class="text-red-600">Error: ${data.error}</p>`;
+                // Only show error toast if there's a real error
+                if (data.error && !data.error.includes('No GitHub token found')) {
+                    statusDiv.classList.remove('hidden');
+                    contentDiv.innerHTML = `<p class="text-red-600">Error: ${data.error}</p>`;
+                } else {
+                    statusDiv.classList.add('hidden');
+                }
             }
         })
         .catch(error => {
             console.error('Error fetching rate limit status:', error);
-            document.getElementById('rate-limit-content').innerHTML = 
-                '<p class="text-red-600">Error fetching rate limit status.</p>';
+            // Don't show error toast for network issues, just log them
         });
 }
 
