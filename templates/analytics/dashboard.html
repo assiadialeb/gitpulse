@@ -1,0 +1,210 @@
+{% extends 'base/base.html' %}
+
+{% block title %}{{ application.name }} - Analytics Dashboard - GitPulse{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-light-gray to-white">
+    <!-- Header -->
+    <div class="container mx-auto px-6 py-8">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-4xl font-bold gradient-text mb-2">{{ application.name }}</h1>
+                <p class="text-medium-gray text-lg">Analytics Dashboard</p>
+            </div>
+            <div class="flex space-x-4">
+                <a href="{% url 'applications:detail' application.id %}" 
+                   class="btn btn-outline btn-primary rounded-xl">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    Back to Application
+                </a>
+            </div>
+        </div>
+
+        <!-- Overall Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="card-modern p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-primary-green bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-medium-gray text-sm">Total Commits</p>
+                        <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_commits|default:"0" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-modern p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-primary-blue bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-primary-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-medium-gray text-sm">Active Developers</p>
+                        <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_authors|default:"0" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-modern p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-green-500 bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-medium-gray text-sm">Lines Added</p>
+                        <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_additions|default:"0" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-modern p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-red-500 bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-medium-gray text-sm">Lines Deleted</p>
+                        <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_deletions|default:"0" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Developer Activity Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Developer Activity Chart -->
+            <div class="card-modern p-6">
+                <h3 class="text-xl font-semibold text-dark-gray mb-4">🧑‍💻 Developer Activity (Last 30 Days)</h3>
+                {% if developer_activity.developers %}
+                <div class="space-y-4">
+                    {% for dev in developer_activity.developers|slice:":5" %}
+                    <div class="flex items-center justify-between p-4 bg-light-gray rounded-xl">
+                        <div class="flex-1">
+                            <p class="font-medium text-dark-gray">{{ dev.name }}</p>
+                            <p class="text-sm text-medium-gray">{{ dev.email }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-lg font-bold text-primary-green">{{ dev.commits }} commits</p>
+                            <p class="text-sm text-medium-gray">
+                                +{{ dev.additions }} / -{{ dev.deletions }} lines
+                            </p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-8">
+                    <p class="text-medium-gray">No developer activity in the last 30 days</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Commit Quality -->
+            <div class="card-modern p-6">
+                <h3 class="text-xl font-semibold text-dark-gray mb-4">📝 Commit Quality</h3>
+                {% if commit_quality.total_commits > 0 %}
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-medium-gray">Explicit Messages</span>
+                        <span class="font-bold text-primary-green">{{ commit_quality.explicit_ratio }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-primary-green h-2 rounded-full" style="width: {{ commit_quality.explicit_ratio }}%"></div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-medium-gray">Generic Messages</span>
+                        <span class="font-bold text-red-500">{{ commit_quality.generic_ratio }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-red-500 h-2 rounded-full" style="width: {{ commit_quality.generic_ratio }}%"></div>
+                    </div>
+                    
+                    <div class="mt-4 p-4 bg-light-gray rounded-xl">
+                        <p class="text-sm text-medium-gray">Total commits analyzed: {{ commit_quality.total_commits }}</p>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-8">
+                    <p class="text-medium-gray">No commits to analyze</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Code Distribution -->
+        <div class="card-modern p-6 mb-8">
+            <h3 class="text-xl font-semibold text-dark-gray mb-6">📊 Code Distribution by Author</h3>
+            {% if code_distribution.distribution %}
+            <div class="overflow-x-auto">
+                <table class="table w-full">
+                    <thead>
+                        <tr>
+                            <th class="text-left">Developer</th>
+                            <th class="text-center">Commits</th>
+                            <th class="text-center">Lines Added</th>
+                            <th class="text-center">Lines Deleted</th>
+                            <th class="text-center">% of Additions</th>
+                            <th class="text-center">Net Lines</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dev in code_distribution.distribution|slice:":10" %}
+                        <tr class="hover:bg-light-gray">
+                            <td class="font-medium">{{ dev.author|truncatechars:30 }}</td>
+                            <td class="text-center">{{ dev.commits }}</td>
+                            <td class="text-center text-green-600">+{{ dev.additions }}</td>
+                            <td class="text-center text-red-600">-{{ dev.deletions }}</td>
+                            <td class="text-center">{{ dev.additions_percentage }}%</td>
+                            <td class="text-center font-bold {% if dev.net_lines > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                {% if dev.net_lines > 0 %}+{% endif %}{{ dev.net_lines }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-medium-gray">No code distribution data available</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Activity Heatmap -->
+        <div class="card-modern p-6">
+            <h3 class="text-xl font-semibold text-dark-gray mb-6">📅 Activity Heatmap (Last 90 Days)</h3>
+            {% if activity_heatmap.daily_activity %}
+            <div class="grid grid-cols-7 gap-1 mb-4">
+                {% for day in activity_heatmap.daily_activity|slice:":35" %}
+                <div class="aspect-square rounded-sm border border-gray-200 flex items-center justify-center text-xs"
+                     style="background-color: rgba(16, 185, 129, {{ day.intensity }});">
+                    {% if day.commits > 0 %}
+                    <span class="text-white font-bold">{{ day.commits }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <p class="text-sm text-medium-gray text-center">
+                Showing last 35 days. Darker squares = more commits.
+            </p>
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-medium-gray">No activity data available</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

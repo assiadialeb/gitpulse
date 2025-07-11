@@ -76,8 +76,28 @@ def application_delete(request, pk):
     
     if request.method == 'POST':
         application_name = application.name
+        application_id = application.id
+        
+        # Clean up MongoDB data before deleting the application
+        try:
+            from analytics.services import cleanup_application_data
+            cleanup_results = cleanup_application_data(application_id)
+            
+            if 'error' in cleanup_results:
+                messages.warning(request, f'Application deleted but some data cleanup failed: {cleanup_results["error"]}')
+            else:
+                messages.success(request, f'Application "{application_name}" and all related data deleted successfully!')
+                if cleanup_results['total_deleted'] > 0:
+                    messages.info(request, f'Cleaned up {cleanup_results["total_deleted"]} MongoDB records.')
+        except ImportError:
+            # If analytics app is not available, just delete the application
+            messages.success(request, f'Application "{application_name}" deleted successfully!')
+        except Exception as e:
+            # If cleanup fails, still delete the application but warn the user
+            messages.warning(request, f'Application deleted but data cleanup failed: {str(e)}')
+        
+        # Delete the application
         application.delete()
-        messages.success(request, f'Application "{application_name}" deleted successfully!')
         return redirect('applications:list')
     
     return render(request, 'applications/delete.html', {
