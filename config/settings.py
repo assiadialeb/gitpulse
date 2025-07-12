@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'github',
     'applications',
     'analytics',
+    'developers',
 ]
 
 MIDDLEWARE = [

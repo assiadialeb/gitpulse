@@ -177,95 +177,6 @@ def start_indexing(request, application_id):
 
 
 @login_required
-def get_rate_limit_status(request):
-    """
-    Get current rate limit status for the user
-    """
-    try:
-        # Get user's GitHub token
-        github_token = GitHubToken.objects.get(user_id=request.user.id)
-        
-        # Get pending rate limit resets
-        from .models import RateLimitReset
-        pending_resets = RateLimitReset.objects.filter(
-            user_id=request.user.id,
-            status__in=['pending', 'scheduled']
-        ).order_by('rate_limit_reset_time')
-        
-        reset_info = []
-        for reset in pending_resets:
-            reset_info.append({
-                'id': str(reset.id),
-                'task_type': reset.pending_task_type,
-                'reset_time': reset.rate_limit_reset_time.isoformat(),
-                'time_until_reset': reset.time_until_reset,
-                'status': reset.status,
-                'original_task_id': reset.original_task_id
-            })
-        
-        return JsonResponse({
-            'success': True,
-            'github_username': github_token.github_username,
-            'pending_resets': reset_info,
-            'total_pending': len(reset_info)
-        })
-        
-    except GitHubToken.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': 'No GitHub token found for user'
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        })
-
-
-@login_required
-def cancel_rate_limit_restart(request, reset_id):
-    """
-    Cancel a pending rate limit restart
-    """
-    try:
-        from .models import RateLimitReset
-        from django_q.models import Schedule as ScheduleModel
-        
-        # Get the rate limit reset
-        rate_limit_reset = RateLimitReset.objects.get(
-            id=reset_id,
-            user_id=request.user.id
-        )
-        
-        # Cancel the scheduled restart
-        try:
-            schedule = ScheduleModel.objects.get(name=f"rate_limit_restart_{reset_id}")
-            schedule.delete()
-        except ScheduleModel.DoesNotExist:
-            pass
-        
-        # Update status
-        rate_limit_reset.status = 'cancelled'
-        rate_limit_reset.save()
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'Rate limit restart cancelled successfully'
-        })
-        
-    except RateLimitReset.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': 'Rate limit reset not found'
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        })
-
-
-@login_required
 def get_indexing_progress(request, application_id):
     """
     Get indexing progress for an application
@@ -324,59 +235,71 @@ def get_indexing_progress(request, application_id):
         }) 
 
 @login_required
-@require_POST
 def delete_group(request, application_id, group_id):
+    """Delete a developer group"""
     application = get_object_or_404(Application, id=application_id, owner=request.user)
+    
     try:
+        from .models import DeveloperGroup
         group = DeveloperGroup.objects.get(id=group_id, application_id=application_id)
-    except DeveloperGroup.DoesNotExist:
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'error': 'Group not found'}, status=404)
-        return redirect('analytics:group_developers', application_id=application_id)
-    try:
-        DeveloperAlias.objects.filter(group=group).delete()
+        group_name = group.primary_name
         group.delete()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': True})
-        return redirect('analytics:group_developers', application_id=application_id)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Developer group "{group_name}" deleted successfully'
+        })
+        
+    except DeveloperGroup.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Developer group not found'
+        })
     except Exception as e:
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'error': str(e)}, status=500)
-        return redirect('analytics:group_developers', application_id=application_id)
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
 
 @login_required
-@require_POST
 def rename_group(request, application_id, group_id):
+    """Rename a developer group"""
     application = get_object_or_404(Application, id=application_id, owner=request.user)
+    
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'error': 'Only POST method allowed'
+        })
+    
     try:
+        from .models import DeveloperGroup
         group = DeveloperGroup.objects.get(id=group_id, application_id=application_id)
-    except DeveloperGroup.DoesNotExist:
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'error': 'Group not found'}, status=404)
-        return redirect('analytics:group_developers', application_id=application_id)
-    # Robustly handle AJAX/JSON and form POST
-    data = None
-    if request.headers.get('content-type', '').startswith('application/json'):
-        try:
-            data = json.loads(request.body.decode())
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': f'Invalid JSON: {e}'}, status=400)
-    else:
-        data = request.POST
-    name = data.get('primary_name') if data else None
-    email = data.get('primary_email') if data else None
-    if not name and not email:
-        return JsonResponse({'success': False, 'error': 'No data provided'}, status=400)
-    if name:
-        group.primary_name = name
-    if email:
-        group.primary_email = email
-    try:
+        
+        new_name = request.POST.get('new_name')
+        if not new_name:
+            return JsonResponse({
+                'success': False,
+                'error': 'New name is required'
+            })
+        
+        old_name = group.primary_name
+        group.primary_name = new_name
         group.save()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': True, 'primary_name': group.primary_name, 'primary_email': group.primary_email})
-        return redirect('analytics:group_developers', application_id=application_id)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Developer group renamed from "{old_name}" to "{new_name}"'
+        })
+        
+    except DeveloperGroup.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Developer group not found'
+        })
     except Exception as e:
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'error': str(e)}, status=500)
-        return redirect('analytics:group_developers', application_id=application_id) 
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }) 

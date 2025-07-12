@@ -31,6 +31,7 @@ class ApplicationRepository(models.Model):
     """Model for linking GitHub repositories to applications"""
     application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name='repositories')
     github_repo_name = models.CharField(max_length=200)  # Format: owner/repo
+    github_repo_url = models.URLField(max_length=500, null=True, blank=True)  # Git repository URL (HTTPS or SSH)
     github_repo_id = models.BigIntegerField()  # GitHub repo ID
     description = models.TextField(blank=True, null=True)  # From GitHub
     default_branch = models.CharField(max_length=100, default='main')

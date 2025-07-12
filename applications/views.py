@@ -243,6 +243,7 @@ def add_repositories(request, pk):
                         application=application,
                         github_repo_name=repo_data['full_name'],
                         github_repo_id=repo_data['id'],
+                        github_repo_url=repo_data.get('clone_url', ''),
                         description=repo_data.get('description', ''),
                         default_branch=repo_data.get('default_branch', 'main'),
                         is_private=repo_data.get('private', False),

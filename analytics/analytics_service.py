@@ -453,4 +453,175 @@ class AnalyticsService:
         Returns:
             Dictionary with grouping results
         """
-        return self.grouping_service.manually_group_developers(group_data) 
+        return self.grouping_service.manually_group_developers(group_data)
+    
+    def get_developer_detailed_stats(self, group_id: str) -> Dict:
+        """
+        Get detailed statistics for a specific developer group
+        
+        Args:
+            group_id: The MongoDB ObjectId of the developer group
+            
+        Returns:
+            Dictionary with detailed developer statistics
+        """
+        from .models import DeveloperGroup, DeveloperAlias
+        
+        # Get the developer group
+        try:
+            group = DeveloperGroup.objects.get(id=group_id, application_id=self.application_id)
+        except:
+            return {
+                'error': 'Developer group not found',
+                'success': False
+            }
+        
+        # Get all aliases for this group
+        aliases = DeveloperAlias.objects.filter(group=group)
+        
+        # Get all commits for this developer group
+        alias_emails = [alias.email for alias in aliases]
+        developer_commits = self.commits.filter(author_email__in=alias_emails)
+        
+        # Calculate basic stats
+        total_commits = developer_commits.count()
+        total_additions = sum(commit.additions for commit in developer_commits)
+        total_deletions = sum(commit.deletions for commit in developer_commits)
+        
+        # Get date range
+        first_commit = developer_commits.order_by('authored_date').first()
+        last_commit = developer_commits.order_by('-authored_date').first()
+        
+        # Calculate activity over time (last 12 months)
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        months_data = []
+        
+        for i in range(12):
+            month_start = now - timedelta(days=30 * (i + 1))
+            month_end = now - timedelta(days=30 * i)
+            
+            month_commits = developer_commits.filter(
+                authored_date__gte=month_start,
+                authored_date__lt=month_end
+            )
+            
+            month_additions = sum(commit.additions for commit in month_commits)
+            month_deletions = sum(commit.deletions for commit in month_commits)
+            
+            months_data.append({
+                'month': month_start.strftime('%Y-%m'),
+                'commits': month_commits.count(),
+                'additions': month_additions,
+                'deletions': month_deletions,
+                'net_lines': month_additions - month_deletions
+            })
+        
+        # Keep newest first (no reverse needed since we build from newest to oldest)
+        
+        # Get most active repositories
+        repo_stats = {}
+        for commit in developer_commits:
+            repo_name = commit.repository_full_name
+            if repo_name not in repo_stats:
+                repo_stats[repo_name] = {
+                    'commits': 0,
+                    'additions': 0,
+                    'deletions': 0
+                }
+            
+            repo_stats[repo_name]['commits'] += 1
+            repo_stats[repo_name]['additions'] += commit.additions
+            repo_stats[repo_name]['deletions'] += commit.deletions
+        
+        # Sort repositories by commit count
+        sorted_repos = sorted(
+            [{'name': repo, **stats} for repo, stats in repo_stats.items()],
+            key=lambda x: x['commits'],
+            reverse=True
+        )
+        
+        # Get commit quality metrics for this developer
+        quality_metrics = self._get_developer_commit_quality(developer_commits)
+        
+        return {
+            'success': True,
+            'group_id': group_id,
+            'primary_name': group.primary_name,
+            'primary_email': group.primary_email,
+            'confidence_score': group.confidence_score,
+            'is_auto_grouped': group.is_auto_grouped,
+            'aliases': [
+                {
+                    'name': alias.name,
+                    'email': alias.email,
+                    'commit_count': alias.commit_count,
+                    'first_seen': alias.first_seen,
+                    'last_seen': alias.last_seen
+                }
+                for alias in aliases
+            ],
+            'total_commits': total_commits,
+            'total_additions': total_additions,
+            'total_deletions': total_deletions,
+            'net_lines': total_additions - total_deletions,
+            'first_commit_date': first_commit.authored_date if first_commit else None,
+            'last_commit_date': last_commit.authored_date if last_commit else None,
+            'activity_over_time': months_data,
+            'top_repositories': sorted_repos[:10],  # Top 10 repositories
+            'commit_quality': quality_metrics
+        }
+    
+    def _get_developer_commit_quality(self, commits) -> Dict:
+        """
+        Analyze commit message quality for a specific developer
+        
+        Args:
+            commits: QuerySet of commits for the developer
+            
+        Returns:
+            Dictionary with commit quality metrics
+        """
+        # Define patterns for generic vs explicit messages
+        generic_patterns = [
+            r'^wip$', r'^fix$', r'^update$', r'^cleanup$', r'^refactor$',
+            r'^typo$', r'^style$', r'^format$', r'^test$', r'^docs$',
+            r'^chore:', r'^feat:', r'^fix:', r'^docs:', r'^style:',
+            r'^refactor:', r'^test:', r'^chore\(', r'^feat\(', r'^fix\(',
+            r'^update\s+\w+$', r'^fix\s+\w+$', r'^add\s+\w+$'
+        ]
+        
+        explicit_count = 0
+        generic_count = 0
+        total_commits = 0
+        
+        for commit in commits:
+            total_commits += 1
+            message = commit.message.lower().strip()
+            
+            # Check if message matches generic patterns
+            is_generic = False
+            for pattern in generic_patterns:
+                if re.match(pattern, message):
+                    is_generic = True
+                    break
+            
+            if is_generic:
+                generic_count += 1
+            else:
+                explicit_count += 1
+        
+        if total_commits > 0:
+            explicit_ratio = (explicit_count / total_commits) * 100
+            generic_ratio = (generic_count / total_commits) * 100
+        else:
+            explicit_ratio = 0
+            generic_ratio = 0
+        
+        return {
+            'total_commits': total_commits,
+            'explicit_commits': explicit_count,
+            'generic_commits': generic_count,
+            'explicit_ratio': round(explicit_ratio, 1),
+            'generic_ratio': round(generic_ratio, 1)
+        } 

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from django_q.tasks import async_task, schedule
 from django_q.models import Schedule
 
-from .sync_service import SyncService
+from .git_sync_service import GitSyncService
 from .services import RateLimitService
 from .github_service import GitHubRateLimitError
 from applications.models import Application, ApplicationRepository
@@ -27,7 +27,7 @@ def sync_application_task(application_id: int, user_id: int, sync_type: str = 'i
     logger.info(f"Starting sync task for application {application_id}, user {user_id}")
     
     try:
-        sync_service = SyncService(user_id)
+        sync_service = GitSyncService(user_id)
         results = sync_service.sync_application_repositories(application_id, sync_type)
         
         logger.info(f"Sync completed for application {application_id}: {results}")
@@ -52,8 +52,11 @@ def sync_repository_task(repo_full_name: str, application_id: int, user_id: int,
     logger.info(f"Starting sync task for repository {repo_full_name}")
     
     try:
-        sync_service = SyncService(user_id)
-        results = sync_service.sync_repository(repo_full_name, application_id, sync_type)
+        sync_service = GitSyncService(user_id)
+        # On a besoin de l'URL du repo pour GitSyncService, on la récupère via ApplicationRepository
+        from applications.models import ApplicationRepository
+        app_repo = ApplicationRepository.objects.get(github_repo_name=repo_full_name, application_id=application_id)
+        results = sync_service.sync_repository(repo_full_name, app_repo.github_repo_url, application_id, sync_type)
         
         logger.info(f"Sync completed for repository {repo_full_name}: {results}")
         return results
@@ -82,7 +85,7 @@ def retry_failed_syncs_task():
         
         for token in github_tokens:
             try:
-                sync_service = SyncService(token.user_id)
+                sync_service = GitSyncService(token.user_id)
                 results = sync_service.retry_failed_syncs()
                 
                 total_results['users_processed'] += 1
@@ -328,7 +331,7 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
             }
         
         # Initialize sync service
-        sync_service = SyncService(user_id)
+        sync_service = GitSyncService(user_id)
         
         results = {
             'application_id': application_id,
@@ -349,6 +352,7 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                 
                 repo_result = sync_service.sync_repository(
                     app_repo.github_repo_name,
+                    app_repo.github_repo_url,
                     application_id,
                     'full'  # Always do full sync for indexing
                 )
@@ -395,7 +399,8 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                 results['repositories_synced'] += 1
                 results['total_commits_new'] += repo_result['commits_new']
                 results['total_commits_updated'] += repo_result['commits_updated']
-                results['total_api_calls'] += repo_result['api_calls']
+                # Git local doesn't use API calls, so we don't track them
+                results['total_api_calls'] = 0
                 
                 logger.info(f"Completed {i}/{total_repos} repositories")
                 

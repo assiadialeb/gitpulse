@@ -26,4 +26,5 @@ urlpatterns = [
     path('github/', include('github.urls')),
     path('applications/', include('applications.urls')),
     path('analytics/', include('analytics.urls')),
+    path('developers/', include('developers.urls')),
 ]
