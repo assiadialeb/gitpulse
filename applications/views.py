@@ -1,9 +1,13 @@
-from django.shortcuts import render, redirect, get_object_or_404
+import json
+import requests
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.urls import reverse
-import requests
+from django.views.decorators.http import require_http_methods
+from django.utils import timezone
+from datetime import datetime, timedelta
+
 from .models import Application, ApplicationRepository
 from .forms import ApplicationForm, RepositorySelectionForm
 from github.models import GitHubToken
@@ -282,6 +286,88 @@ def add_repositories(request, pk):
         'choices_count': len(choices),
         'choices': choices  # Passer les choix directement
     })
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_get_repositories(request, pk):
+    """API endpoint to get GitHub repositories with caching and real-time search"""
+    application = get_object_or_404(Application, pk=pk, owner=request.user)
+    
+    # Get user's GitHub token
+    try:
+        github_token = GitHubToken.objects.get(user=request.user)
+    except GitHubToken.DoesNotExist:
+        return JsonResponse({'error': 'GitHub token not found'}, status=401)
+    
+    # Get search query
+    search_query = request.GET.get('search', '').lower()
+    
+    # Get existing repos for this application
+    existing_repos = list(application.repositories.values_list('github_repo_name', flat=True))
+    
+    try:
+        headers = {
+            'Authorization': f'token {github_token.access_token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+        
+        # Get user's repositories
+        all_repos = []
+        page = 1
+        while True:
+            response = requests.get('https://api.github.com/user/repos', headers=headers, params={
+                'sort': 'updated',
+                'per_page': 100,
+                'type': 'all',
+                'page': page
+            })
+            
+            if response.status_code == 200:
+                repos_page = response.json()
+                if not repos_page:
+                    break
+                all_repos.extend(repos_page)
+                page += 1
+                if page > 10:
+                    break
+            else:
+                return JsonResponse({'error': f'GitHub API error: {response.status_code}'}, status=500)
+        
+        # Filter repositories
+        filtered_repos = []
+        for repo in all_repos:
+            repo_name = repo.get('full_name', '')
+            description = repo.get('description', '')
+            
+            # Skip if already added
+            if repo_name in existing_repos:
+                continue
+            
+            # Filter by search query if provided
+            if search_query:
+                if (search_query not in repo_name.lower() and 
+                    search_query not in (description or '').lower()):
+                    continue
+            
+            filtered_repos.append({
+                'full_name': repo_name,
+                'description': description or 'No description',
+                'is_private': repo.get('private', False),
+                'language': repo.get('language', ''),
+                'stars_count': repo.get('stargazers_count', 0),
+                'forks_count': repo.get('forks_count', 0),
+                'updated_at': repo.get('pushed_at')
+            })
+        
+        return JsonResponse({
+            'repositories': filtered_repos,
+            'total_count': len(filtered_repos),
+            'search_query': search_query
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Error fetching repositories: {str(e)}'}, status=500)
 
 
 @login_required
