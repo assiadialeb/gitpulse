@@ -23,8 +23,8 @@ class DeveloperGroup(Document):
     primary_email = fields.StringField(required=True)
     github_id = fields.StringField()  # GitHub user ID if available
     
-    # Application context
-    application_id = fields.IntField(required=True)
+    # Application context (None for global groups)
+    application_id = fields.IntField(required=False, null=True)
     
     # Group metadata
     created_at = fields.DateTimeField(default=datetime.utcnow)

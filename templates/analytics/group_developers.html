@@ -121,7 +121,7 @@
                                                         <p class="text-sm text-medium-gray">{{ dev.email }}</p>
                                                     </div>
                                                     <div class="text-right">
-                                                        <p class="text-sm font-medium text-primary-green">{{ dev.commit_count }} commits</p>
+                                                        <p class="text-sm font-medium text-primary-green">{{ dev.total_commits|default:0 }} commits</p>
                                                         <p class="text-xs text-medium-gray">
                                                             {{ dev.first_seen|date:"M Y" }} - {{ dev.last_seen|date:"M Y" }}
                                                         </p>
@@ -139,7 +139,7 @@
                                                         <p class="text-sm text-medium-gray">{{ dev.email }}</p>
                                                     </div>
                                                     <div class="text-right">
-                                                        <p class="text-sm font-medium text-primary-green">{{ dev.commit_count }} commits</p>
+                                                        <p class="text-sm font-medium text-primary-green">{{ dev.total_commits|default:0 }} commits</p>
                                                         <p class="text-xs text-medium-gray">
                                                             {{ dev.first_seen|date:"M Y" }} - {{ dev.last_seen|date:"M Y" }}
                                                         </p>
@@ -211,7 +211,7 @@
                                         <p class="text-sm text-medium-gray">{{ alias.email }}</p>
                                     </div>
                                     <div class="text-right">
-                                        <p class="text-sm font-medium text-primary-green">{{ alias.commit_count }} commits</p>
+                                        <p class="text-sm font-medium text-primary-green">{{ alias.total_commits|default:0 }} commits</p>
                                         <p class="text-xs text-medium-gray">
                                             {{ alias.first_seen|date:"M Y" }} - {{ alias.last_seen|date:"M Y" }}
                                         </p>

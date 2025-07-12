@@ -80,43 +80,8 @@ def api_commit_quality(request, application_id):
     return JsonResponse(data)
 
 
-@login_required
-def group_developers(request, application_id):
-    """
-    Manually trigger developer grouping and show results
-    """
-    application = get_object_or_404(Application, id=application_id, owner=request.user)
-    
-    # Initialize analytics service
-    analytics = AnalyticsService(application_id)
-    
-    # Group developers
-    grouping_results = analytics.group_developers()
-    grouped_developers = analytics.get_grouped_developers()
-    individual_developers = analytics.get_individual_developers()
-    
-    context = {
-        'application': application,
-        'grouping_results': grouping_results,
-        'grouped_developers': grouped_developers,
-        'individual_developers': individual_developers,
-    }
-    
-    return render(request, 'analytics/group_developers.html', context)
-
-
-@login_required
-@require_http_methods(["POST"])
-def api_group_developers(request, application_id):
-    """
-    API endpoint to trigger developer grouping
-    """
-    application = get_object_or_404(Application, id=application_id, owner=request.user)
-    
-    analytics = AnalyticsService(application_id)
-    results = analytics.group_developers()
-    
-    return JsonResponse(results)
+# These views have been removed as auto-grouping is no longer supported
+# Use the global developer grouping in /developers/ instead
 
 
 @login_required
@@ -303,3 +268,41 @@ def rename_group(request, application_id, group_id):
             'success': False,
             'error': str(e)
         }) 
+
+@login_required
+def api_auto_group_developers(request, application_id):
+    """API endpoint to automatically group developers"""
+    if request.method == 'POST':
+        try:
+            from .developer_grouping_service import DeveloperGroupingService
+            
+            grouping_service = DeveloperGroupingService(application_id)
+            result = grouping_service.auto_group_developers()
+            
+            return JsonResponse(result)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error in auto-grouping: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405) 
+
+@login_required
+def api_merge_existing_groups(request, application_id):
+    """API endpoint to merge existing groups that should be combined"""
+    if request.method == 'POST':
+        try:
+            from .developer_grouping_service import DeveloperGroupingService
+            
+            grouping_service = DeveloperGroupingService(application_id)
+            result = grouping_service.merge_existing_groups()
+            
+            return JsonResponse(result)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error merging groups: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405) 

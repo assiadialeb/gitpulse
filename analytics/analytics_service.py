@@ -377,15 +377,6 @@ class AnalyticsService:
             'avg_commits_per_day': round(avg_commits_per_day, 2)
         }
     
-    def group_developers(self) -> Dict:
-        """
-        Group developers using the grouping service
-        
-        Returns:
-            Dictionary with grouping results
-        """
-        return self.grouping_service.group_developers()
-    
     def get_grouped_developers(self) -> List[Dict]:
         """
         Get all grouped developers
@@ -397,20 +388,13 @@ class AnalyticsService:
     
     def get_individual_developers(self) -> List[Dict]:
         """
-        Get all individual developers (ungrouped) for manual grouping
+        Get all individual developers for manual grouping
         
         Returns:
             List of individual developers with their commit data
         """
         commits = self.commits.all()
         developers = {}
-        
-        # Get all grouped aliases for this application
-        from .models import DeveloperAlias, DeveloperGroup
-        grouped_aliases = set()
-        for group in DeveloperGroup.objects.filter(application_id=self.application_id):
-            for alias in DeveloperAlias.objects.filter(group=group):
-                grouped_aliases.add((alias.name, alias.email))
         
         for commit in commits:
             dev_key = f"{commit.author_name}|{commit.author_email}"
@@ -422,8 +406,7 @@ class AnalyticsService:
                     'last_seen': commit.authored_date,
                     'commit_count': 0,
                     'total_additions': 0,
-                    'total_deletions': 0,
-                    'is_grouped': (commit.author_name, commit.author_email) in grouped_aliases
+                    'total_deletions': 0
                 }
             
             developers[dev_key]['commit_count'] += 1
@@ -467,9 +450,9 @@ class AnalyticsService:
         """
         from .models import DeveloperGroup, DeveloperAlias
         
-        # Get the developer group
+        # Get the developer group (global grouping, no application_id filter)
         try:
-            group = DeveloperGroup.objects.get(id=group_id, application_id=self.application_id)
+            group = DeveloperGroup.objects.get(id=group_id)
         except:
             return {
                 'error': 'Developer group not found',
@@ -479,9 +462,10 @@ class AnalyticsService:
         # Get all aliases for this group
         aliases = DeveloperAlias.objects.filter(group=group)
         
-        # Get all commits for this developer group
+        # Get all commits for this developer group (global, from all applications)
         alias_emails = [alias.email for alias in aliases]
-        developer_commits = self.commits.filter(author_email__in=alias_emails)
+        from .models import Commit
+        developer_commits = Commit.objects.filter(author_email__in=alias_emails)
         
         # Calculate basic stats
         total_commits = developer_commits.count()

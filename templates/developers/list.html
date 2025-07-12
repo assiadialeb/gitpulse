@@ -1,157 +1,593 @@
-{% extends "base/base.html" %}
+{% extends 'base/base.html' %}
 
-{% block title %}Developers{% endblock %}
+{% block title %}Developers - GitPulse{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-white">
-    <div class="container mx-auto px-4 py-8">
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-8">
-            <div>
-                <h1 class="text-4xl font-bold gradient-text mb-2">Developers</h1>
-                <p class="text-medium-gray text-lg">All developers across all applications</p>
-                <p class="text-sm text-medium-gray">{{ total_developers }} developers found</p>
-            </div>
+<!-- CSRF Token for AJAX requests -->
+{% csrf_token %}
 
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-dark-gray">Developers</h1>
+        <div class="flex space-x-2">
+            <button onclick="autoGroupDevelopers()" 
+                    class="btn btn-primary btn-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Auto-Group Developers
+            </button>
+            <button onclick="mergeExistingGroups()" 
+                    class="btn btn-secondary btn-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
+                </svg>
+                Merge Groups
+            </button>
+            <a href="{% url 'developers:sync' %}" class="btn btn-outline btn-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Sync Data
+            </a>
         </div>
+    </div>
 
-        <!-- Developers List -->
-        <div class="card-modern p-6">
+    <!-- Stats Summary -->
+    <div class="stats shadow mb-6">
+        <div class="stat">
+            <div class="stat-title">Total Developers</div>
+            <div class="stat-value text-primary">{{ total_count }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Grouped</div>
+            <div class="stat-value text-success">{{ grouped_count }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Individual</div>
+            <div class="stat-value text-info">{{ ungrouped_count }}</div>
+        </div>
+    </div>
+
+    <!-- Developer List -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">All Developers</h2>
+            
             {% if page_obj %}
-                <div class="grid gap-6">
-                    {% for developer in page_obj %}
-                    <div class="border border-light-gray rounded-xl p-6 hover:shadow-lg transition-shadow">
-                        <div class="flex items-center justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center space-x-3 mb-2">
-                                    <h3 class="text-xl font-semibold text-dark-gray">
-                                        <a href="{% url 'developers:detail' developer.group_id %}" 
-                                           class="hover:text-primary transition-colors">
-                                            {{ developer.primary_name }}
-                                        </a>
-                                    </h3>
-                                    {% if developer.confidence_score < 100 %}
-                                        <span class="badge badge-warning badge-sm">
-                                            {{ developer.confidence_score }}% confidence
-                                        </span>
-                                    {% endif %}
-                                    {% if developer.is_auto_grouped %}
-                                        <span class="badge badge-info badge-sm">Auto-grouped</span>
-                                    {% else %}
-                                        <span class="badge badge-success badge-sm">Manual</span>
-                                    {% endif %}
-                                </div>
-                                
-                                <p class="text-medium-gray mb-3">{{ developer.primary_email }}</p>
-                                
-                                <div class="flex items-center space-x-6 text-sm">
-                                    <div class="flex items-center space-x-2">
-                                        <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                        </svg>
-                                        <span class="text-dark-gray">{{ developer.total_commits }} commits</span>
-                                    </div>
-                                    
-                                    {% if developer.aliases|length > 1 %}
-                                    <div class="flex items-center space-x-2">
-                                        <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                        </svg>
-                                        <span class="text-dark-gray">{{ developer.aliases|length }} identities</span>
-                                    </div>
-                                    {% endif %}
-                                    
-                                    <div class="flex items-center space-x-2">
-                                        <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                        </svg>
-                                        <span class="text-dark-gray">{{ developer.application.name }}</span>
-                                    </div>
-                                </div>
-                                
-                                {% if developer.aliases|length > 1 %}
-                                <div class="mt-4 pt-4 border-t border-light-gray">
-                                    <p class="text-sm text-medium-gray mb-2">Identities:</p>
-                                    <div class="flex flex-wrap gap-2">
-                                        {% for alias in developer.aliases %}
-                                        <span class="badge badge-outline badge-sm">
-                                            {{ alias.name }} ({{ alias.commit_count }})
-                                        </span>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="flex flex-col items-end space-y-2">
-                                <a href="{% url 'developers:detail' developer.group_id %}" 
-                                   class="btn btn-primary btn-sm rounded-xl">
-                                    View Details
-                                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                                    </svg>
-                                </a>
-                                {% if developer.application.id %}
-                                <a href="{% url 'applications:detail' developer.application.id %}" 
-                                   class="btn btn-outline btn-sm rounded-xl">
-                                    {{ developer.application.name }}
-                                </a>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>
+                                    <a href="?sort=name&order={% if sort_by == 'name' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" 
+                                       class="flex items-center space-x-1 hover:text-primary">
+                                        <span>Name</span>
+                                        {% if sort_by == 'name' %}
+                                            {% if sort_order == 'asc' %}
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                                </svg>
+                                            {% else %}
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            {% endif %}
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="?sort=email&order={% if sort_by == 'email' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" 
+                                       class="flex items-center space-x-1 hover:text-primary">
+                                        <span>Email</span>
+                                        {% if sort_by == 'email' %}
+                                            {% if sort_order == 'asc' %}
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                                </svg>
+                                            {% else %}
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            {% endif %}
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="?sort=first_seen&order={% if sort_by == 'first_seen' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" 
+                                       class="flex items-center space-x-1 hover:text-primary">
+                                        <span>First Seen</span>
+                                        {% if sort_by == 'first_seen' %}
+                                            {% if sort_order == 'asc' %}
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                                </svg>
+                                            {% else %}
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            {% endif %}
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="?sort=last_seen&order={% if sort_by == 'last_seen' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" 
+                                       class="flex items-center space-x-1 hover:text-primary">
+                                        <span>Last Seen</span>
+                                        {% if sort_by == 'last_seen' %}
+                                            {% if sort_order == 'asc' %}
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                                </svg>
+                                            {% else %}
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            {% endif %}
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for developer in page_obj %}
+                                <tr class="hover">
+                                    <td>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-medium">{{ developer.name }}</span>
+                                            {% if developer.is_grouped %}
+                                                <span class="badge badge-success">Grouped</span>
+                                            {% else %}
+                                                <span class="badge badge-info">Individual</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>{{ developer.email }}</td>
+                                    <td>{{ developer.first_seen|date:"M d, Y" }}</td>
+                                    <td>{{ developer.last_seen|date:"M d, Y" }}</td>
+                                    <td>
+                                        <div class="flex space-x-2">
+                                            {% if developer.group_id %}
+                                                <a href="{% url 'developers:detail' developer.group_id %}" 
+                                                   class="btn btn-xs btn-outline btn-primary">
+                                                    View Stats
+                                                </a>
+                                                {% if developer.is_grouped %}
+                                                    <button class="btn btn-xs btn-outline btn-warning"
+                                                            onclick="openMergeGroupsModalForGroup('{{ developer.name|escapejs }}', '{{ developer.email|escapejs }}', '{{ developer.group_id|escapejs }}')">
+                                                        Merge Group
+                                                    </button>
+                                                {% else %}
+                                                    <button class="btn btn-xs btn-outline btn-secondary"
+                                                            onclick="openAddToGroupModal('{{ developer.name|escapejs }}', '{{ developer.email|escapejs }}')">
+                                                        Add to Group
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-xs text-gray-500">No ID</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-                
+
                 <!-- Pagination -->
                 {% if page_obj.has_other_pages %}
-                <div class="mt-8 flex justify-center">
-                    <div class="join">
-                        {% if page_obj.has_previous %}
-                            <a href="?page={{ page_obj.previous_page_number }}" class="join-item btn btn-outline btn-sm">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                                </svg>
-                                Previous
-                            </a>
-                        {% endif %}
-                        
-                        {% for num in page_obj.paginator.page_range %}
-                            {% if page_obj.number == num %}
-                                <span class="join-item btn btn-primary btn-sm">{{ num }}</span>
-                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                                <a href="?page={{ num }}" class="join-item btn btn-outline btn-sm">{{ num }}</a>
+                    <div class="flex justify-center mt-6">
+                        <div class="join">
+                            {% if page_obj.has_previous %}
+                                <a href="?page={{ page_obj.previous_page_number }}{% if sort_by %}&sort={{ sort_by }}{% endif %}{% if sort_order %}&order={{ sort_order }}{% endif %}" class="join-item btn">«</a>
                             {% endif %}
-                        {% endfor %}
-                        
-                        {% if page_obj.has_next %}
-                            <a href="?page={{ page_obj.next_page_number }}" class="join-item btn btn-outline btn-sm">
-                                Next
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                                </svg>
-                            </a>
-                        {% endif %}
+                            
+                            <span class="join-item btn btn-disabled">
+                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                            </span>
+                            
+                            {% if page_obj.has_next %}
+                                <a href="?page={{ page_obj.next_page_number }}{% if sort_by %}&sort={{ sort_by }}{% endif %}{% if sort_order %}&order={{ sort_order }}{% endif %}" class="join-item btn">»</a>
+                            {% endif %}
+                        </div>
                     </div>
-                </div>
                 {% endif %}
-                
             {% else %}
-                <div class="text-center py-12">
-                    <svg class="w-16 h-16 text-medium-gray mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    <h3 class="text-xl font-semibold text-dark-gray mb-2">No Developers Found</h3>
-                    <p class="text-medium-gray mb-6">No developers have been grouped yet across your applications.</p>
-                    <a href="{% url 'applications:list' %}" class="btn btn-primary rounded-xl">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                        </svg>
-                        View Applications
+                <div class="text-center py-8">
+                    <p class="text-gray-500">No developers found.</p>
+                    <a href="{% url 'developers:sync' %}" class="btn btn-primary mt-4">
+                        Extract from Commits
                     </a>
                 </div>
             {% endif %}
         </div>
     </div>
 </div>
-{% endblock content %} 
+
+
+<!-- Nouvelle modale DaisyUI pour ajout à un groupe existant -->
+<input type="checkbox" id="addToGroupModal" class="modal-toggle" />
+<div class="modal" id="addToGroupModalContainer">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg mb-2">Ajouter à un groupe existant</h3>
+    <form id="addToGroupForm" class="space-y-4">
+      <div>
+        <span class="font-semibold">Nom :</span>
+        <span id="modalDevName"></span>
+      </div>
+      <div>
+        <span class="font-semibold">Email :</span>
+        <span id="modalDevEmail"></span>
+      </div>
+      <div>
+        <label class="label" for="groupSelect">Groupe existant</label>
+        <select id="groupSelect" class="select select-bordered w-full" required>
+          <option value="">Chargement...</option>
+        </select>
+      </div>
+      <div class="modal-action">
+        <button type="submit" class="btn btn-primary">Ajouter</button>
+        <label for="addToGroupModal" class="btn">Annuler</label>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modale pour fusionner des groupes -->
+<input type="checkbox" id="mergeGroupsModal" class="modal-toggle" />
+<div class="modal" id="mergeGroupsModalContainer">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg mb-2">Fusionner le groupe</h3>
+    <form id="mergeGroupsForm" class="space-y-4">
+      <div>
+        <label class="label">Groupe source (sera supprimé)</label>
+        <div class="input input-bordered w-full bg-gray-100" id="sourceGroupDisplay">
+          Chargement...
+        </div>
+        <input type="hidden" id="sourceGroupId" name="source_group_id">
+      </div>
+      <div>
+        <label class="label" for="targetGroupSelect">Groupe de destination (recevra les identités)</label>
+        <select id="targetGroupSelect" class="select select-bordered w-full" required>
+          <option value="">Chargement...</option>
+        </select>
+      </div>
+      <div class="modal-action">
+        <button type="submit" class="btn btn-warning">Fusionner</button>
+        <label for="mergeGroupsModal" class="btn">Annuler</label>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<script>
+function openAddToGroupModal(name, email) {
+  document.getElementById('modalDevName').textContent = name;
+  document.getElementById('modalDevEmail').textContent = email;
+  document.getElementById('addToGroupModal').checked = true;
+  
+  // Afficher un message de chargement
+  const select = document.getElementById('groupSelect');
+  select.innerHTML = '<option value="">Chargement...</option>';
+  
+  fetch('/developers/list_groups/')
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      return res.text().then(text => {
+        try {
+          return JSON.parse(text);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          console.error('Response text:', text);
+          throw new Error('Invalid JSON response');
+        }
+      });
+    })
+    .then(data => {
+      const select = document.getElementById('groupSelect');
+      select.innerHTML = '';
+      
+      if (data.error) {
+        select.innerHTML = '<option value="">Erreur: ' + data.error + '</option>';
+        return;
+      }
+      
+      if (!data.groups || data.groups.length === 0) {
+        select.innerHTML = '<option value="">Aucun groupe disponible</option>';
+        return;
+      }
+      
+      // Trier les groupes par nom (ordre alphabétique, insensible à la casse)
+      const sortedGroups = data.groups.slice().sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+      
+      sortedGroups.forEach(group => {
+        try {
+          const opt = document.createElement('option');
+          opt.value = group.id || '';
+          // Échapper les caractères spéciaux pour éviter les problèmes d'affichage
+          const displayName = (group.name || '').replace(/[<>]/g, '');
+          const displayEmail = (group.email || '').replace(/[<>]/g, '');
+          opt.textContent = `${displayName} (${displayEmail})`;
+          select.appendChild(opt);
+        } catch (groupError) {
+          console.error('Error processing group:', groupError, group);
+        }
+      });
+    })
+    .catch(error => {
+      console.error('Error loading groups:', error);
+      const select = document.getElementById('groupSelect');
+      select.innerHTML = '<option value="">Erreur de chargement</option>';
+    });
+}
+
+document.getElementById('addToGroupForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const groupId = document.getElementById('groupSelect').value;
+  const name = document.getElementById('modalDevName').textContent;
+  const email = document.getElementById('modalDevEmail').textContent;
+  fetch('/developers/add_identity_to_group/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    },
+    body: JSON.stringify({ group_id: groupId, name: name, email: email })
+  })
+  .then(res => res.json())
+  .then(resp => {
+    if (resp.success) {
+      alert('Identité ajoutée au groupe !');
+      document.getElementById('addToGroupModal').checked = false;
+      window.location.reload();
+    } else {
+      alert('Erreur : ' + (resp.error || 'Inconnue'));
+    }
+  })
+  .catch(() => alert('Erreur réseau'));
+});
+
+function autoGroupDevelopers() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.innerHTML = `
+        <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Auto-Grouping...
+    `;
+    button.disabled = true;
+    
+    // Make API call to auto-group developers
+    fetch('/analytics/api/applications/0/auto-group-developers/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            alert(`Auto-grouping completed! Created ${data.groups_created} groups.`);
+            // Reload page to show updated results
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error auto-grouping developers. Please try again.');
+    })
+    .finally(() => {
+        // Restore button
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function mergeExistingGroups() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.innerHTML = `
+        <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Merging Groups...
+    `;
+    button.disabled = true;
+    
+    // Make API call to merge existing groups
+    fetch('/analytics/api/applications/0/merge-existing-groups/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            alert(`Group merging completed! Merged ${data.groups_merged} groups.`);
+            // Reload page to show updated results
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error merging groups. Please try again.');
+    })
+    .finally(() => {
+        // Restore button
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function openMergeGroupsModal() {
+  // Fermer la modale actuelle
+  document.getElementById('addToGroupModal').checked = false;
+  
+  // Ouvrir la modale de fusion
+  document.getElementById('mergeGroupsModal').checked = true;
+  
+  // Charger les groupes dans les deux select
+  loadGroupsForMerge();
+}
+
+function openMergeGroupsModalForGroup(name, email, groupId) {
+  // Ouvrir la modale de fusion
+  document.getElementById('mergeGroupsModal').checked = true;
+  
+  // Afficher le groupe source
+  document.getElementById('sourceGroupDisplay').textContent = `${name} (${email})`;
+  document.getElementById('sourceGroupId').value = groupId; // Set the hidden input
+  
+  // Charger les groupes de destination (en excluant le groupe source)
+  loadTargetGroupsForMerge();
+}
+
+function loadTargetGroupsForMerge() {
+  const targetSelect = document.getElementById('targetGroupSelect');
+  const sourceGroupId = document.getElementById('sourceGroupId').value;
+  
+  targetSelect.innerHTML = '<option value="">Chargement...</option>';
+  
+  fetch('/developers/list_groups/')
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      return res.text().then(text => {
+        try {
+          return JSON.parse(text);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          console.error('Response text:', text);
+          throw new Error('Invalid JSON response');
+        }
+      });
+    })
+    .then(data => {
+      if (data.error) {
+        targetSelect.innerHTML = '<option value="">Erreur: ' + data.error + '</option>';
+        return;
+      }
+      
+      if (!data.groups || data.groups.length === 0) {
+        targetSelect.innerHTML = '<option value="">Aucun groupe disponible</option>';
+        return;
+      }
+      
+      // Trier les groupes par nom (ordre alphabétique, insensible à la casse)
+      const sortedGroups = data.groups.slice().sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+      
+      targetSelect.innerHTML = '<option value="">Sélectionner un groupe de destination...</option>';
+      
+      sortedGroups.forEach(group => {
+        try {
+          // Exclure le groupe source de la liste des destinations
+          if (group.id === sourceGroupId) {
+            return;
+          }
+          
+          const opt = document.createElement('option');
+          opt.value = group.id || '';
+          const displayName = (group.name || '').replace(/[<>]/g, '');
+          const displayEmail = (group.email || '').replace(/[<>]/g, '');
+          opt.textContent = `${displayName} (${displayEmail})`;
+          targetSelect.appendChild(opt);
+        } catch (groupError) {
+          console.error('Error processing group:', groupError, group);
+        }
+      });
+    })
+    .catch(error => {
+      console.error('Error loading groups:', error);
+      targetSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+    });
+}
+
+// Gestionnaire pour le formulaire de fusion
+document.getElementById('mergeGroupsForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const sourceGroupId = document.getElementById('sourceGroupId').value;
+  const targetGroupId = document.getElementById('targetGroupSelect').value;
+  
+  if (!sourceGroupId || !targetGroupId) {
+    alert('Veuillez sélectionner un groupe de destination');
+    return;
+  }
+  
+  if (sourceGroupId === targetGroupId) {
+    alert('Le groupe de destination doit être différent du groupe source');
+    return;
+  }
+  
+  // Confirmation avant fusion
+  if (!confirm('Êtes-vous sûr de vouloir fusionner ce groupe ? Il sera supprimé après la fusion.')) {
+    return;
+  }
+  
+  // Afficher l'état de chargement
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.innerHTML = 'Fusion en cours...';
+  submitBtn.disabled = true;
+  
+  fetch('/developers/merge_group/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    },
+    body: JSON.stringify({
+      source_group_id: sourceGroupId,
+      target_group_id: targetGroupId
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert(`Fusion réussie ! ${data.aliases_moved} identités ont été déplacées.`);
+      document.getElementById('mergeGroupsModal').checked = false;
+      window.location.reload();
+    } else {
+      alert('Erreur : ' + (data.error || 'Inconnue'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Erreur réseau lors de la fusion');
+  })
+  .finally(() => {
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
+  });
+});
+</script>
+{% endblock %} 

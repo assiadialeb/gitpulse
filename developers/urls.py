@@ -5,6 +5,11 @@ app_name = 'developers'
 
 urlpatterns = [
     path('', views.developer_list, name='list'),
-    path('<str:group_id>/', views.developer_detail, name='detail'),
-    path('<str:group_id>/stats/', views.api_developer_stats, name='api_stats'),
+    path('sync/', views.sync_from_mongo, name='sync'),
+    path('list_groups/', views.list_groups, name='list_groups'),
+    path('create-group/', views.create_group, name='create_group'),
+    path('add-to-group/', views.add_to_group, name='add_to_group'),
+    path('merge_group/', views.merge_group, name='merge_group'),
+    path('add_identity_to_group/', views.add_identity_to_group, name='add_identity_to_group'),
+    path('<str:developer_id>/', views.developer_detail, name='detail'),
 ] 

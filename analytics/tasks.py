@@ -56,7 +56,14 @@ def sync_repository_task(repo_full_name: str, application_id: int, user_id: int,
         # On a besoin de l'URL du repo pour GitSyncService, on la récupère via ApplicationRepository
         from applications.models import ApplicationRepository
         app_repo = ApplicationRepository.objects.get(github_repo_name=repo_full_name, application_id=application_id)
-        results = sync_service.sync_repository(repo_full_name, app_repo.github_repo_url, application_id, sync_type)
+        
+        # Check if github_repo_url exists, if not generate it
+        repo_url = getattr(app_repo, 'github_repo_url', None)
+        if not repo_url:
+            repo_url = f"https://github.com/{app_repo.github_repo_name}.git"
+            logger.warning(f"Missing github_repo_url for {app_repo.github_repo_name}, using generated URL: {repo_url}")
+        
+        results = sync_service.sync_repository(repo_full_name, repo_url, application_id, sync_type)
         
         logger.info(f"Sync completed for repository {repo_full_name}: {results}")
         return results
@@ -350,9 +357,15 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
             try:
                 logger.info(f"Indexing repository {i}/{total_repos}: {app_repo.github_repo_name}")
                 
+                # Check if github_repo_url exists, if not generate it
+                repo_url = getattr(app_repo, 'github_repo_url', None)
+                if not repo_url:
+                    repo_url = f"https://github.com/{app_repo.github_repo_name}.git"
+                    logger.warning(f"Missing github_repo_url for {app_repo.github_repo_name}, using generated URL: {repo_url}")
+                
                 repo_result = sync_service.sync_repository(
                     app_repo.github_repo_name,
-                    app_repo.github_repo_url,
+                    repo_url,
                     application_id,
                     'full'  # Always do full sync for indexing
                 )
