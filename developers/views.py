@@ -191,6 +191,25 @@ def developer_list(request):
             developer['is_grouped'] = False
             all_developers.append(developer)
     
+    # Get search parameter
+    search_term = request.GET.get('search', '').strip().lower()
+    
+    # Filter developers based on search term
+    if search_term:
+        filtered_developers = []
+        for developer in all_developers:
+            name = developer.get('name', '').lower()
+            email = developer.get('email', '').lower()
+            first_seen = developer.get('first_seen', '').strftime('%b %d, %Y').lower() if developer.get('first_seen') else ''
+            last_seen = developer.get('last_seen', '').strftime('%b %d, %Y').lower() if developer.get('last_seen') else ''
+            
+            if (search_term in name or 
+                search_term in email or 
+                search_term in first_seen or 
+                search_term in last_seen):
+                filtered_developers.append(developer)
+        all_developers = filtered_developers
+    
     # Get sorting parameters
     sort_by = request.GET.get('sort', 'name')  # Default sort by name
     sort_order = request.GET.get('order', 'asc')  # Default ascending
@@ -223,6 +242,7 @@ def developer_list(request):
         'ungrouped_count': ungrouped_count,
         'sort_by': sort_by,
         'sort_order': sort_order,
+        'search_term': search_term,
     }
     
     return render(request, 'developers/list.html', context)
@@ -629,7 +649,7 @@ def sync_from_mongo(request):
 
 @login_required
 def create_group(request):
-    """Create a new developer group"""
+    """Create a new empty developer group"""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -639,12 +659,28 @@ def create_group(request):
             if not name or not email:
                 return JsonResponse({'error': 'Name and email are required'}, status=400)
             
-            # Create a simple group ID
-            group_id = f"group_{base64.urlsafe_b64encode(f'{name}|{email}'.encode('utf-8')).decode('utf-8').rstrip('=')}"
+            # Import the models
+            from analytics.models import DeveloperGroup
+            
+            # Check if a group with this name/email already exists
+            existing_group = DeveloperGroup.objects.filter(
+                primary_name=name,
+                primary_email=email
+            ).first()
+            
+            if existing_group:
+                return JsonResponse({'error': 'A group with this name and email already exists'}, status=400)
+            
+            # Create a new empty group
+            new_group = DeveloperGroup(
+                primary_name=name,
+                primary_email=email
+            )
+            new_group.save()
             
             return JsonResponse({
                 'success': True,
-                'group_id': group_id,
+                'group_id': str(new_group.id),
                 'group_name': name,
                 'group_email': email
             })
@@ -652,6 +688,140 @@ def create_group(request):
             return JsonResponse({'error': str(e)}, status=500)
     
     return JsonResponse({'error': 'POST method required'}, status=405)
+
+
+@login_required
+def search_developers(request):
+    """AJAX endpoint for searching developers"""
+    from analytics.developer_grouping_service import DeveloperGroupingService
+    
+    search_term = request.GET.get('q', '').strip().lower()
+    page = request.GET.get('page', 1)
+    sort_by = request.GET.get('sort', 'name')
+    sort_order = request.GET.get('order', 'asc')
+    
+    # Get grouped developers
+    grouping_service = DeveloperGroupingService()
+    grouped_developers = grouping_service.get_grouped_developers()
+    
+    # Create a set of grouped developer keys for filtering
+    grouped_developers_set = set()
+    for group in grouped_developers:
+        for alias in group['aliases']:
+            dev_key = f"{alias['name']}|{alias['email']}"
+            grouped_developers_set.add(dev_key)
+    
+    # Get all individual developers from commits
+    from analytics.models import Commit
+    commits = Commit.objects.all()
+    
+    # Extract unique developers from commits
+    seen_developers = set()
+    all_individual_developers = []
+    
+    for commit in commits:
+        dev_key = f"{commit.author_name}|{commit.author_email}"
+        
+        if dev_key not in seen_developers:
+            seen_developers.add(dev_key)
+            
+            dev_data = f"{commit.author_name}|{commit.author_email}"
+            encoded_data = urllib.parse.quote(dev_data, safe='')
+            developer = {
+                'name': commit.author_name,
+                'email': commit.author_email,
+                'commit_count': 1,
+                'first_seen': commit.authored_date,
+                'last_seen': commit.authored_date,
+                'is_grouped': False,
+                'group_id': f"individual_{encoded_data}"
+            }
+            all_individual_developers.append(developer)
+        else:
+            for dev in all_individual_developers:
+                if f"{dev['name']}|{dev['email']}" == dev_key:
+                    dev['commit_count'] += 1
+                    if commit.authored_date < dev['first_seen']:
+                        dev['first_seen'] = commit.authored_date
+                    if commit.authored_date > dev['last_seen']:
+                        dev['last_seen'] = commit.authored_date
+                    break
+    
+    # Combine grouped and individual developers
+    all_developers = []
+    
+    for developer in grouped_developers:
+        developer['is_grouped'] = True
+        developer['name'] = developer.get('primary_name', '')
+        developer['email'] = developer.get('primary_email', '')
+        developer['group_id'] = developer.get('group_id', '')
+        all_developers.append(developer)
+    
+    for developer in all_individual_developers:
+        dev_key = f"{developer['name']}|{developer['email']}"
+        if dev_key not in grouped_developers_set:
+            developer['application'] = {
+                'id': 0,
+                'name': 'All Applications'
+            }
+            developer['is_grouped'] = False
+            all_developers.append(developer)
+    
+    # Filter by search term
+    if search_term:
+        filtered_developers = []
+        for developer in all_developers:
+            name = developer.get('name', '').lower()
+            email = developer.get('email', '').lower()
+            first_seen = developer.get('first_seen', '').strftime('%b %d, %Y').lower() if developer.get('first_seen') else ''
+            last_seen = developer.get('last_seen', '').strftime('%b %d, %Y').lower() if developer.get('last_seen') else ''
+            
+            if (search_term in name or 
+                search_term in email or 
+                search_term in first_seen or 
+                search_term in last_seen):
+                filtered_developers.append(developer)
+        all_developers = filtered_developers
+    
+    # Sort developers
+    if sort_by == 'name':
+        all_developers.sort(key=lambda x: x['name'].lower(), reverse=(sort_order == 'desc'))
+    elif sort_by == 'email':
+        all_developers.sort(key=lambda x: x['email'].lower(), reverse=(sort_order == 'desc'))
+    elif sort_by == 'first_seen':
+        all_developers.sort(key=lambda x: x.get('first_seen', datetime.min), reverse=(sort_order == 'desc'))
+    elif sort_by == 'last_seen':
+        all_developers.sort(key=lambda x: x.get('last_seen', datetime.min), reverse=(sort_order == 'desc'))
+    else:
+        all_developers.sort(key=lambda x: x.get('commit_count', x.get('total_commits', 0)), reverse=(sort_order == 'desc'))
+    
+    # Paginate
+    paginator = Paginator(all_developers, 20)
+    page_obj = paginator.get_page(page)
+    
+    # Prepare data for JSON response
+    developers_data = []
+    for dev in page_obj:
+        developers_data.append({
+            'name': dev['name'],
+            'email': dev['email'],
+            'first_seen': dev.get('first_seen', '').strftime('%b %d, %Y') if dev.get('first_seen') else '',
+            'last_seen': dev.get('last_seen', '').strftime('%b %d, %Y') if dev.get('last_seen') else '',
+            'is_grouped': dev.get('is_grouped', False),
+            'group_id': dev.get('group_id', ''),
+            'commit_count': dev.get('commit_count', 0)
+        })
+    
+    return JsonResponse({
+        'developers': developers_data,
+        'total_count': len(all_developers),
+        'grouped_count': len([d for d in all_developers if d.get('is_grouped', False)]),
+        'ungrouped_count': len(all_developers) - len([d for d in all_developers if d.get('is_grouped', False)]),
+        'has_previous': page_obj.has_previous(),
+        'has_next': page_obj.has_next(),
+        'current_page': page_obj.number,
+        'total_pages': page_obj.paginator.num_pages
+    })
 
 
 @login_required

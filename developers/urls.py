@@ -11,5 +11,6 @@ urlpatterns = [
     path('add-to-group/', views.add_to_group, name='add_to_group'),
     path('merge_group/', views.merge_group, name='merge_group'),
     path('add_identity_to_group/', views.add_identity_to_group, name='add_identity_to_group'),
+    path('search/', views.search_developers, name='search_developers'),
     path('<str:developer_id>/', views.developer_detail, name='detail'),
 ] 

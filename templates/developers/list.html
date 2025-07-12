@@ -10,6 +10,13 @@
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold text-dark-gray">Developers</h1>
         <div class="flex space-x-2">
+            <button onclick="openCreateGroupModal()" 
+                    class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-4 py-2 font-semibold shadow-soft hover:shadow-glow transition-all duration-300">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Create Group
+            </button>
             <button onclick="autoGroupDevelopers()" 
                     class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-4 py-2 font-semibold shadow-soft hover:shadow-glow transition-all duration-300">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,6 +46,13 @@
         <div class="stat">
             <div class="stat-title">Individual</div>
             <div class="stat-value text-info">{{ ungrouped_count }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Search</div>
+            <div class="stat-value">
+                <input type="text" id="searchInput" value="{{ search_term }}" placeholder="Search developers..." 
+                       class="input input-bordered input-sm w-full max-w-xs" />
+            </div>
         </div>
     </div>
 
@@ -174,7 +188,7 @@
                     <div class="flex justify-center mt-6">
                         <div class="join">
                             {% if page_obj.has_previous %}
-                                <a href="?page={{ page_obj.previous_page_number }}{% if sort_by %}&sort={{ sort_by }}{% endif %}{% if sort_order %}&order={{ sort_order }}{% endif %}" class="join-item btn">«</a>
+                                <a href="?page={{ page_obj.previous_page_number }}{% if sort_by %}&sort={{ sort_by }}{% endif %}{% if sort_order %}&order={{ sort_order }}{% endif %}{% if search_term %}&search={{ search_term }}{% endif %}" class="join-item btn">«</a>
                             {% endif %}
                             
                             <span class="join-item btn btn-disabled">
@@ -182,7 +196,7 @@
                             </span>
                             
                             {% if page_obj.has_next %}
-                                <a href="?page={{ page_obj.next_page_number }}{% if sort_by %}&sort={{ sort_by }}{% endif %}{% if sort_order %}&order={{ sort_order }}{% endif %}" class="join-item btn">»</a>
+                                <a href="?page={{ page_obj.next_page_number }}{% if sort_by %}&sort={{ sort_by }}{% endif %}{% if sort_order %}&order={{ sort_order }}{% endif %}{% if search_term %}&search={{ search_term }}{% endif %}" class="join-item btn">»</a>
                             {% endif %}
                         </div>
                     </div>
@@ -203,26 +217,30 @@
 <!-- Nouvelle modale DaisyUI pour ajout à un groupe existant -->
 <input type="checkbox" id="addToGroupModal" class="modal-toggle" />
 <div class="modal" id="addToGroupModalContainer">
-  <div class="modal-box">
-    <h3 class="font-bold text-lg mb-2">Ajouter à un groupe existant</h3>
+  <div class="modal-box w-11/12 max-w-4xl" style="height: 600px;">
+    <h3 class="font-bold text-lg mb-2">Add to Existing Group</h3>
     <form id="addToGroupForm" class="space-y-4">
       <div>
-        <span class="font-semibold">Nom :</span>
+        <span class="font-semibold">Name:</span>
         <span id="modalDevName"></span>
       </div>
       <div>
-        <span class="font-semibold">Email :</span>
+        <span class="font-semibold">Email:</span>
         <span id="modalDevEmail"></span>
       </div>
       <div>
-        <label class="label" for="groupSelect">Groupe existant</label>
-        <select id="groupSelect" class="select select-bordered w-full" required>
-          <option value="">Chargement...</option>
-        </select>
+        <label class="label" for="groupSelect">Existing Group</label>
+        <div class="relative">
+          <input type="text" id="groupSelect" placeholder="Start typing to search..." 
+                 class="input input-bordered w-full" required autocomplete="off" />
+          <div id="groupDropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto hidden">
+            <!-- Options will be populated here -->
+          </div>
+        </div>
       </div>
       <div class="modal-action">
-        <button type="submit" class="btn btn-primary">Ajouter</button>
-        <label for="addToGroupModal" class="btn">Annuler</label>
+        <button type="submit" class="btn btn-primary">Add</button>
+        <label for="addToGroupModal" class="btn">Cancel</label>
       </div>
     </form>
   </div>
@@ -231,25 +249,51 @@
 <!-- Modale pour fusionner des groupes -->
 <input type="checkbox" id="mergeGroupsModal" class="modal-toggle" />
 <div class="modal" id="mergeGroupsModalContainer">
-  <div class="modal-box">
-    <h3 class="font-bold text-lg mb-2">Fusionner le groupe</h3>
+  <div class="modal-box w-11/12 max-w-4xl" style="height: 600px;">
+    <h3 class="font-bold text-lg mb-2">Merge Group</h3>
     <form id="mergeGroupsForm" class="space-y-4">
       <div>
-        <label class="label">Groupe source (sera supprimé)</label>
+        <label class="label">Source Group (will be deleted)</label>
         <div class="input input-bordered w-full bg-gray-100" id="sourceGroupDisplay">
-          Chargement...
+          Loading...
         </div>
         <input type="hidden" id="sourceGroupId" name="source_group_id">
       </div>
       <div>
-        <label class="label" for="targetGroupSelect">Groupe de destination (recevra les identités)</label>
-        <select id="targetGroupSelect" class="select select-bordered w-full" required>
-          <option value="">Chargement...</option>
-        </select>
+        <label class="label" for="targetGroupSelect">Destination Group (will receive identities)</label>
+        <div class="relative">
+          <input type="text" id="targetGroupSelect" placeholder="Start typing to search..." 
+                 class="input input-bordered w-full" required autocomplete="off" />
+          <div id="targetGroupDropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto hidden">
+            <!-- Options will be populated here -->
+          </div>
+        </div>
       </div>
       <div class="modal-action">
-        <button type="submit" class="btn btn-warning">Fusionner</button>
-        <label for="mergeGroupsModal" class="btn">Annuler</label>
+        <button type="submit" class="btn btn-warning">Merge</button>
+        <label for="mergeGroupsModal" class="btn">Cancel</label>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modale pour créer un nouveau groupe -->
+<input type="checkbox" id="createGroupModal" class="modal-toggle" />
+<div class="modal" id="createGroupModalModalContainer">
+  <div class="modal-box w-11/12 max-w-4xl" style="height: 600px;">
+    <h3 class="font-bold text-lg mb-2">Create New Group</h3>
+    <form id="createGroupForm" class="space-y-4">
+      <div>
+        <label class="label" for="newGroupName">Group Name</label>
+        <input type="text" id="newGroupName" class="input input-bordered w-full" required>
+      </div>
+      <div>
+        <label class="label" for="newGroupEmail">Group Email</label>
+        <input type="email" id="newGroupEmail" class="input input-bordered w-full" required>
+      </div>
+      <div class="modal-action">
+        <button type="submit" class="btn btn-primary">Create Group</button>
+        <label for="createGroupModal" class="btn">Cancel</label>
       </div>
     </form>
   </div>
@@ -262,9 +306,14 @@ function openAddToGroupModal(name, email) {
   document.getElementById('modalDevEmail').textContent = email;
   document.getElementById('addToGroupModal').checked = true;
   
+  // Reset search input
+  const groupInput = document.getElementById('groupSelect');
+  const groupDropdown = document.getElementById('groupDropdown');
+  groupInput.value = '';
+  groupInput.selectedGroupId = '';
+  
   // Afficher un message de chargement
-  const select = document.getElementById('groupSelect');
-  select.innerHTML = '<option value="">Chargement...</option>';
+  groupInput.placeholder = 'Chargement...';
   
   fetch('/developers/list_groups/')
     .then(res => {
@@ -282,16 +331,13 @@ function openAddToGroupModal(name, email) {
       });
     })
     .then(data => {
-      const select = document.getElementById('groupSelect');
-      select.innerHTML = '';
-      
       if (data.error) {
-        select.innerHTML = '<option value="">Erreur: ' + data.error + '</option>';
+        groupInput.placeholder = 'Error: ' + data.error;
         return;
       }
       
       if (!data.groups || data.groups.length === 0) {
-        select.innerHTML = '<option value="">Aucun groupe disponible</option>';
+        groupInput.placeholder = 'No groups available';
         return;
       }
       
@@ -302,32 +348,28 @@ function openAddToGroupModal(name, email) {
         return nameA.localeCompare(nameB);
       });
       
-      sortedGroups.forEach(group => {
-        try {
-          const opt = document.createElement('option');
-          opt.value = group.id || '';
-          // Échapper les caractères spéciaux pour éviter les problèmes d'affichage
-          const displayName = (group.name || '').replace(/[<>]/g, '');
-          const displayEmail = (group.email || '').replace(/[<>]/g, '');
-          opt.textContent = `${displayName} (${displayEmail})`;
-          select.appendChild(opt);
-        } catch (groupError) {
-          console.error('Error processing group:', groupError, group);
-        }
-      });
+      // Store all groups for filtering
+      groupInput.allGroups = sortedGroups;
+      groupInput.placeholder = 'Start typing to search...';
     })
     .catch(error => {
       console.error('Error loading groups:', error);
-      const select = document.getElementById('groupSelect');
-      select.innerHTML = '<option value="">Erreur de chargement</option>';
+      groupInput.placeholder = 'Loading error';
     });
 }
 
 document.getElementById('addToGroupForm').addEventListener('submit', function(e) {
   e.preventDefault();
-  const groupId = document.getElementById('groupSelect').value;
+  const groupInput = document.getElementById('groupSelect');
+  const groupId = groupInput.selectedGroupId;
   const name = document.getElementById('modalDevName').textContent;
   const email = document.getElementById('modalDevEmail').textContent;
+  
+  if (!groupId) {
+    alert('Veuillez sélectionner un groupe');
+    return;
+  }
+  
   fetch('/developers/add_identity_to_group/', {
     method: 'POST',
     headers: {
@@ -339,14 +381,13 @@ document.getElementById('addToGroupForm').addEventListener('submit', function(e)
   .then(res => res.json())
   .then(resp => {
     if (resp.success) {
-      alert('Identité ajoutée au groupe !');
       document.getElementById('addToGroupModal').checked = false;
       window.location.reload();
     } else {
-      alert('Erreur : ' + (resp.error || 'Inconnue'));
+      alert('Error: ' + (resp.error || 'Unknown'));
     }
   })
-  .catch(() => alert('Erreur réseau'));
+  .catch(() => alert('Network error'));
 });
 
 function autoGroupDevelopers() {
@@ -452,6 +493,13 @@ function openMergeGroupsModalForGroup(name, email, groupId) {
   // Ouvrir la modale de fusion
   document.getElementById('mergeGroupsModal').checked = true;
   
+  // Reset search input
+  const targetGroupInput = document.getElementById('targetGroupSelect');
+  if (targetGroupInput) {
+    targetGroupInput.value = '';
+    targetGroupInput.selectedGroupId = '';
+  }
+  
   // Afficher le groupe source
   document.getElementById('sourceGroupDisplay').textContent = `${name} (${email})`;
   document.getElementById('sourceGroupId').value = groupId; // Set the hidden input
@@ -460,11 +508,214 @@ function openMergeGroupsModalForGroup(name, email, groupId) {
   loadTargetGroupsForMerge();
 }
 
+function openCreateGroupModal() {
+  // Reset form fields
+  document.getElementById('newGroupName').value = '';
+  document.getElementById('newGroupEmail').value = '';
+  
+  // Open the modal
+  document.getElementById('createGroupModal').checked = true;
+}
+
+// Search functionality with debounce and AJAX
+let searchTimeout;
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('searchInput');
+  const tableBody = document.querySelector('tbody');
+  const statsContainer = document.querySelector('.stats');
+  
+  searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    
+    searchTimeout = setTimeout(() => {
+      const searchTerm = this.value.trim();
+      
+      // Show loading state
+      if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="loading loading-spinner loading-md"></div></td></tr>';
+      }
+      
+      // Build AJAX URL
+      const params = new URLSearchParams();
+      if (searchTerm) {
+        params.set('q', searchTerm);
+      }
+      params.set('sort', '{{ sort_by }}');
+      params.set('order', '{{ sort_order }}');
+      
+      // Fetch results via AJAX
+      fetch(`/developers/search/?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+          // Update table body
+          if (tableBody) {
+            let tableHTML = '';
+            if (data.developers.length === 0) {
+              tableHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No developers found.</td></tr>';
+            } else {
+              data.developers.forEach(dev => {
+                const nameCell = dev.is_grouped 
+                  ? `<a href="/developers/${dev.group_id}/" class="font-medium text-primary-blue hover:text-primary-green transition-colors duration-300">${dev.name}</a>`
+                  : `<span class="font-medium text-gray-500">${dev.name}</span>`;
+                
+                const badge = dev.is_grouped ? '<span class="badge badge-success">Grouped</span>' : '';
+                
+                const actionsCell = dev.group_id 
+                  ? `<button class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-lg px-3 py-1 text-xs font-semibold shadow-soft hover:shadow-glow transition-all duration-300" onclick="openAddToGroupModal('${dev.name.replace(/'/g, "\\'")}', '${dev.email.replace(/'/g, "\\'")}')">Add to Group</button>`
+                  : '<span class="text-xs text-gray-500">No ID</span>';
+                
+                tableHTML += `
+                  <tr class="hover">
+                    <td>
+                      <div class="flex items-center space-x-2">
+                        ${nameCell}
+                        ${badge}
+                      </div>
+                    </td>
+                    <td>${dev.email}</td>
+                    <td>${dev.first_seen}</td>
+                    <td>${dev.last_seen}</td>
+                    <td>
+                      <div class="flex space-x-2">
+                        ${actionsCell}
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              });
+            }
+            tableBody.innerHTML = tableHTML;
+          }
+          
+          // Update stats
+          if (statsContainer) {
+            const totalStat = statsContainer.querySelector('.stat:nth-child(1) .stat-value');
+            const groupedStat = statsContainer.querySelector('.stat:nth-child(2) .stat-value');
+            const individualStat = statsContainer.querySelector('.stat:nth-child(3) .stat-value');
+            
+            if (totalStat) totalStat.textContent = data.total_count;
+            if (groupedStat) groupedStat.textContent = data.grouped_count;
+            if (individualStat) individualStat.textContent = data.ungrouped_count;
+          }
+        })
+        .catch(error => {
+          console.error('Search error:', error);
+          if (tableBody) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-error">Error loading results</td></tr>';
+          }
+        });
+    }, 500); // 500ms delay
+  });
+});
+
+// Search functionality for group selectboxes with dropdown
+document.addEventListener('DOMContentLoaded', function() {
+  // Add to group modal search
+  const groupInput = document.getElementById('groupSelect');
+  const groupDropdown = document.getElementById('groupDropdown');
+  
+  if (groupInput) {
+    groupInput.addEventListener('input', function() {
+      const searchTerm = this.value.toLowerCase().trim();
+      
+      if (!this.allGroups) return;
+      
+      const filteredGroups = this.allGroups.filter(group => {
+        const name = (group.name || '').toLowerCase();
+        const email = (group.email || '').toLowerCase();
+        return name.includes(searchTerm) || email.includes(searchTerm);
+      });
+      
+      // Show/hide dropdown
+      if (searchTerm && filteredGroups.length > 0) {
+        groupDropdown.innerHTML = '';
+        filteredGroups.forEach(group => {
+          const option = document.createElement('div');
+          option.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
+          option.textContent = `${group.name} (${group.email})`;
+          option.dataset.value = group.id;
+          option.dataset.name = group.name;
+          option.dataset.email = group.email;
+          
+          option.addEventListener('click', function() {
+            groupInput.value = `${group.name} (${group.email})`;
+            groupInput.selectedGroupId = group.id;
+            groupDropdown.classList.add('hidden');
+          });
+          
+          groupDropdown.appendChild(option);
+        });
+        groupDropdown.classList.remove('hidden');
+      } else {
+        groupDropdown.classList.add('hidden');
+      }
+    });
+    
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!groupInput.contains(e.target) && !groupDropdown.contains(e.target)) {
+        groupDropdown.classList.add('hidden');
+      }
+    });
+  }
+  
+  // Merge groups modal search
+  const targetGroupInput = document.getElementById('targetGroupSelect');
+  const targetGroupDropdown = document.getElementById('targetGroupDropdown');
+  
+  if (targetGroupInput) {
+    targetGroupInput.addEventListener('input', function() {
+      const searchTerm = this.value.toLowerCase().trim();
+      
+      if (!this.allGroups) return;
+      
+      const filteredGroups = this.allGroups.filter(group => {
+        const name = (group.name || '').toLowerCase();
+        const email = (group.email || '').toLowerCase();
+        return name.includes(searchTerm) || email.includes(searchTerm);
+      });
+      
+      // Show/hide dropdown
+      if (searchTerm && filteredGroups.length > 0) {
+        targetGroupDropdown.innerHTML = '';
+        filteredGroups.forEach(group => {
+          const option = document.createElement('div');
+          option.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
+          option.textContent = `${group.name} (${group.email})`;
+          option.dataset.value = group.id;
+          option.dataset.name = group.name;
+          option.dataset.email = group.email;
+          
+          option.addEventListener('click', function() {
+            targetGroupInput.value = `${group.name} (${group.email})`;
+            targetGroupInput.selectedGroupId = group.id;
+            targetGroupDropdown.classList.add('hidden');
+          });
+          
+          targetGroupDropdown.appendChild(option);
+        });
+        targetGroupDropdown.classList.remove('hidden');
+      } else {
+        targetGroupDropdown.classList.add('hidden');
+      }
+    });
+    
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!targetGroupInput.contains(e.target) && !targetGroupDropdown.contains(e.target)) {
+        targetGroupDropdown.classList.add('hidden');
+      }
+    });
+  }
+});
+
 function loadTargetGroupsForMerge() {
-  const targetSelect = document.getElementById('targetGroupSelect');
+  const targetInput = document.getElementById('targetGroupSelect');
   const sourceGroupId = document.getElementById('sourceGroupId').value;
   
-  targetSelect.innerHTML = '<option value="">Chargement...</option>';
+  targetInput.value = '';
+  targetInput.selectedGroupId = '';
+  targetInput.placeholder = 'Chargement...';
   
   fetch('/developers/list_groups/')
     .then(res => {
@@ -483,12 +734,12 @@ function loadTargetGroupsForMerge() {
     })
     .then(data => {
       if (data.error) {
-        targetSelect.innerHTML = '<option value="">Erreur: ' + data.error + '</option>';
+        targetInput.placeholder = 'Error: ' + data.error;
         return;
       }
       
       if (!data.groups || data.groups.length === 0) {
-        targetSelect.innerHTML = '<option value="">Aucun groupe disponible</option>';
+        targetInput.placeholder = 'No groups available';
         return;
       }
       
@@ -499,29 +750,13 @@ function loadTargetGroupsForMerge() {
         return nameA.localeCompare(nameB);
       });
       
-      targetSelect.innerHTML = '<option value="">Sélectionner un groupe de destination...</option>';
-      
-      sortedGroups.forEach(group => {
-        try {
-          // Exclure le groupe source de la liste des destinations
-          if (group.id === sourceGroupId) {
-            return;
-          }
-          
-          const opt = document.createElement('option');
-          opt.value = group.id || '';
-          const displayName = (group.name || '').replace(/[<>]/g, '');
-          const displayEmail = (group.email || '').replace(/[<>]/g, '');
-          opt.textContent = `${displayName} (${displayEmail})`;
-          targetSelect.appendChild(opt);
-        } catch (groupError) {
-          console.error('Error processing group:', groupError, group);
-        }
-      });
+      // Store all groups for filtering (excluding source group)
+      targetInput.allGroups = sortedGroups.filter(group => group.id !== sourceGroupId);
+      targetInput.placeholder = 'Start typing to search...';
     })
     .catch(error => {
       console.error('Error loading groups:', error);
-      targetSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+      targetInput.placeholder = 'Loading error';
     });
 }
 
@@ -530,20 +765,21 @@ document.getElementById('mergeGroupsForm').addEventListener('submit', function(e
   e.preventDefault();
   
   const sourceGroupId = document.getElementById('sourceGroupId').value;
-  const targetGroupId = document.getElementById('targetGroupSelect').value;
+  const targetGroupInput = document.getElementById('targetGroupSelect');
+  const targetGroupId = targetGroupInput.selectedGroupId;
   
   if (!sourceGroupId || !targetGroupId) {
-    alert('Veuillez sélectionner un groupe de destination');
+    alert('Please select a destination group');
     return;
   }
   
   if (sourceGroupId === targetGroupId) {
-    alert('Le groupe de destination doit être différent du groupe source');
+    alert('The destination group must be different from the source group');
     return;
   }
   
-  // Confirmation avant fusion
-  if (!confirm('Êtes-vous sûr de vouloir fusionner ce groupe ? Il sera supprimé après la fusion.')) {
+  // Confirmation before merge
+  if (!confirm('Are you sure you want to merge this group? It will be deleted after the merge.')) {
     return;
   }
   
@@ -567,16 +803,63 @@ document.getElementById('mergeGroupsForm').addEventListener('submit', function(e
   .then(res => res.json())
   .then(data => {
     if (data.success) {
-      alert(`Fusion réussie ! ${data.aliases_moved} identités ont été déplacées.`);
       document.getElementById('mergeGroupsModal').checked = false;
       window.location.reload();
     } else {
-      alert('Erreur : ' + (data.error || 'Inconnue'));
+      alert('Error: ' + (data.error || 'Unknown'));
     }
   })
   .catch(error => {
     console.error('Error:', error);
-    alert('Erreur réseau lors de la fusion');
+    alert('Network error during merge');
+  })
+  .finally(() => {
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
+  });
+});
+
+// Gestionnaire pour le formulaire de création de groupe
+document.getElementById('createGroupForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const name = document.getElementById('newGroupName').value.trim();
+  const email = document.getElementById('newGroupEmail').value.trim();
+  
+  if (!name || !email) {
+    alert('Please fill in both name and email fields');
+    return;
+  }
+  
+  // Show loading state
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.innerHTML = 'Creating...';
+  submitBtn.disabled = true;
+  
+  fetch('/developers/create-group/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    },
+    body: JSON.stringify({
+      name: name,
+      email: email
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      document.getElementById('createGroupModal').checked = false;
+      window.location.reload();
+    } else {
+      alert('Error: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Network error while creating group');
   })
   .finally(() => {
     submitBtn.innerHTML = originalText;
