@@ -11,20 +11,13 @@
         <h1 class="text-2xl font-bold text-dark-gray">Developers</h1>
         <div class="flex space-x-2">
             <button onclick="autoGroupDevelopers()" 
-                    class="btn btn-primary btn-sm">
+                    class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-4 py-2 font-semibold shadow-soft hover:shadow-glow transition-all duration-300">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                 </svg>
                 Auto-Group Developers
             </button>
-            <button onclick="mergeExistingGroups()" 
-                    class="btn btn-secondary btn-sm">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
-                </svg>
-                Merge Groups
-            </button>
-            <a href="{% url 'developers:sync' %}" class="btn btn-outline btn-sm">
+            <a href="{% url 'developers:sync' %}" class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-4 py-2 font-semibold shadow-soft hover:shadow-glow transition-all duration-300">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                 </svg>
@@ -135,11 +128,16 @@
                                 <tr class="hover">
                                     <td>
                                         <div class="flex items-center space-x-2">
-                                            <span class="font-medium">{{ developer.name }}</span>
+                                            {% if developer.group_id %}
+                                                <a href="{% url 'developers:detail' developer.group_id %}" 
+                                                   class="font-medium text-primary-blue hover:text-primary-green transition-colors duration-300">
+                                                    {{ developer.name }}
+                                                </a>
+                                            {% else %}
+                                                <span class="font-medium text-gray-500">{{ developer.name }}</span>
+                                            {% endif %}
                                             {% if developer.is_grouped %}
                                                 <span class="badge badge-success">Grouped</span>
-                                            {% else %}
-                                                <span class="badge badge-info">Individual</span>
                                             {% endif %}
                                         </div>
                                     </td>
@@ -149,17 +147,13 @@
                                     <td>
                                         <div class="flex space-x-2">
                                             {% if developer.group_id %}
-                                                <a href="{% url 'developers:detail' developer.group_id %}" 
-                                                   class="btn btn-xs btn-outline btn-primary">
-                                                    View Stats
-                                                </a>
                                                 {% if developer.is_grouped %}
-                                                    <button class="btn btn-xs btn-outline btn-warning"
+                                                    <button class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-lg px-3 py-1 text-xs font-semibold shadow-soft hover:shadow-glow transition-all duration-300"
                                                             onclick="openMergeGroupsModalForGroup('{{ developer.name|escapejs }}', '{{ developer.email|escapejs }}', '{{ developer.group_id|escapejs }}')">
                                                         Merge Group
                                                     </button>
                                                 {% else %}
-                                                    <button class="btn btn-xs btn-outline btn-secondary"
+                                                    <button class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-lg px-3 py-1 text-xs font-semibold shadow-soft hover:shadow-glow transition-all duration-300"
                                                             onclick="openAddToGroupModal('{{ developer.name|escapejs }}', '{{ developer.email|escapejs }}')">
                                                         Add to Group
                                                     </button>
