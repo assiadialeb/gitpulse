@@ -231,6 +231,54 @@ def developer_list(request):
     return render(request, 'developers/list.html', context)
 
 
+def _generate_commit_quality_data(commits_query):
+    """Generate commit quality metrics for a developer"""
+    import re
+    
+    # Define patterns for generic vs explicit messages
+    generic_patterns = [
+        r'^wip$', r'^fix$', r'^update$', r'^cleanup$', r'^refactor$',
+        r'^typo$', r'^style$', r'^format$', r'^test$', r'^docs$',
+        r'^chore:', r'^feat:', r'^fix:', r'^docs:', r'^style:',
+        r'^refactor:', r'^test:', r'^chore\(', r'^feat\(', r'^fix\(',
+        r'^update\s+\w+$', r'^fix\s+\w+$', r'^add\s+\w+$'
+    ]
+    
+    explicit_count = 0
+    generic_count = 0
+    total_commits = 0
+    
+    for commit in commits_query:
+        total_commits += 1
+        message = commit.message.lower().strip()
+        
+        # Check if message matches generic patterns
+        is_generic = False
+        for pattern in generic_patterns:
+            if re.match(pattern, message):
+                is_generic = True
+                break
+        
+        if is_generic:
+            generic_count += 1
+        else:
+            explicit_count += 1
+    
+    if total_commits > 0:
+        explicit_ratio = (explicit_count / total_commits) * 100
+        generic_ratio = (generic_count / total_commits) * 100
+    else:
+        explicit_ratio = 0
+        generic_ratio = 0
+    
+    return {
+        'total_commits': total_commits,
+        'explicit_commits': explicit_count,
+        'generic_commits': generic_count,
+        'explicit_ratio': round(explicit_ratio, 1),
+        'generic_ratio': round(generic_ratio, 1)
+    }
+
 def _generate_polar_chart_data(commits_query):
     """Generate polar area chart data for repositories by net lines added"""
     from collections import defaultdict
@@ -368,6 +416,7 @@ def developer_detail(request, developer_id):
                 # Generate chart data
                 chart_data, min_date, max_date = _generate_chart_data(Commit.objects(query))
                 polar_chart_data = _generate_polar_chart_data(Commit.objects(query))
+                commit_quality = _generate_commit_quality_data(Commit.objects(query))
                 
                 context = {
                     'developer': {
@@ -380,6 +429,7 @@ def developer_detail(request, developer_id):
                     'identities': aliases,
                     'chart_data': json.dumps(chart_data),
                     'polar_chart_data': json.dumps(polar_chart_data),
+                    'commit_quality': commit_quality,
                     'min_date': min_date,
                     'max_date': max_date,
                     'first_commit': first_commit,
@@ -416,6 +466,7 @@ def developer_detail(request, developer_id):
             # Generate chart data
             chart_data, min_date, max_date = _generate_chart_data(Commit.objects(query))
             polar_chart_data = _generate_polar_chart_data(Commit.objects(query))
+            commit_quality = _generate_commit_quality_data(Commit.objects(query))
             
             context = {
                 'developer': {
@@ -426,6 +477,7 @@ def developer_detail(request, developer_id):
                 },
                 'chart_data': json.dumps(chart_data),
                 'polar_chart_data': json.dumps(polar_chart_data),
+                'commit_quality': commit_quality,
                 'min_date': min_date,
                 'max_date': max_date,
                 'first_commit': first_commit,
