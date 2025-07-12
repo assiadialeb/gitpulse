@@ -277,6 +277,10 @@ class GitSyncService:
                 # Parse commit data
                 parsed_data = self._parse_commit_data(commit_data, repo_full_name, application_id)
                 
+                # Add commit classification
+                from .commit_classifier import classify_commit
+                parsed_data['commit_type'] = classify_commit(commit_data.get('message', ''))
+                
                 # Store or update commit
                 if existing_commit:
                     # Update existing commit

@@ -327,6 +327,18 @@ class AnalyticsService:
             'generic_ratio': round(generic_ratio, 1)
         }
     
+    def get_commit_type_distribution(self) -> Dict:
+        """
+        Get commit type distribution statistics
+        
+        Returns:
+            Dictionary with commit type statistics
+        """
+        from .commit_classifier import get_commit_type_stats
+        
+        commits = self.commits.all()
+        return get_commit_type_stats(commits)
+    
     def get_overall_stats(self) -> Dict:
         """
         Get overall application statistics with grouped developers

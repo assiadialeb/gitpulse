@@ -80,6 +80,20 @@ def api_commit_quality(request, application_id):
     return JsonResponse(data)
 
 
+@login_required
+@require_http_methods(["GET"])
+def api_commit_types(request, application_id):
+    """
+    API endpoint for commit type distribution
+    """
+    application = get_object_or_404(Application, id=application_id, owner=request.user)
+    
+    analytics = AnalyticsService(application_id)
+    data = analytics.get_commit_type_distribution()
+    
+    return JsonResponse(data)
+
+
 # These views have been removed as auto-grouping is no longer supported
 # Use the global developer grouping in /developers/ instead
 

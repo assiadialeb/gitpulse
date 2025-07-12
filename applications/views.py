@@ -61,7 +61,26 @@ def application_detail(request, pk):
             'bubble_chart': analytics.get_bubble_chart_data(days=30),
             'code_distribution': analytics.get_code_distribution(),
             'commit_quality': analytics.get_commit_quality_metrics(),
+            'commit_types': analytics.get_commit_type_distribution(),
         }
+        doughnut_colors = {
+            'fix': '#4caf50',
+            'feature': '#2196f3',
+            'docs': '#ffeb3b',
+            'refactor': '#ff9800',
+            'test': '#9c27b0',
+            'style': '#00bcd4',
+            'chore': '#607d8b',
+            'other': '#bdbdbd',
+        }
+        context['doughnut_colors'] = doughnut_colors
+        context['commit_type_labels'] = json.dumps(list(context['commit_types']['counts'].keys()))
+        context['commit_type_values'] = json.dumps(list(context['commit_types']['counts'].values()))
+        legend_data = []
+        for label, count in context['commit_types']['counts'].items():
+            color = context['doughnut_colors'].get(label, '#bdbdbd')
+            legend_data.append({'label': label, 'count': count, 'color': color})
+        context['commit_type_legend'] = legend_data
     except ImportError:
         # If analytics app is not available, provide empty data
         context = {

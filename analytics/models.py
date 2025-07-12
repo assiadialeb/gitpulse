@@ -105,6 +105,9 @@ class Commit(Document):
     total_changes = fields.IntField(default=0)
     files_changed = fields.ListField(fields.EmbeddedDocumentField(FileChange))
     
+    # Commit classification
+    commit_type = fields.StringField(choices=['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other'], default='other')
+    
     # Metadata
     parent_shas = fields.ListField(fields.StringField(max_length=40))
     tree_sha = fields.StringField(max_length=40)

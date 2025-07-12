@@ -97,10 +97,10 @@
                         </div>
                     </div>
 
-                    <!-- Developer Activity Section -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                        <!-- Developer Activity Chart -->
-                        <div class="card-modern p-6">
+                    <!-- Developer Activity and Commit Analytics -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        <!-- Left Column: Developer Activity (spans full height) -->
+                        <div class="card-modern p-6 h-full">
                             <h3 class="text-xl font-semibold text-dark-gray mb-4">🧑‍💻 Developer Activity (Last 30 Days)</h3>
                             {% if developer_activity.developers %}
                             <div class="space-y-4">
@@ -125,37 +125,94 @@
                             </div>
                             {% endif %}
                         </div>
-
-                        <!-- Commit Quality -->
-                        <div class="card-modern p-6">
-                            <h3 class="text-xl font-semibold text-dark-gray mb-4">📝 Commit Quality</h3>
-                            {% if commit_quality.total_commits > 0 %}
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-medium-gray">Explicit Messages</span>
-                                    <span class="font-bold text-primary-green">{{ commit_quality.explicit_ratio }}%</span>
+                        
+                        <!-- Right Column: Commit Quality and Type Distribution -->
+                        <div class="flex flex-col space-y-6">
+                            <!-- Commit Quality -->
+                            <div class="card-modern p-6">
+                                <h3 class="text-xl font-semibold text-dark-gray mb-4">📝 Commit Quality</h3>
+                                {% if commit_quality.total_commits > 0 %}
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-medium-gray">Explicit Messages</span>
+                                        <span class="font-bold text-primary-green">{{ commit_quality.explicit_ratio }}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-primary-green h-2 rounded-full" style="width: {{ commit_quality.explicit_ratio }}%"></div>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-medium-gray">Generic Messages</span>
+                                        <span class="font-bold text-red-500">{{ commit_quality.generic_ratio }}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-red-500 h-2 rounded-full" style="width: {{ commit_quality.generic_ratio }}%"></div>
+                                    </div>
+                                    
+                                    <div class="mt-4 p-4 bg-light-gray rounded-xl">
+                                        <p class="text-sm text-medium-gray">Total commits analyzed: {{ commit_quality.total_commits }}</p>
+                                    </div>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-primary-green h-2 rounded-full" style="width: {{ commit_quality.explicit_ratio }}%"></div>
+                                {% else %}
+                                <div class="text-center py-8">
+                                    <p class="text-medium-gray">No commit quality data available</p>
                                 </div>
-                                
-                                <div class="flex items-center justify-between">
-                                    <span class="text-medium-gray">Generic Messages</span>
-                                    <span class="font-bold text-red-500">{{ commit_quality.generic_ratio }}%</span>
-                                </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-red-500 h-2 rounded-full" style="width: {{ commit_quality.generic_ratio }}%"></div>
-                                </div>
-                                
-                                <div class="mt-4 p-4 bg-light-gray rounded-xl">
-                                    <p class="text-sm text-medium-gray">Total commits analyzed: {{ commit_quality.total_commits }}</p>
-                                </div>
+                                {% endif %}
                             </div>
-                            {% else %}
-                            <div class="text-center py-8">
-                                <p class="text-medium-gray">No commits to analyze</p>
+                            
+                            <!-- Commit Type Distribution Doughnut Chart -->
+                            <div class="card-modern p-6">
+                                <h3 class="text-xl font-semibold text-dark-gray mb-4">🍩 Commit Type Distribution</h3>
+                                {% if commit_types.total > 0 %}
+                                <div class="flex items-start space-x-6">
+                                    <div class="relative" style="width: 280px; height: 280px;">
+                                        <canvas id="commitTypeDoughnut"></canvas>
+                                    </div>
+                                    <div class="flex flex-col space-y-3">
+                                        {% for item in commit_type_legend %}
+                                            <div class="flex items-center space-x-2">
+                                                <span class="inline-block w-4 h-4 rounded-full" style="background-color: {{ item.color }};"></span>
+                                                <span class="text-sm text-dark-gray font-medium">{{ item.label|title }} ({{ item.count }})</span>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                                <script>
+                                    const commitTypeData = {
+                                        labels: {{ commit_type_labels|safe }},
+                                        datasets: [{
+                                            data: {{ commit_type_values|safe }},
+                                            backgroundColor: [
+                                                '#4caf50', // fix
+                                                '#2196f3', // feature
+                                                '#ffeb3b', // docs
+                                                '#ff9800', // refactor
+                                                '#9c27b0', // test
+                                                '#00bcd4', // style
+                                                '#607d8b', // chore
+                                                '#bdbdbd', // other
+                                            ],
+                                            borderWidth: 1
+                                        }]
+                                    };
+                                    const ctx = document.getElementById('commitTypeDoughnut').getContext('2d');
+                                    new Chart(ctx, {
+                                        type: 'doughnut',
+                                        data: commitTypeData,
+                                        options: {
+                                            plugins: {
+                                                legend: { display: false }
+                                            }
+                                        }
+                                    });
+                                </script>
+                                {% else %}
+                                <div class="text-center py-8">
+                                    <p class="text-medium-gray">No commit type data available</p>
+                                </div>
+                                {% endif %}
                             </div>
-                            {% endif %}
                         </div>
                     </div>
 
