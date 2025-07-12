@@ -245,7 +245,20 @@
                     <!-- Commit Activity Bubble Chart -->
                     <div class="card-modern p-6">
                         <h3 class="text-xl font-semibold text-dark-gray mb-6">🕐 Commit Activity by Hour (Last 30 Days)</h3>
-                        {% if bubble_chart.bubbles %}
+                        {% if bubble_chart.datasets %}
+                        <!-- Repository Legend -->
+                        <div class="mb-4 p-4 bg-light-gray rounded-xl">
+                            <h4 class="text-sm font-semibold text-dark-gray mb-3">Repositories:</h4>
+                            <div class="flex flex-wrap gap-3" id="repository-legend">
+                                {% for dataset in bubble_chart.datasets %}
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-4 h-4 rounded-full" style="background-color: {{ dataset.backgroundColor }}; border: 2px solid {{ dataset.borderColor }};"></div>
+                                    <span class="text-sm text-dark-gray font-medium">{{ dataset.label }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
                         <div class="relative" style="height: 500px;">
                             <canvas id="bubbleChart" width="400" height="500"></canvas>
                         </div>
@@ -777,7 +790,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(showRateLimitStatus, 2000); // Show after 2 seconds
     
     // Initialize bubble chart if data is available
-    {% if bubble_chart.bubbles %}
+    {% if bubble_chart.datasets %}
     initializeBubbleChart();
     {% endif %}
 });
@@ -787,32 +800,26 @@ function initializeBubbleChart() {
     const ctx = document.getElementById('bubbleChart');
     if (!ctx) return;
     
-    const bubbleData = {{ bubble_chart.bubbles|safe }};
+    const chartData = {{ bubble_chart.datasets|safe }};
     
     new Chart(ctx, {
         type: 'bubble',
         data: {
-            datasets: [{
-                label: 'Commits',
-                data: bubbleData,
-                backgroundColor: 'rgba(16, 185, 129, 0.6)',
-                borderColor: 'rgba(16, 185, 129, 1)',
-                borderWidth: 1,
-                hoverBackgroundColor: 'rgba(16, 185, 129, 0.8)',
-                hoverBorderColor: 'rgba(16, 185, 129, 1)'
-            }]
+            datasets: chartData
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    display: false
+                    display: false  // We have a custom legend above the chart
                 },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `Commits: ${context.raw.commits}`;
+                            const repo = context.dataset.label;
+                            const commits = context.raw.commits;
+                            return `${repo}: ${commits} commits`;
                         }
                     }
                 }

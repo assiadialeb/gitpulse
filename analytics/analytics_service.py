@@ -140,53 +140,69 @@ class AnalyticsService:
     
     def get_bubble_chart_data(self, days: int = 30) -> Dict:
         """
-        Get bubble chart data for commit activity over time and hours
+        Get bubble chart data for commit activity over time and hours, split by repository
         
         Args:
             days: Number of days to analyze (default: 30)
             
         Returns:
-            Dictionary with bubble chart data
+            Dictionary with bubble chart data organized by repository
         """
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
-        # Group commits by date and hour
-        bubble_data = []
+        # Group commits by repository, date, and hour
+        repo_bubble_data = defaultdict(lambda: defaultdict(lambda: {'commits': 0}))
         
         for commit in recent_commits:
             date = commit.authored_date.date()
             hour = commit.authored_date.hour
+            repo = commit.repository_full_name
             
-            # Find existing bubble for this date/hour combination
-            existing_bubble = None
-            for bubble in bubble_data:
-                if bubble['date'] == date and bubble['hour'] == hour:
-                    existing_bubble = bubble
-                    break
-            
-            if existing_bubble:
-                existing_bubble['commits'] += 1
-            else:
-                bubble_data.append({
-                    'date': date,
-                    'hour': hour,
-                    'commits': 1
-                })
+            key = (date, hour)
+            repo_bubble_data[repo][key]['commits'] += 1
         
-        # Convert to Chart.js format
-        chart_data = []
-        for bubble in bubble_data:
-            chart_data.append({
-                'x': (datetime.utcnow().date() - bubble['date']).days,  # Days ago
-                'y': bubble['hour'],  # Hour of day (0-23)
-                'r': min(bubble['commits'] * 3, 20),  # Bubble radius based on commits
-                'commits': bubble['commits']
-            })
+        # Convert to Chart.js format with separate datasets per repository
+        datasets = []
+        colors = [
+            {'bg': 'rgba(16, 185, 129, 0.6)', 'border': 'rgba(16, 185, 129, 1)', 'hover': 'rgba(16, 185, 129, 0.8)'},  # Green
+            {'bg': 'rgba(59, 130, 246, 0.6)', 'border': 'rgba(59, 130, 246, 1)', 'hover': 'rgba(59, 130, 246, 0.8)'},  # Blue
+            {'bg': 'rgba(245, 158, 11, 0.6)', 'border': 'rgba(245, 158, 11, 1)', 'hover': 'rgba(245, 158, 11, 0.8)'},  # Orange
+            {'bg': 'rgba(239, 68, 68, 0.6)', 'border': 'rgba(239, 68, 68, 1)', 'hover': 'rgba(239, 68, 68, 0.8)'},  # Red
+            {'bg': 'rgba(139, 92, 246, 0.6)', 'border': 'rgba(139, 92, 246, 1)', 'hover': 'rgba(139, 92, 246, 0.8)'},  # Purple
+            {'bg': 'rgba(236, 72, 153, 0.6)', 'border': 'rgba(236, 72, 153, 1)', 'hover': 'rgba(236, 72, 153, 0.8)'},  # Pink
+        ]
+        
+        max_commits = 0
+        for i, (repo, bubbles) in enumerate(repo_bubble_data.items()):
+            color = colors[i % len(colors)]
+            dataset = {
+                'label': repo,
+                'data': [],
+                'backgroundColor': color['bg'],
+                'borderColor': color['border'],
+                'borderWidth': 1,
+                'hoverBackgroundColor': color['hover'],
+                'hoverBorderColor': color['border']
+            }
+            
+            for (date, hour), data in bubbles.items():
+                days_ago = (datetime.utcnow().date() - date).days
+                dataset['data'].append({
+                    'x': days_ago,
+                    'y': hour,
+                    'r': min(data['commits'] * 3, 20),
+                    'commits': data['commits'],
+                    'repository': repo
+                })
+                max_commits = max(max_commits, data['commits'])
+            
+            datasets.append(dataset)
         
         return {
-            'bubbles': chart_data,
-            'max_commits': max([b['commits'] for b in bubble_data]) if bubble_data else 0
+            'datasets': datasets,
+            'max_commits': max_commits,
+            'repositories': list(repo_bubble_data.keys())
         }
     
     def get_code_distribution(self) -> Dict:
