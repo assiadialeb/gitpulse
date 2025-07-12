@@ -144,11 +144,8 @@ def developer_list(request):
             
             # Create URL-safe encoded ID for the developer
             dev_data = f"{commit.author_name}|{commit.author_email}"
-            print(f"DEBUG: Creating ID for '{commit.author_name}' with email '{commit.author_email}'")
-            print(f"DEBUG: Dev data to encode: '{dev_data}'")
             # Use proper URL encoding
             encoded_data = urllib.parse.quote(dev_data, safe='')
-            print(f"DEBUG: Encoded data: '{encoded_data}'")
             developer = {
                 'name': commit.author_name,
                 'email': commit.author_email,
