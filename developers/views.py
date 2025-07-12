@@ -276,6 +276,12 @@ def _generate_commit_quality_data(commits_query):
         'generic_ratio': round(generic_ratio, 1)
     }
 
+def _generate_commit_type_distribution(commits_query):
+    """Generate commit type distribution for a developer"""
+    from analytics.commit_classifier import get_commit_type_stats
+    
+    return get_commit_type_stats(commits_query)
+
 def _generate_polar_chart_data(commits_query):
     """Generate polar area chart data for repositories by net lines added"""
     from collections import defaultdict
@@ -414,6 +420,19 @@ def developer_detail(request, developer_id):
                 chart_data, min_date, max_date = _generate_chart_data(Commit.objects(query))
                 polar_chart_data = _generate_polar_chart_data(Commit.objects(query))
                 commit_quality = _generate_commit_quality_data(Commit.objects(query))
+                commit_type_distribution = _generate_commit_type_distribution(Commit.objects(query))
+                
+                # Prepare doughnut chart data
+                doughnut_colors = {
+                    'fix': '#4caf50',
+                    'feature': '#2196f3',
+                    'docs': '#ffeb3b',
+                    'refactor': '#ff9800',
+                    'test': '#9c27b0',
+                    'style': '#00bcd4',
+                    'chore': '#607d8b',
+                    'other': '#bdbdbd',
+                }
                 
                 context = {
                     'developer': {
@@ -427,12 +446,22 @@ def developer_detail(request, developer_id):
                     'chart_data': json.dumps(chart_data),
                     'polar_chart_data': json.dumps(polar_chart_data),
                     'commit_quality': commit_quality,
+                    'commit_type_distribution': commit_type_distribution,
+                    'commit_type_labels': json.dumps(list(commit_type_distribution['counts'].keys())),
+                    'commit_type_values': json.dumps(list(commit_type_distribution['counts'].values())),
+                    'doughnut_colors': doughnut_colors,
                     'min_date': min_date,
                     'max_date': max_date,
                     'first_commit': first_commit,
                     'last_commit': last_commit,
                     'is_group': True
                 }
+                # Prépare la légende après
+                legend_data = []
+                for label, count in commit_type_distribution['counts'].items():
+                    color = doughnut_colors.get(label, '#bdbdbd')
+                    legend_data.append({'label': label, 'count': count, 'color': color})
+                context['commit_type_legend'] = legend_data
             except DeveloperGroup.DoesNotExist:
                 return redirect('developers:list')
         else:
@@ -464,6 +493,19 @@ def developer_detail(request, developer_id):
             chart_data, min_date, max_date = _generate_chart_data(Commit.objects(query))
             polar_chart_data = _generate_polar_chart_data(Commit.objects(query))
             commit_quality = _generate_commit_quality_data(Commit.objects(query))
+            commit_type_distribution = _generate_commit_type_distribution(Commit.objects(query))
+            
+            # Prepare doughnut chart data
+            doughnut_colors = {
+                'fix': '#4caf50',
+                'feature': '#2196f3',
+                'docs': '#ffeb3b',
+                'refactor': '#ff9800',
+                'test': '#9c27b0',
+                'style': '#00bcd4',
+                'chore': '#607d8b',
+                'other': '#bdbdbd',
+            }
             
             context = {
                 'developer': {
@@ -475,15 +517,26 @@ def developer_detail(request, developer_id):
                 'chart_data': json.dumps(chart_data),
                 'polar_chart_data': json.dumps(polar_chart_data),
                 'commit_quality': commit_quality,
+                'commit_type_distribution': commit_type_distribution,
+                'commit_type_labels': json.dumps(list(commit_type_distribution['counts'].keys())),
+                'commit_type_values': json.dumps(list(commit_type_distribution['counts'].values())),
+                'doughnut_colors': doughnut_colors,
                 'min_date': min_date,
                 'max_date': max_date,
                 'first_commit': first_commit,
                 'last_commit': last_commit,
                 'is_group': False
             }
+            # Prépare la légende après
+            legend_data = []
+            for label, count in commit_type_distribution['counts'].items():
+                color = doughnut_colors.get(label, '#bdbdbd')
+                legend_data.append({'label': label, 'count': count, 'color': color})
+            context['commit_type_legend'] = legend_data
     except Exception as e:
         print(f"Error processing developer: {str(e)}")
         return redirect('developers:list')
+    
     return render(request, 'developers/detail.html', context)
 
 import base64

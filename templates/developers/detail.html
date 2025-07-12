@@ -111,6 +111,62 @@
         </div>
     </div>
 
+    <!-- Commit Type Distribution Doughnut Chart -->
+    <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+            <h2 class="card-title text-xl">🍩 Commit Type Distribution</h2>
+            {% if commit_type_distribution.total > 0 %}
+            <div class="flex items-start space-x-6">
+                <div class="relative" style="width: 280px; height: 280px;">
+                    <canvas id="commitTypeDoughnut"></canvas>
+                </div>
+                <div class="flex flex-col space-y-3">
+                    {% for item in commit_type_legend %}
+                        <div class="flex items-center space-x-2">
+                            <span class="inline-block w-4 h-4 rounded-full" style="background-color: {{ item.color }};"></span>
+                            <span class="text-sm text-gray-700 font-medium">{{ item.label|title }} ({{ item.count }})</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+                const commitTypeData = {
+                    labels: {{ commit_type_labels|safe }},
+                    datasets: [{
+                        data: {{ commit_type_values|safe }},
+                        backgroundColor: [
+                            '#4caf50', // fix
+                            '#2196f3', // feature
+                            '#ffeb3b', // docs
+                            '#ff9800', // refactor
+                            '#9c27b0', // test
+                            '#00bcd4', // style
+                            '#607d8b', // chore
+                            '#bdbdbd', // other
+                        ],
+                        borderWidth: 1
+                    }]
+                };
+                const ctx = document.getElementById('commitTypeDoughnut').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: commitTypeData,
+                    options: {
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            </script>
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-gray-500">No commit type data available</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Activity Bubble Chart -->
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
