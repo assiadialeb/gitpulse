@@ -29,12 +29,15 @@
     {% if applications %}
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for application in applications %}
-        <div class="card-modern p-6 hover:shadow-glow transition-all duration-300 transform hover:scale-105">
-            <div class="flex items-start justify-between mb-4">
-                <div class="w-12 h-12 bg-gradient-to-r from-primary-green to-primary-blue rounded-xl flex items-center justify-center">
-                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                    </svg>
+        <div class="card-modern p-6 hover:shadow-glow transition-all duration-300 transform hover:scale-105 h-64 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-gradient-to-r from-primary-green to-primary-blue rounded-xl flex items-center justify-center mr-3">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-dark-gray">{{ application.name }}</h3>
                 </div>
                 <div class="dropdown dropdown-end">
                     <div tabindex="0" role="button" class="btn btn-ghost btn-sm rounded-xl">
@@ -59,9 +62,12 @@
                 </div>
             </div>
             
-            <div class="mb-4">
-                <h3 class="text-xl font-bold text-dark-gray mb-2">{{ application.name }}</h3>
-                <p class="text-medium-gray text-sm">{{ application.description|truncatewords:15 }}</p>
+            <div class="flex-grow mb-4">
+                {% if application.description %}
+                    <p class="text-medium-gray text-sm">{{ application.description|truncatewords:15 }}</p>
+                {% else %}
+                    <p class="text-medium-gray text-sm italic">No description available</p>
+                {% endif %}
             </div>
             
             <div class="flex items-center justify-between mb-4">
@@ -74,7 +80,7 @@
                 <span class="text-xs text-medium-gray">{{ application.created_at|date:"M d, Y" }}</span>
             </div>
             
-            <a href="{% url 'applications:detail' application.pk %}" class="btn btn-outline border-primary-green text-primary-green hover:bg-primary-green hover:text-white rounded-xl w-full font-semibold transition-all duration-300">
+            <a href="{% url 'applications:detail' application.pk %}" class="btn btn-outline border-primary-green text-primary-green hover:bg-primary-green hover:text-white rounded-xl w-full font-semibold transition-all duration-300 mt-auto">
                 View Details
             </a>
         </div>
