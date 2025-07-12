@@ -282,6 +282,17 @@ def _generate_commit_type_distribution(commits_query):
     
     return get_commit_type_stats(commits_query)
 
+
+def _generate_commit_frequency_data(commits_query):
+    """Generate commit frequency metrics for a developer"""
+    from analytics.analytics_service import AnalyticsService
+    
+    # Create a temporary analytics service instance
+    # We don't need application_id for this calculation
+    analytics_service = AnalyticsService(0)
+    
+    return analytics_service.get_developer_commit_frequency(commits_query)
+
 def _generate_polar_chart_data(commits_query):
     """Generate polar area chart data for repositories by net lines added"""
     from collections import defaultdict
@@ -421,6 +432,7 @@ def developer_detail(request, developer_id):
                 polar_chart_data = _generate_polar_chart_data(Commit.objects(query))
                 commit_quality = _generate_commit_quality_data(Commit.objects(query))
                 commit_type_distribution = _generate_commit_type_distribution(Commit.objects(query))
+                commit_frequency = _generate_commit_frequency_data(Commit.objects(query))
                 
                 # Prepare doughnut chart data
                 doughnut_colors = {
@@ -454,7 +466,8 @@ def developer_detail(request, developer_id):
                     'max_date': max_date,
                     'first_commit': first_commit,
                     'last_commit': last_commit,
-                    'is_group': True
+                    'is_group': True,
+                    'commit_frequency': commit_frequency,
                 }
                 # Prépare la légende après
                 legend_data = []
@@ -494,6 +507,7 @@ def developer_detail(request, developer_id):
             polar_chart_data = _generate_polar_chart_data(Commit.objects(query))
             commit_quality = _generate_commit_quality_data(Commit.objects(query))
             commit_type_distribution = _generate_commit_type_distribution(Commit.objects(query))
+            commit_frequency = _generate_commit_frequency_data(Commit.objects(query))
             
             # Prepare doughnut chart data
             doughnut_colors = {
@@ -525,7 +539,8 @@ def developer_detail(request, developer_id):
                 'max_date': max_date,
                 'first_commit': first_commit,
                 'last_commit': last_commit,
-                'is_group': False
+                'is_group': False,
+                'commit_frequency': commit_frequency,
             }
             # Prépare la légende après
             legend_data = []
@@ -603,14 +618,6 @@ def add_identity_to_group(request):
         return JsonResponse({'error': 'Groupe introuvable'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-            
-        # Fin du bloc if/else principal, plus de else orphelin ici
-            
-    except Exception as e:
-        print(f"Error processing developer: {str(e)}")
-        return redirect('developers:list')
-    
-    return render(request, 'developers/detail.html', context)
 
 
 @login_required

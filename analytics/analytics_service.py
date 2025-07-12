@@ -388,6 +388,130 @@ class AnalyticsService:
             'last_commit_date': last_commit.authored_date if last_commit else None,
             'avg_commits_per_day': round(avg_commits_per_day, 2)
         }
+
+    def get_application_commit_frequency(self) -> Dict:
+        """
+        Calculate commit frequency metrics for the entire application
+        
+        Returns:
+            Dictionary with application commit frequency metrics
+        """
+        from datetime import datetime, timedelta
+        import statistics
+        
+        commits = self.commits.all()
+        
+        if not commits:
+            return {
+                'avg_commits_per_day': 0,
+                'recent_activity_score': 0,
+                'consistency_score': 0,
+                'overall_frequency_score': 0,
+                'commits_last_30_days': 0,
+                'commits_last_90_days': 0,
+                'days_since_last_commit': None,
+                'active_days': 0,
+                'total_days': 0
+            }
+        
+        # Convert to list for processing
+        commits_list = list(commits.order_by('authored_date'))
+        
+        if not commits_list:
+            return {
+                'avg_commits_per_day': 0,
+                'recent_activity_score': 0,
+                'consistency_score': 0,
+                'overall_frequency_score': 0,
+                'commits_last_30_days': 0,
+                'commits_last_90_days': 0,
+                'days_since_last_commit': None,
+                'active_days': 0,
+                'total_days': 0
+            }
+        
+        now = datetime.utcnow()
+        first_commit = commits_list[0]
+        last_commit = commits_list[-1]
+        
+        # Calculate total time span
+        total_days = (last_commit.authored_date - first_commit.authored_date).days + 1
+        
+        # Calculate average commits per day
+        avg_commits_per_day = len(commits_list) / total_days if total_days > 0 else 0
+        
+        # Calculate recent activity (last 30 and 90 days)
+        cutoff_30 = now - timedelta(days=30)
+        cutoff_90 = now - timedelta(days=90)
+        
+        commits_last_30_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_30)
+        commits_last_90_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_90)
+        
+        # Calculate days since last commit
+        days_since_last_commit = (now - last_commit.authored_date).days
+        
+        # Calculate activity consistency
+        # Group commits by day to find active days
+        active_days = set()
+        for commit in commits_list:
+            active_days.add(commit.authored_date.date())
+        
+        active_days_count = len(active_days)
+        consistency_ratio = active_days_count / total_days if total_days > 0 else 0
+        
+        # Calculate gaps between commits (for consistency)
+        gaps = []
+        for i in range(1, len(commits_list)):
+            gap = (commits_list[i].authored_date - commits_list[i-1].authored_date).days
+            gaps.append(gap)
+        
+        avg_gap = statistics.mean(gaps) if gaps else 0
+        gap_std = statistics.stdev(gaps) if len(gaps) > 1 else 0
+        
+        # Calculate scores (0-100 scale)
+        
+        # Recent activity score (0-100)
+        # Based on commits in last 30 days vs 90 days
+        if commits_last_90_days > 0:
+            recent_activity_ratio = commits_last_30_days / commits_last_90_days
+            recent_activity_score = min(recent_activity_ratio * 100, 100)
+        else:
+            recent_activity_score = 0
+        
+        # Consistency score (0-100)
+        # Based on consistency ratio and gap standard deviation
+        consistency_score = min(consistency_ratio * 100, 100)
+        
+        # Overall frequency score (0-100)
+        # Weighted combination of different factors
+        weights = {
+            'avg_commits_per_day': 0.3,
+            'recent_activity': 0.4,
+            'consistency': 0.3
+        }
+        
+        # Normalize avg_commits_per_day (0-5 commits/day = 0-100 score)
+        normalized_avg = min(avg_commits_per_day * 20, 100)
+        
+        overall_frequency_score = (
+            normalized_avg * weights['avg_commits_per_day'] +
+            recent_activity_score * weights['recent_activity'] +
+            consistency_score * weights['consistency']
+        )
+        
+        return {
+            'avg_commits_per_day': round(avg_commits_per_day, 2),
+            'recent_activity_score': round(recent_activity_score, 1),
+            'consistency_score': round(consistency_score, 1),
+            'overall_frequency_score': round(overall_frequency_score, 1),
+            'commits_last_30_days': commits_last_30_days,
+            'commits_last_90_days': commits_last_90_days,
+            'days_since_last_commit': days_since_last_commit,
+            'active_days': active_days_count,
+            'total_days': total_days,
+            'avg_gap_between_commits': round(avg_gap, 1),
+            'gap_consistency': round(gap_std, 1)
+        }
     
     def get_grouped_developers(self) -> List[Dict]:
         """
@@ -620,4 +744,129 @@ class AnalyticsService:
             'generic_commits': generic_count,
             'explicit_ratio': round(explicit_ratio, 1),
             'generic_ratio': round(generic_ratio, 1)
+        }
+
+    def get_developer_commit_frequency(self, commits) -> Dict:
+        """
+        Calculate commit frequency metrics for a developer
+        
+        Args:
+            commits: QuerySet of commits for the developer
+            
+        Returns:
+            Dictionary with commit frequency metrics
+        """
+        from datetime import datetime, timedelta
+        import statistics
+        
+        if not commits:
+            return {
+                'avg_commits_per_day': 0,
+                'recent_activity_score': 0,
+                'consistency_score': 0,
+                'overall_frequency_score': 0,
+                'commits_last_30_days': 0,
+                'commits_last_90_days': 0,
+                'days_since_last_commit': None,
+                'active_days': 0,
+                'total_days': 0
+            }
+        
+        # Convert to list for processing
+        commits_list = list(commits.order_by('authored_date'))
+        
+        if not commits_list:
+            return {
+                'avg_commits_per_day': 0,
+                'recent_activity_score': 0,
+                'consistency_score': 0,
+                'overall_frequency_score': 0,
+                'commits_last_30_days': 0,
+                'commits_last_90_days': 0,
+                'days_since_last_commit': None,
+                'active_days': 0,
+                'total_days': 0
+            }
+        
+        now = datetime.utcnow()
+        first_commit = commits_list[0]
+        last_commit = commits_list[-1]
+        
+        # Calculate total time span
+        total_days = (last_commit.authored_date - first_commit.authored_date).days + 1
+        
+        # Calculate average commits per day
+        avg_commits_per_day = len(commits_list) / total_days if total_days > 0 else 0
+        
+        # Calculate recent activity (last 30 and 90 days)
+        cutoff_30 = now - timedelta(days=30)
+        cutoff_90 = now - timedelta(days=90)
+        
+        commits_last_30_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_30)
+        commits_last_90_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_90)
+        
+        # Calculate days since last commit
+        days_since_last_commit = (now - last_commit.authored_date).days
+        
+        # Calculate activity consistency
+        # Group commits by day to find active days
+        active_days = set()
+        for commit in commits_list:
+            active_days.add(commit.authored_date.date())
+        
+        active_days_count = len(active_days)
+        consistency_ratio = active_days_count / total_days if total_days > 0 else 0
+        
+        # Calculate gaps between commits (for consistency)
+        gaps = []
+        for i in range(1, len(commits_list)):
+            gap = (commits_list[i].authored_date - commits_list[i-1].authored_date).days
+            gaps.append(gap)
+        
+        avg_gap = statistics.mean(gaps) if gaps else 0
+        gap_std = statistics.stdev(gaps) if len(gaps) > 1 else 0
+        
+        # Calculate scores (0-100 scale)
+        
+        # Recent activity score (0-100)
+        # Based on commits in last 30 days vs 90 days
+        if commits_last_90_days > 0:
+            recent_activity_ratio = commits_last_30_days / commits_last_90_days
+            recent_activity_score = min(recent_activity_ratio * 100, 100)
+        else:
+            recent_activity_score = 0
+        
+        # Consistency score (0-100)
+        # Based on consistency ratio and gap standard deviation
+        consistency_score = min(consistency_ratio * 100, 100)
+        
+        # Overall frequency score (0-100)
+        # Weighted combination of different factors
+        weights = {
+            'avg_commits_per_day': 0.3,
+            'recent_activity': 0.4,
+            'consistency': 0.3
+        }
+        
+        # Normalize avg_commits_per_day (0-5 commits/day = 0-100 score)
+        normalized_avg = min(avg_commits_per_day * 20, 100)
+        
+        overall_frequency_score = (
+            normalized_avg * weights['avg_commits_per_day'] +
+            recent_activity_score * weights['recent_activity'] +
+            consistency_score * weights['consistency']
+        )
+        
+        return {
+            'avg_commits_per_day': round(avg_commits_per_day, 2),
+            'recent_activity_score': round(recent_activity_score, 1),
+            'consistency_score': round(consistency_score, 1),
+            'overall_frequency_score': round(overall_frequency_score, 1),
+            'commits_last_30_days': commits_last_30_days,
+            'commits_last_90_days': commits_last_90_days,
+            'days_since_last_commit': days_since_last_commit,
+            'active_days': active_days_count,
+            'total_days': total_days,
+            'avg_gap_between_commits': round(avg_gap, 1),
+            'gap_consistency': round(gap_std, 1)
         } 

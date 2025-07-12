@@ -52,6 +52,23 @@ def application_detail(request, pk):
         from analytics.analytics_service import AnalyticsService
         analytics = AnalyticsService(pk)
         
+        # Get commit frequency with error handling
+        try:
+            commit_frequency = analytics.get_application_commit_frequency()
+        except Exception as e:
+            print(f"Error getting commit frequency: {e}")
+            commit_frequency = {
+                'avg_commits_per_day': 0,
+                'recent_activity_score': 0,
+                'consistency_score': 0,
+                'overall_frequency_score': 0,
+                'commits_last_30_days': 0,
+                'commits_last_90_days': 0,
+                'days_since_last_commit': None,
+                'active_days': 0,
+                'total_days': 0
+            }
+        
         context = {
             'application': application,
             'repositories': repositories,
@@ -62,6 +79,7 @@ def application_detail(request, pk):
             'code_distribution': analytics.get_code_distribution(),
             'commit_quality': analytics.get_commit_quality_metrics(),
             'commit_types': analytics.get_commit_type_distribution(),
+            'commit_frequency': commit_frequency,
         }
         doughnut_colors = {
             'fix': '#4caf50',
@@ -397,6 +415,25 @@ def remove_repository(request, pk, repo_id):
     
     if request.method == 'POST':
         repo_name = repository.github_repo_name
+        
+        # Clean up MongoDB data before deleting the repository
+        try:
+            from analytics.services import cleanup_repository_data
+            cleanup_results = cleanup_repository_data(repo_name)
+            
+            if 'error' in cleanup_results:
+                messages.warning(request, f'Repository removed but some data cleanup failed: {cleanup_results["error"]}')
+            else:
+                if cleanup_results['total_deleted'] > 0:
+                    messages.info(request, f'Cleaned up {cleanup_results["total_deleted"]} MongoDB records.')
+        except ImportError:
+            # If analytics app is not available, just delete the repository
+            pass
+        except Exception as e:
+            # If cleanup fails, still delete the repository but warn the user
+            messages.warning(request, f'Repository removed but data cleanup failed: {str(e)}')
+        
+        # Delete the repository
         repository.delete()
         messages.success(request, f'Repository "{repo_name}" removed from "{application.name}".')
     

@@ -40,7 +40,7 @@
                 <div class="max-w-6xl mx-auto">
                     <!-- Overall Stats Cards -->
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        <div class="card-modern p-6">
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
                             <div class="flex items-center">
                                 <div class="p-3 bg-primary-green bg-opacity-10 rounded-xl mr-4">
                                     <svg class="w-8 h-8 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -54,7 +54,27 @@
                             </div>
                         </div>
 
-                        <div class="card-modern p-6">
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
+                            <div class="flex items-center">
+                                <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl mr-4">
+                                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Commit Frequency</p>
+                                    <p class="text-2xl font-bold {% if commit_frequency and commit_frequency.avg_commits_per_day >= 1 %}text-green-600{% elif commit_frequency and commit_frequency.avg_commits_per_day >= 0.3 %}text-blue-600{% else %}text-gray-500{% endif %}">
+                                        {% if commit_frequency and commit_frequency.avg_commits_per_day is not None %}
+                                            {{ commit_frequency.avg_commits_per_day }}/day
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
                             <div class="flex items-center">
                                 <div class="p-3 bg-primary-blue bg-opacity-10 rounded-xl mr-4">
                                     <svg class="w-8 h-8 text-primary-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,7 +88,7 @@
                             </div>
                         </div>
 
-                        <div class="card-modern p-6">
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
                             <div class="flex items-center">
                                 <div class="p-3 bg-green-500 bg-opacity-10 rounded-xl mr-4">
                                     <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,31 +101,17 @@
                                 </div>
                             </div>
                         </div>
-
-                        <div class="card-modern p-6">
-                            <div class="flex items-center">
-                                <div class="p-3 bg-red-500 bg-opacity-10 rounded-xl mr-4">
-                                    <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-medium-gray text-sm">Lines Deleted</p>
-                                    <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_deletions|default:"0" }}</p>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Developer Activity and Commit Analytics -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         <!-- Left Column: Developer Activity (spans full height) -->
-                        <div class="card-modern p-6 h-full">
+                        <div class="bg-white p-6 h-full rounded-xl shadow-lg">
                             <h3 class="text-xl font-semibold text-dark-gray mb-4">🧑‍💻 Developer Activity (Last 30 Days)</h3>
                             {% if developer_activity.developers %}
                             <div class="space-y-4">
                                 {% for dev in developer_activity.developers|slice:":5" %}
-                                <div class="flex items-center justify-between p-4 bg-light-gray rounded-xl">
+                                <div class="flex items-center justify-between p-4 bg-light-gray rounded-xl shadow-sm">
                                     <div class="flex-1">
                                         <p class="font-medium text-dark-gray">{{ dev.name }}</p>
                                         <p class="text-sm text-medium-gray">{{ dev.email }}</p>
@@ -129,7 +135,7 @@
                         <!-- Right Column: Commit Quality and Type Distribution -->
                         <div class="flex flex-col space-y-6">
                             <!-- Commit Quality -->
-                            <div class="card-modern p-6">
+                            <div class="bg-white p-6 rounded-xl shadow-lg">
                                 <h3 class="text-xl font-semibold text-dark-gray mb-4">📝 Commit Quality</h3>
                                 {% if commit_quality.total_commits > 0 %}
                                 <div class="space-y-4">
@@ -161,7 +167,7 @@
                             </div>
                             
                             <!-- Commit Type Distribution Doughnut Chart -->
-                            <div class="card-modern p-6">
+                            <div class="bg-white p-6 rounded-xl shadow-lg">
                                 <h3 class="text-xl font-semibold text-dark-gray mb-4">🍩 Commit Type Distribution</h3>
                                 {% if commit_types.total > 0 %}
                                 <div class="flex items-start space-x-6">
@@ -217,7 +223,7 @@
                     </div>
 
                     <!-- Code Distribution -->
-                    <div class="card-modern p-6 mb-8">
+                    <div class="bg-white p-6 mb-8 rounded-xl shadow-lg">
                         <h3 class="text-xl font-semibold text-dark-gray mb-6">📊 Code Distribution by Author</h3>
                         {% if code_distribution.distribution %}
                         <div class="overflow-x-auto">
@@ -299,8 +305,8 @@
 
 
 
-                    <!-- Commit Activity Bubble Chart -->
-                    <div class="card-modern p-6">
+                        <!-- Commit Activity Bubble Chart -->
+    <div class="bg-white p-6 rounded-xl shadow-lg">
                         <h3 class="text-xl font-semibold text-dark-gray mb-6">🕐 Commit Activity by Hour (Last 30 Days)</h3>
                         {% if bubble_chart.datasets %}
                         <!-- Repository Legend -->

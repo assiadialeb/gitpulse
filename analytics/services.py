@@ -47,7 +47,52 @@ def cleanup_application_data(application_id: int) -> Dict:
     except Exception as e:
         # Return error information
         results['error'] = str(e)
-        return results 
+        return results
+
+
+def cleanup_repository_data(repository_full_name: str) -> Dict:
+    """
+    Clean up all MongoDB data related to a specific repository
+    
+    Args:
+        repository_full_name: The repository name in format "owner/repo"
+        
+    Returns:
+        Dictionary with cleanup results
+    """
+    results = {
+        'commits_deleted': 0,
+        'sync_logs_deleted': 0,
+        'repository_stats_deleted': 0,
+        'total_deleted': 0
+    }
+    
+    try:
+        # Delete all commits for this repository
+        commits_deleted = Commit.objects(repository_full_name=repository_full_name).delete()
+        results['commits_deleted'] = commits_deleted
+        
+        # Delete all sync logs for this repository
+        sync_logs_deleted = SyncLog.objects(repository_full_name=repository_full_name).delete()
+        results['sync_logs_deleted'] = sync_logs_deleted
+        
+        # Delete repository stats for this repository
+        repo_stats_deleted = RepositoryStats.objects(repository_full_name=repository_full_name).delete()
+        results['repository_stats_deleted'] = repo_stats_deleted
+        
+        # Calculate total
+        results['total_deleted'] = (
+            results['commits_deleted'] + 
+            results['sync_logs_deleted'] + 
+            results['repository_stats_deleted']
+        )
+        
+        return results
+        
+    except Exception as e:
+        # Return error information
+        results['error'] = str(e)
+        return results
 
 """
 Rate limit management service for handling GitHub API rate limits

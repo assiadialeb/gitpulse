@@ -32,14 +32,24 @@
         <!-- Left Column: Stats and Commit Quality -->
         <div class="flex flex-col h-full">
             <!-- Stats -->
-            <div class="stats shadow h-32 mb-6">
+            <div class="stats shadow-xl h-32 mb-6">
                 <div class="stat">
-                    <div class="stat-title">Total Commits</div>
-                    <div class="stat-value text-primary">{{ developer.commit_count }}</div>
+                    <div class="stat-title text-xs">Total Commits</div>
+                    <div class="stat-value text-primary text-lg">{{ developer.commit_count }}</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-title">First Commit</div>
-                    <div class="stat-value text-success">
+                    <div class="stat-title text-xs">Commit Frequency</div>
+                    <div class="stat-value text-lg {% if commit_frequency.avg_commits_per_day >= 1 %}text-success{% elif commit_frequency.avg_commits_per_day >= 0.3 %}text-info{% else %}text-gray-500{% endif %}">
+                        {% if commit_frequency.avg_commits_per_day is not None %}
+                            {{ commit_frequency.avg_commits_per_day }}/day
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="stat">
+                    <div class="stat-title text-xs">First Commit</div>
+                    <div class="stat-value text-success text-lg">
                         {% if first_commit %}
                             {{ first_commit.authored_date|date:"M d, Y" }}
                         {% else %}
@@ -48,8 +58,8 @@
                     </div>
                 </div>
                 <div class="stat">
-                    <div class="stat-title">Last Commit</div>
-                    <div class="stat-value text-info">
+                    <div class="stat-title text-xs">Last Commit</div>
+                    <div class="stat-value text-info text-lg">
                         {% if last_commit %}
                             {{ last_commit.authored_date|date:"M d, Y" }}
                         {% else %}
@@ -60,7 +70,7 @@
             </div>
             
             <!-- Commit Quality -->
-            <div class="card bg-base-100 shadow flex-1">
+            <div class="card bg-base-100 shadow-xl flex-1">
                 <div class="card-body">
                     <h2 class="card-title text-xl">📝 Commit Quality</h2>
                     {% if commit_quality.total_commits > 0 %}
@@ -95,7 +105,7 @@
         </div>
         
         <!-- Right Column: Polar Area Chart (spans full height) -->
-        <div class="card bg-base-100 shadow h-full">
+        <div class="card bg-base-100 shadow-xl h-full">
             <div class="card-body">
                 <h3 class="card-title text-lg">Net Lines Added by Repository</h3>
                 {% if polar_chart_data %}
