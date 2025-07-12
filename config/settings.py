@@ -78,10 +78,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+import os
+
 # MongoDB Configuration
-MONGODB_HOST = 'localhost'
-MONGODB_PORT = 27017
-MONGODB_NAME = 'gitpulse'
+MONGODB_HOST = os.environ.get('MONGODB_HOST', 'localhost')
+MONGODB_PORT = int(os.environ.get('MONGODB_PORT', 27017))
+MONGODB_NAME = os.environ.get('MONGODB_NAME', 'gitpulse')
 
 # Connect to MongoDB
 mongoengine.connect(
@@ -151,8 +153,8 @@ Q_CLUSTER = {
     'cpu_affinity': 1,
     'label': 'Django Q',
     'redis': {
-        'host': '127.0.0.1',
-        'port': 6379,
+        'host': os.environ.get('REDIS_HOST', '127.0.0.1'),
+        'port': int(os.environ.get('REDIS_PORT', 6379)),
         'db': 0,
     }
 }
