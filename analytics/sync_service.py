@@ -316,6 +316,10 @@ class SyncService:
                         detailed_commit = self.github_service.get_commit_details(repo_full_name, sha)
                         commit_data.update(detailed_commit)
                         results['api_calls'] += 1
+                    except GitHubRateLimitError as e:
+                        logger.warning(f"Rate limit hit while fetching details for commit {sha}: {e}")
+                        # Stop processing commits and raise rate limit error
+                        raise
                     except GitHubAPIError as e:
                         logger.warning(f"Could not fetch details for commit {sha}: {e}")
                         # Continue with basic data

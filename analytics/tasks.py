@@ -371,10 +371,13 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                         'task_id': task_id
                     }
                     
+                    # Create a rate limit error for handling
+                    rate_limit_error = GitHubRateLimitError("Rate limit exceeded during indexing")
+                    
                     restart_info = RateLimitService.handle_rate_limit_error(
                         user_id=user_id,
                         github_username=github_username,
-                        error=GitHubRateLimitError("Rate limit exceeded during indexing"),
+                        error=rate_limit_error,
                         task_type='indexing',
                         task_data=task_data,
                         original_task_id=task_id

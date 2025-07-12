@@ -138,7 +138,7 @@ class RateLimitService:
             try:
                 # Extract seconds from "Retry after X seconds"
                 seconds_str = error_msg.split("Retry after")[1].split("seconds")[0].strip()
-                wait_seconds = int(seconds_str)
+                wait_seconds = float(seconds_str)  # Use float to handle decimal seconds
                 return datetime.utcnow() + timedelta(seconds=wait_seconds)
             except (ValueError, IndexError):
                 pass
@@ -153,7 +153,7 @@ class RateLimitService:
         Schedule automatic restart of the task
         
         Args:
-            rate_limit_reset: RateLimitReset document
+            rate_limit_reset: Rate limit reset document
             
         Returns:
             True if restart was scheduled successfully
@@ -218,7 +218,7 @@ class RateLimitService:
         Restart a rate-limited task
         
         Args:
-            rate_limit_reset: RateLimitReset document
+            rate_limit_reset: Rate limit reset document
             
         Returns:
             True if restart was successful
@@ -289,7 +289,7 @@ def restart_rate_limited_task(rate_limit_reset_id: str) -> Dict[str, Any]:
     Django-Q task to restart a rate-limited task
     
     Args:
-        rate_limit_reset_id: RateLimitReset document ID
+        rate_limit_reset_id: Rate limit reset document ID
         
     Returns:
         Dictionary with restart results

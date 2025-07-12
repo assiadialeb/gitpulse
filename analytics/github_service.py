@@ -48,7 +48,7 @@ class GitHubService:
             rate_limit_remaining = int(response.headers.get('X-RateLimit-Remaining', 0))
             rate_limit_reset = int(response.headers.get('X-RateLimit-Reset', 0))
             
-            if rate_limit_remaining < 10:
+            if rate_limit_remaining < 5:  # More conservative threshold
                 reset_time = datetime.fromtimestamp(rate_limit_reset, timezone.utc)
                 logger.warning(f"GitHub rate limit low: {rate_limit_remaining} requests remaining. Resets at {reset_time}")
                 
