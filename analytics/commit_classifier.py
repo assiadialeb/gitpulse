@@ -119,8 +119,9 @@ Answer with only one word:"""
         result = response.json()
         llm_response = result.get('response', '').strip().lower()
         
-        # Extract the category from response
-        for category in ['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'perf', 'ci', 'chore', 'other']:
+        # Extract the category from response - only use valid MongoDB choices
+        valid_categories = ['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other']
+        for category in valid_categories:
             if category in llm_response:
                 return category
         
@@ -136,10 +137,15 @@ Answer with only one word:"""
             'delete': 'refactor',
             'clean': 'refactor',
             'cleanup': 'refactor',
-            'optimize': 'perf',
-            'speed': 'perf',
-            'fast': 'perf',
-            'slow': 'perf'
+            'optimize': 'refactor',  # Changed from 'perf' to 'refactor'
+            'speed': 'refactor',     # Changed from 'perf' to 'refactor'
+            'fast': 'refactor',      # Changed from 'perf' to 'refactor'
+            'slow': 'refactor',      # Changed from 'perf' to 'refactor'
+            'perf': 'refactor',      # Map 'perf' to 'refactor'
+            'ci': 'chore',           # Map 'ci' to 'chore'
+            'build': 'chore',
+            'deploy': 'chore',
+            'maintenance': 'chore'
         }
         
         for variation, category in variations.items():

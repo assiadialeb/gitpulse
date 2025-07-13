@@ -3,7 +3,7 @@ Management command to classify existing commits
 """
 from django.core.management.base import BaseCommand
 from analytics.models import Commit
-from analytics.commit_classifier import classify_commit
+from analytics.commit_classifier import classify_commit_with_ollama_fallback
 import logging
 
 logger = logging.getLogger(__name__)
@@ -67,8 +67,8 @@ class Command(BaseCommand):
                 if hasattr(commit, 'commit_type') and commit.commit_type != 'other':
                     continue
                 
-                # Classify the commit
-                commit_type = classify_commit(commit.message)
+                # Classify the commit with Ollama fallback
+                commit_type = classify_commit_with_ollama_fallback(commit.message)
                 stats[commit_type] += 1
                 
                 if not dry_run:

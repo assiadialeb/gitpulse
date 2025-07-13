@@ -313,6 +313,180 @@ class DeveloperGroupingService:
         
         return grouped_developers
     
+    def get_grouped_developers_for_application(self, application_id: int) -> List[Dict]:
+        """
+        Get grouped developers that have commits in the specified application
+        
+        Args:
+            application_id: ID of the application to filter by
+            
+        Returns:
+            List of grouped developers with their activity in this application
+        """
+        # Get all commits for this application
+        application_commits = Commit.objects.filter(application_id=application_id)
+        
+        # Get unique emails from commits in this application
+        application_emails = set()
+        for commit in application_commits:
+            application_emails.add(commit.author_email.lower())
+        
+        # Get all groups and filter by emails that appear in this application
+        groups = DeveloperGroup.objects.all()
+        grouped_developers = []
+        
+        for group in groups:
+            aliases = DeveloperAlias.objects.filter(group=group)
+            
+            # Filter aliases to only include those that have commits in this application
+            relevant_aliases = []
+            application_commit_count = 0
+            
+            for alias in aliases:
+                if alias.email.lower() in application_emails:
+                    relevant_aliases.append(alias)
+                    # Count commits for this alias in this application
+                    alias_commits = application_commits.filter(author_email=alias.email)
+                    application_commit_count += alias_commits.count()
+            
+            # Only include groups that have relevant aliases
+            if relevant_aliases:
+                # Sort aliases by name
+                sorted_aliases = sorted(relevant_aliases, key=lambda x: x.name.lower())
+                
+                grouped_developers.append({
+                    'group_id': str(group.id),
+                    'primary_name': group.primary_name,
+                    'primary_email': group.primary_email,
+                    'github_id': group.github_id,
+                    'confidence_score': group.confidence_score,
+                    'is_auto_grouped': group.is_auto_grouped,
+                    'total_commits': application_commit_count,  # Only commits in this application
+                    'aliases': [
+                        {
+                            'name': alias.name,
+                            'email': alias.email,
+                            'commit_count': application_commits.filter(author_email=alias.email).count(),
+                            'first_seen': alias.first_seen,
+                            'last_seen': alias.last_seen
+                        }
+                        for alias in sorted_aliases
+                    ]
+                })
+        
+        # Sort groups by primary name (case-insensitive)
+        grouped_developers.sort(key=lambda x: x['primary_name'].lower())
+        
+        return grouped_developers
+    
+    def get_all_developers_for_application(self, application_id: int) -> List[Dict]:
+        """
+        Get all developers (both grouped and ungrouped) for a specific application
+        
+        Args:
+            application_id: ID of the application to filter by
+            
+        Returns:
+            List of all developers with their activity in this application
+        """
+        # Get all commits for this application
+        application_commits = Commit.objects.filter(application_id=application_id)
+        
+        # Get unique emails from commits in this application
+        application_emails = set()
+        for commit in application_commits:
+            application_emails.add(commit.author_email.lower())
+        
+        # Get all groups and filter by emails that appear in this application
+        groups = DeveloperGroup.objects.all()
+        grouped_developers = []
+        grouped_emails = set()  # Track emails that are in groups
+        
+        for group in groups:
+            aliases = DeveloperAlias.objects.filter(group=group)
+            
+            # Filter aliases to only include those that have commits in this application
+            relevant_aliases = []
+            application_commit_count = 0
+            
+            for alias in aliases:
+                if alias.email.lower() in application_emails:
+                    relevant_aliases.append(alias)
+                    grouped_emails.add(alias.email.lower())  # Track this email as grouped
+                    # Count commits for this alias in this application
+                    alias_commits = application_commits.filter(author_email=alias.email)
+                    application_commit_count += alias_commits.count()
+            
+            # Only include groups that have relevant aliases
+            if relevant_aliases:
+                # Sort aliases by name
+                sorted_aliases = sorted(relevant_aliases, key=lambda x: x.name.lower())
+                
+                grouped_developers.append({
+                    'group_id': str(group.id),
+                    'primary_name': group.primary_name,
+                    'primary_email': group.primary_email,
+                    'github_id': group.github_id,
+                    'confidence_score': group.confidence_score,
+                    'is_auto_grouped': group.is_auto_grouped,
+                    'total_commits': application_commit_count,  # Only commits in this application
+                    'aliases': [
+                        {
+                            'name': alias.name,
+                            'email': alias.email,
+                            'commit_count': application_commits.filter(author_email=alias.email).count(),
+                            'first_seen': alias.first_seen,
+                            'last_seen': alias.last_seen
+                        }
+                        for alias in sorted_aliases
+                    ]
+                })
+        
+        # Find ungrouped developers (emails that are not in any group)
+        ungrouped_emails = application_emails - grouped_emails
+        
+        # Create individual developer entries for ungrouped developers
+        ungrouped_developers = []
+        for email in ungrouped_emails:
+            # Get commits for this email in this application
+            email_commits = application_commits.filter(author_email=email)
+            if email_commits.count() > 0:
+                # Get the most common name for this email
+                name_counts = {}
+                for commit in email_commits:
+                    name = commit.author_name
+                    name_counts[name] = name_counts.get(name, 0) + 1
+                
+                # Use the most common name
+                most_common_name = max(name_counts.items(), key=lambda x: x[1])[0]
+                
+                ungrouped_developers.append({
+                    'group_id': None,  # No group
+                    'primary_name': most_common_name,
+                    'primary_email': email,
+                    'github_id': None,
+                    'confidence_score': 100,  # Individual developer
+                    'is_auto_grouped': False,
+                    'total_commits': email_commits.count(),
+                    'aliases': [
+                        {
+                            'name': most_common_name,
+                            'email': email,
+                            'commit_count': email_commits.count(),
+                            'first_seen': email_commits.order_by('authored_date').first().authored_date,
+                            'last_seen': email_commits.order_by('-authored_date').first().authored_date
+                        }
+                    ]
+                })
+        
+        # Combine grouped and ungrouped developers
+        all_developers = grouped_developers + ungrouped_developers
+        
+        # Sort by primary name (case-insensitive)
+        all_developers.sort(key=lambda x: x['primary_name'].lower())
+        
+        return all_developers
+    
     def manually_group_developers(self, group_data: Dict) -> Dict:
         """
         Manually group developers based on user selection (global grouping)
