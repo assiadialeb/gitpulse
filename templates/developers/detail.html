@@ -136,59 +136,145 @@
         </div>
     </div>
 
-    <!-- Commit Type Distribution Doughnut Chart -->
-    <div class="card bg-base-100 shadow-xl mb-6">
-        <div class="card-body">
-            <h2 class="card-title text-xl">🍩 Commit Type Distribution</h2>
-            {% if commit_type_distribution.total > 0 %}
-            <div class="flex items-start space-x-6">
-                <div class="relative" style="width: 280px; height: 280px;">
-                    <canvas id="commitTypeDoughnut"></canvas>
+    <!-- Quality Metrics and Commit Type Distribution on same row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Quality Metrics Table -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-xl">📊 Quality Metrics</h2>
+                {% if quality_metrics.total_commits > 0 %}
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra w-full">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Value</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Total Commits Analyzed</td>
+                                <td>{{ quality_metrics.total_commits }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td>Real Code Commits</td>
+                                <td>{{ quality_metrics.real_code_commits }}</td>
+                                <td>{{ quality_metrics.real_code_ratio }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Suspicious Commits</td>
+                                <td>{{ quality_metrics.suspicious_commits }}</td>
+                                <td>{{ quality_metrics.suspicious_ratio }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Documentation Only</td>
+                                <td>{{ quality_metrics.doc_only_commits }}</td>
+                                <td>{{ quality_metrics.doc_only_ratio }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Configuration Only</td>
+                                <td>{{ quality_metrics.config_only_commits }}</td>
+                                <td>{{ quality_metrics.config_only_ratio }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Micro Commits (≤2 changes)</td>
+                                <td>{{ quality_metrics.micro_commits }}</td>
+                                <td>{{ quality_metrics.micro_commits_ratio }}%</td>
+                            </tr>
+                            <tr>
+                                <td>No Ticket Reference</td>
+                                <td>{{ quality_metrics.no_ticket_commits }}</td>
+                                <td>{{ quality_metrics.no_ticket_ratio }}%</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                <div class="flex flex-col space-y-3">
-                    {% for item in commit_type_legend %}
-                        <div class="flex items-center space-x-2">
-                            <span class="inline-block w-4 h-4 rounded-full" style="background-color: {{ item.color }};"></span>
-                            <span class="text-sm text-gray-700 font-medium">{{ item.label|title }} ({{ item.count }})</span>
+                
+                <!-- Quality Scores -->
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Code Quality Score</div>
+                        <div class="stat-value text-lg {% if quality_metrics.avg_code_quality >= 70 %}text-success{% elif quality_metrics.avg_code_quality >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {{ quality_metrics.avg_code_quality }}/100
                         </div>
-                    {% endfor %}
+                    </div>
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Impact Score</div>
+                        <div class="stat-value text-lg {% if quality_metrics.avg_impact >= 70 %}text-success{% elif quality_metrics.avg_impact >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {{ quality_metrics.avg_impact }}/100
+                        </div>
+                    </div>
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Complexity Score</div>
+                        <div class="stat-value text-lg {% if quality_metrics.avg_complexity >= 70 %}text-success{% elif quality_metrics.avg_complexity >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {{ quality_metrics.avg_complexity }}/100
+                        </div>
+                    </div>
                 </div>
+                {% else %}
+                <div class="text-center py-8">
+                    <p class="text-gray-500">No quality metrics available. Run the quality analysis first.</p>
+                </div>
+                {% endif %}
             </div>
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <script>
-                const commitTypeData = {
-                    labels: {{ commit_type_labels|safe }},
-                    datasets: [{
-                        data: {{ commit_type_values|safe }},
-                        backgroundColor: [
-                            '#4caf50', // fix
-                            '#2196f3', // feature
-                            '#ffeb3b', // docs
-                            '#ff9800', // refactor
-                            '#9c27b0', // test
-                            '#00bcd4', // style
-                            '#607d8b', // chore
-                            '#bdbdbd', // other
-                        ],
-                        borderWidth: 1
-                    }]
-                };
-                const ctx = document.getElementById('commitTypeDoughnut').getContext('2d');
-                new Chart(ctx, {
-                    type: 'doughnut',
-                    data: commitTypeData,
-                    options: {
-                        plugins: {
-                            legend: { display: false }
+        </div>
+
+        <!-- Commit Type Distribution Doughnut Chart -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-xl">🍩 Commit Type Distribution</h2>
+                {% if commit_type_distribution.total > 0 %}
+                <div class="flex items-start space-x-6">
+                    <div class="relative flex-1" style="height: 350px;">
+                        <canvas id="commitTypeDoughnut"></canvas>
+                    </div>
+                    <div class="flex flex-col space-y-3 min-w-0">
+                        {% for item in commit_type_legend %}
+                            <div class="flex items-center space-x-2">
+                                <span class="inline-block w-4 h-4 rounded-full flex-shrink-0" style="background-color: {{ item.color }};"></span>
+                                <span class="text-sm text-gray-700 font-medium truncate">{{ item.label|title }} ({{ item.count }})</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                <script>
+                    const commitTypeData = {
+                        labels: {{ commit_type_labels|safe }},
+                        datasets: [{
+                            data: {{ commit_type_values|safe }},
+                            backgroundColor: [
+                                '#4caf50', // fix
+                                '#2196f3', // feature
+                                '#ffeb3b', // docs
+                                '#ff9800', // refactor
+                                '#9c27b0', // test
+                                '#00bcd4', // style
+                                '#607d8b', // chore
+                                '#bdbdbd', // other
+                            ],
+                            borderWidth: 1
+                        }]
+                    };
+                    const ctx = document.getElementById('commitTypeDoughnut').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'doughnut',
+                        data: commitTypeData,
+                        options: {
+                            plugins: {
+                                legend: { display: false }
+                            }
                         }
-                    }
-                });
-            </script>
-            {% else %}
-            <div class="text-center py-8">
-                <p class="text-gray-500">No commit type data available</p>
+                    });
+                </script>
+                {% else %}
+                <div class="text-center py-8">
+                    <p class="text-gray-500">No commit type data available</p>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </div>
 

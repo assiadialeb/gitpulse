@@ -238,41 +238,40 @@ class GitService:
                     continue
                 
                 # Check for individual file changes
-                if line.startswith(' '):
-                    parts = line.strip().split()
+                if line.startswith(' ') and '|' in line:
+                    # Parse file line like "filename | 2 +-"
+                    parts = line.strip().split('|')
                     if len(parts) >= 2:
-                        filename = parts[0]
-                        change_info = parts[1]
+                        filename = parts[0].strip()
+                        change_info = parts[1].strip()
                         
-                        # Skip summary lines
-                        if 'insertions' in change_info or 'deletions' in change_info:
-                            continue
-                        
-                        # Parse individual file changes
+                        # Parse change info like "2 +-" or "171 +++++++++++++--------------"
                         try:
                             file_additions = 0
                             file_deletions = 0
                             
-                            # Look for patterns like "15 insertions(+), 5 deletions(-)" or "15 insertions(+)" or "5 deletions(-)"
-                            if 'insertions(+)' in change_info and 'deletions(-)' in change_info:
+                            # Count + and - characters
+                            if '+' in change_info and '-' in change_info:
                                 # Both additions and deletions
-                                add_part = change_info.split('insertions(+),')[0].strip()
-                                del_part = change_info.split('deletions(-)')[0].split(',')[-1].strip()
+                                plus_count = change_info.count('+')
+                                minus_count = change_info.count('-')
                                 
-                                file_additions = int(add_part)
-                                file_deletions = int(del_part)
+                                # Estimate additions/deletions based on the visual representation
+                                # Each + or - represents roughly 1 line
+                                file_additions = plus_count
+                                file_deletions = minus_count
                                 
-                            elif 'insertions(+)' in change_info:
+                            elif '+' in change_info:
                                 # Only additions
-                                add_part = change_info.split('insertions(+),')[0].strip()
-                                file_additions = int(add_part)
+                                plus_count = change_info.count('+')
+                                file_additions = plus_count
                                 file_deletions = 0
                                 
-                            elif 'deletions(-)' in change_info:
+                            elif '-' in change_info:
                                 # Only deletions
-                                del_part = change_info.split('deletions(-)')[0].split(',')[-1].strip()
+                                minus_count = change_info.count('-')
                                 file_additions = 0
-                                file_deletions = int(del_part)
+                                file_deletions = minus_count
                             
                             if file_additions > 0 or file_deletions > 0:
                                 file_changes.append({

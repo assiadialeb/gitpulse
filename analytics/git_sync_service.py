@@ -128,7 +128,26 @@ class GitSyncService:
         finally:
             # Clean up all cloned repositories
             self.git_service.cleanup_all_repositories()
-        
+
+        # Auto-group developers after successful sync
+        if results['repositories_synced'] > 0:
+            try:
+                logger.info("Starting automatic developer grouping...")
+                from .developer_grouping_service import DeveloperGroupingService
+                grouping_service = DeveloperGroupingService()
+                grouping_result = grouping_service.auto_group_developers()
+                if grouping_result['success']:
+                    logger.info(f"Developer grouping completed: {grouping_result['groups_created']} groups processed")
+                    results['developer_groups_processed'] = grouping_result['groups_created']
+                else:
+                    logger.warning(f"Developer grouping failed: {grouping_result.get('error', 'Unknown error')}")
+                    results['developer_groups_processed'] = 0
+            except Exception as e:
+                logger.error(f"Error during developer grouping: {e}")
+                results['developer_groups_processed'] = 0
+        else:
+            results['developer_groups_processed'] = 0
+
         return results
     
     def sync_repository(self, repo_full_name: str, repo_url: str, application_id: int, 
@@ -294,6 +313,22 @@ class GitSyncService:
                     commit = Commit(**parsed_data)
                     commit.save()
                     results['commits_new'] += 1
+                
+                # Analyze commit quality after storing the commit
+                try:
+                    # Get the commit object for analysis
+                    commit_obj = existing_commit if existing_commit else commit
+                    
+                    # Import and use the quality service
+                    from .quality_service import QualityAnalysisService
+                    quality_service = QualityAnalysisService()
+                    quality_service.store_commit_quality(commit_obj)
+                    
+                    logger.info(f"Stored quality metrics for commit {sha}")
+                except Exception as e:
+                    logger.warning(f"Could not analyze commit {sha} quality: {e}")
+                
+
                 
                 results['commits_processed'] += 1
                 

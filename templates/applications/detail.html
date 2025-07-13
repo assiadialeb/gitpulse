@@ -103,6 +103,8 @@
                         </div>
                     </div>
 
+
+
                     <!-- Developer Activity and Commit Analytics -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         <!-- Left Column: Developer Activity (spans full height) -->
@@ -219,7 +221,90 @@
                                 </div>
                                 {% endif %}
                             </div>
+                            
+
                         </div>
+                    </div>
+
+                    <!-- Application Quality Metrics -->
+                    <div class="bg-white p-6 mb-8 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-semibold text-dark-gray mb-6">📊 Application Quality Metrics</h3>
+                        {% if application_quality_metrics.total_commits > 0 %}
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>Metric</th>
+                                        <th>Value</th>
+                                        <th>Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Total Commits Analyzed</td>
+                                        <td>{{ application_quality_metrics.total_commits }}</td>
+                                        <td>-</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Real Code Commits</td>
+                                        <td>{{ application_quality_metrics.real_code_commits }}</td>
+                                        <td>{{ application_quality_metrics.real_code_ratio }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Suspicious Commits</td>
+                                        <td>{{ application_quality_metrics.suspicious_commits }}</td>
+                                        <td>{{ application_quality_metrics.suspicious_ratio }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Documentation Only</td>
+                                        <td>{{ application_quality_metrics.doc_only_commits }}</td>
+                                        <td>{{ application_quality_metrics.doc_only_ratio }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Configuration Only</td>
+                                        <td>{{ application_quality_metrics.config_only_commits }}</td>
+                                        <td>{{ application_quality_metrics.config_only_ratio }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Micro Commits (≤2 changes)</td>
+                                        <td>{{ application_quality_metrics.micro_commits }}</td>
+                                        <td>{{ application_quality_metrics.micro_commits_ratio }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>No Ticket Reference</td>
+                                        <td>{{ application_quality_metrics.no_ticket_commits }}</td>
+                                        <td>{{ application_quality_metrics.no_ticket_ratio }}%</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Quality Scores -->
+                        <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="stat bg-base-200 rounded-lg">
+                                <div class="stat-title">Code Quality Score</div>
+                                <div class="stat-value text-lg {% if application_quality_metrics.avg_code_quality >= 70 %}text-success{% elif application_quality_metrics.avg_code_quality >= 50 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ application_quality_metrics.avg_code_quality }}/100
+                                </div>
+                            </div>
+                            <div class="stat bg-base-200 rounded-lg">
+                                <div class="stat-title">Impact Score</div>
+                                <div class="stat-value text-lg {% if application_quality_metrics.avg_impact >= 70 %}text-success{% elif application_quality_metrics.avg_impact >= 50 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ application_quality_metrics.avg_impact }}/100
+                                </div>
+                            </div>
+                            <div class="stat bg-base-200 rounded-lg">
+                                <div class="stat-title">Complexity Score</div>
+                                <div class="stat-value text-lg {% if application_quality_metrics.avg_complexity >= 70 %}text-success{% elif application_quality_metrics.avg_complexity >= 50 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ application_quality_metrics.avg_complexity }}/100
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-8">
+                            <p class="text-gray-500">No quality metrics available. Run the quality analysis first.</p>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <!-- Code Distribution -->

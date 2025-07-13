@@ -69,6 +69,9 @@ def application_detail(request, pk):
                 'total_days': 0
             }
         
+        # Get application quality metrics
+        application_quality_metrics = _generate_application_quality_metrics(application)
+        
         context = {
             'application': application,
             'repositories': repositories,
@@ -80,6 +83,7 @@ def application_detail(request, pk):
             'commit_quality': analytics.get_commit_quality_metrics(),
             'commit_types': analytics.get_commit_type_distribution(),
             'commit_frequency': commit_frequency,
+            'application_quality_metrics': application_quality_metrics,
         }
         doughnut_colors = {
             'fix': '#4caf50',
@@ -484,3 +488,146 @@ def debug_github(request):
     except Exception as e:
         messages.error(request, f'Error: {str(e)}')
         return redirect('applications:list')
+
+
+def _generate_application_quality_metrics(application):
+    """Generate quality metrics data for an application from MongoDB collection"""
+    from pymongo import MongoClient
+    from datetime import datetime, timedelta, timezone
+    
+    try:
+        # Connect to MongoDB
+        client = MongoClient('localhost', 27017)
+        db = client['gitpulse']
+        quality_collection = db['developer_quality_metrics']
+        
+        # Get all repository names for this application
+        repository_names = list(application.repositories.values_list('github_repo_name', flat=True))
+        
+        if not repository_names:
+            return {
+                'total_commits': 0,
+                'avg_code_quality': 0,
+                'avg_impact': 0,
+                'avg_complexity': 0,
+                'suspicious_commits': 0,
+                'suspicious_ratio': 0,
+                'real_code_commits': 0,
+                'real_code_ratio': 0,
+                'doc_only_commits': 0,
+                'config_only_commits': 0,
+                'micro_commits': 0,
+                'no_ticket_commits': 0
+            }
+        
+        # Query MongoDB for quality metrics for this application
+        # Since we don't have application_id in MongoDB, we'll filter by repository names
+        pipeline = [
+            {
+                '$match': {
+                    'repository': {'$in': repository_names}
+                }
+            },
+            {
+                '$group': {
+                    '_id': None,
+                    'total_commits': {'$sum': 1},
+                    'avg_code_quality': {'$avg': '$code_quality_score'},
+                    'avg_impact': {'$avg': '$impact_score'},
+                    'avg_complexity': {'$avg': '$complexity_score'},
+                    'suspicious_commits': {
+                        '$sum': {
+                            '$cond': [
+                                {
+                                    '$gt': [
+                                        {
+                                            '$size': {
+                                                '$filter': {
+                                                    'input': '$suspicious_patterns',
+                                                    'cond': {'$ne': ['$$this', 'no_ticket_reference']}
+                                                }
+                                            }
+                                        },
+                                        0
+                                    ]
+                                },
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    'real_code_commits': {
+                        '$sum': {'$cond': ['$is_real_code', 1, 0]}
+                    },
+                    'doc_only_commits': {
+                        '$sum': {'$cond': ['$is_documentation_only', 1, 0]}
+                    },
+                    'config_only_commits': {
+                        '$sum': {'$cond': ['$is_config_only', 1, 0]}
+                    },
+                    'micro_commits': {
+                        '$sum': {'$cond': [{'$in': ['micro_commit', '$suspicious_patterns']}, 1, 0]}
+                    },
+                    'no_ticket_commits': {
+                        '$sum': {'$cond': [{'$in': ['no_ticket_reference', '$suspicious_patterns']}, 1, 0]}
+                    }
+                }
+            }
+        ]
+        
+        result = list(quality_collection.aggregate(pipeline))
+        
+        if not result:
+            return {
+                'total_commits': 0,
+                'avg_code_quality': 0,
+                'avg_impact': 0,
+                'avg_complexity': 0,
+                'suspicious_commits': 0,
+                'suspicious_ratio': 0,
+                'real_code_commits': 0,
+                'real_code_ratio': 0,
+                'doc_only_commits': 0,
+                'config_only_commits': 0,
+                'micro_commits': 0,
+                'no_ticket_commits': 0
+            }
+        
+        data = result[0]
+        total_commits = data.get('total_commits', 0)
+        
+        return {
+            'total_commits': total_commits,
+            'avg_code_quality': round(data.get('avg_code_quality', 0), 1),
+            'avg_impact': round(data.get('avg_impact', 0), 1),
+            'avg_complexity': round(data.get('avg_complexity', 0), 1),
+            'suspicious_commits': data.get('suspicious_commits', 0),
+            'suspicious_ratio': round((data.get('suspicious_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
+            'real_code_commits': data.get('real_code_commits', 0),
+            'real_code_ratio': round((data.get('real_code_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
+            'doc_only_commits': data.get('doc_only_commits', 0),
+            'doc_only_ratio': round((data.get('doc_only_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
+            'config_only_commits': data.get('config_only_commits', 0),
+            'config_only_ratio': round((data.get('config_only_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
+            'micro_commits': data.get('micro_commits', 0),
+            'micro_commits_ratio': round((data.get('micro_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
+            'no_ticket_commits': data.get('no_ticket_commits', 0),
+            'no_ticket_ratio': round((data.get('no_ticket_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1)
+        }
+        
+    except Exception as e:
+        print(f"Error generating application quality metrics: {e}")
+        return {
+            'total_commits': 0,
+            'avg_code_quality': 0,
+            'avg_impact': 0,
+            'avg_complexity': 0,
+            'suspicious_commits': 0,
+            'suspicious_ratio': 0,
+            'real_code_commits': 0,
+            'real_code_ratio': 0,
+            'doc_only_commits': 0,
+            'config_only_commits': 0,
+            'micro_commits': 0,
+            'no_ticket_commits': 0
+        }

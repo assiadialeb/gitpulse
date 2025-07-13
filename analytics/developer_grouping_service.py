@@ -41,6 +41,7 @@ class DeveloperGroupingService:
             # Track which developers have been processed
             processed_developers = set()
             groups_to_create = []
+            created_groups = []
             
             # Step 1: Group by exact email match (highest priority)
             email_groups = defaultdict(list)
@@ -49,13 +50,31 @@ class DeveloperGroupingService:
             
             for email, developers in email_groups.items():
                 if len(developers) > 1:
-                    groups_to_create.append({
-                        'type': 'email',
-                        'key': email,
-                        'developers': developers,
-                        'primary_name': developers[0]['name'],
-                        'primary_email': email
-                    })
+                    # Check if any of these developers are already in existing groups
+                    existing_group = self._find_existing_group_for_developers(developers)
+                    
+                    if existing_group:
+                        # Add to existing group
+                        added_count = self._add_developers_to_group(existing_group, developers)
+                        created_groups.append({
+                            'group_id': str(existing_group.id),
+                            'primary_name': existing_group.primary_name,
+                            'primary_email': existing_group.primary_email,
+                            'type': 'email',
+                            'key': email,
+                            'added_count': added_count,
+                            'action': 'added_to_existing'
+                        })
+                    else:
+                        # Create new group
+                        groups_to_create.append({
+                            'type': 'email',
+                            'key': email,
+                            'developers': developers,
+                            'primary_name': developers[0]['name'],
+                            'primary_email': email
+                        })
+                    
                     for dev in developers:
                         processed_developers.add(dev['name'] + '|' + dev['email'])
             
@@ -227,18 +246,18 @@ class DeveloperGroupingService:
             return 50
     
     def _find_existing_group_for_developers(self, developers: List[Dict]) -> Optional[DeveloperGroup]:
-        """Find if any of these developers are already in an existing group or if there's a group with the same name"""
-        # First check if any developer is already in an existing group
+        """Find if any of these developers are already in an existing group"""
+        # Check if any developer email is already in any existing group
         for dev in developers:
+            # Chercher dans TOUS les groupes existants par email
             existing_alias = DeveloperAlias.objects.filter(
-                email=dev['email'],
-                name=dev['name']
+                email=dev['email']  # Chercher par email seulement
             ).first()
             
             if existing_alias:
                 return existing_alias.group
         
-        # If no existing group found, check if there's a group with the same primary name
+        # Si aucun groupe trouvé par email, chercher par nom similaire
         if developers:
             # Use the first developer's name as reference
             primary_name = developers[0]['name']
