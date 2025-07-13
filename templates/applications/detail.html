@@ -224,7 +224,7 @@
 
                     <!-- Code Distribution -->
                     <div class="bg-white p-6 mb-8 rounded-xl shadow-lg">
-                        <h3 class="text-xl font-semibold text-dark-gray mb-6">📊 Code Distribution by Author</h3>
+                        <h3 class="text-xl font-semibold text-dark-gray mb-6">📊 Top 10 Contributors by Net Lines</h3>
                         {% if code_distribution.distribution %}
                         <div class="overflow-x-auto">
                             <table class="table w-full" id="code-distribution-table">
@@ -281,9 +281,9 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for dev in code_distribution.distribution|slice:":10" %}
+                                    {% for dev in code_distribution.distribution %}
                                     <tr class="hover:bg-light-gray">
-                                        <td class="font-medium">{{ dev.author|truncatechars:30 }}</td>
+                                        <td class="font-medium">{{ dev.author }}</td>
                                         <td class="text-center" data-sort="{{ dev.commits }}">{{ dev.commits }}</td>
                                         <td class="text-center text-green-600" data-sort="{{ dev.additions }}">+{{ dev.additions }}</td>
                                         <td class="text-center text-red-600" data-sort="{{ dev.deletions }}">-{{ dev.deletions }}</td>
