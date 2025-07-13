@@ -474,6 +474,7 @@ def developer_detail(request, developer_id):
                         'commit_count': commits.count(),
                         'is_group': True
                     },
+                    'developer_id': developer_id,
                     'identities': aliases,
                     'chart_data': json.dumps(chart_data),
                     'polar_chart_data': json.dumps(polar_chart_data),
@@ -548,6 +549,7 @@ def developer_detail(request, developer_id):
                     'commit_count': commits.count(),
                     'is_group': False
                 },
+                'developer_id': developer_id,
                 'chart_data': json.dumps(chart_data),
                 'polar_chart_data': json.dumps(polar_chart_data),
                 'commit_quality': commit_quality,
@@ -587,6 +589,7 @@ from django.contrib.auth.decorators import login_required
 from .models import DeveloperGroup, DeveloperIdentity
 from analytics.models import Commit
 import json
+from django.views.decorators.http import require_POST
 
 @login_required
 @require_http_methods(["POST"])
@@ -842,4 +845,81 @@ def add_to_group(request):
             return JsonResponse({'error': str(e)}, status=500)
     
     return JsonResponse({'error': 'POST method required'}, status=405)
+
+
+@login_required
+@require_POST
+def update_developer_name(request, developer_id):
+    """Update developer name (for both individual and group developers)"""
+    try:
+        new_name = request.POST.get('new_name', '').strip()
+        if not new_name:
+            return JsonResponse({
+                'success': False,
+                'error': 'New name is required'
+            })
+        
+        # Check if this is a MongoDB group ID (24 character hex string)
+        if len(developer_id) == 24 and all(c in '0123456789abcdef' for c in developer_id.lower()):
+            # MongoDB group ID - update the group
+            from analytics.models import DeveloperGroup
+            try:
+                group = DeveloperGroup.objects.get(id=developer_id)
+                old_name = group.primary_name
+                group.primary_name = new_name
+                group.save()
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Developer group renamed from "{old_name}" to "{new_name}"',
+                    'new_name': new_name
+                })
+                
+            except DeveloperGroup.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Developer group not found'
+                })
+        else:
+            # Individual developer - update all commits with this name/email
+            try:
+                # Use proper URL decoding
+                decoded = urllib.parse.unquote(developer_id)
+                name, email = decoded.split('|', 1)
+                
+                # Remove 'individual_' prefix if present
+                if name.startswith('individual_'):
+                    name = '_'.join(name.split('_')[1:])
+                
+                # Update all commits with this name/email combination
+                from analytics.models import Commit
+                from mongoengine.queryset.visitor import Q
+                
+                commits_to_update = Commit.objects.filter(
+                    author_name__iexact=name,
+                    author_email__iexact=email
+                )
+                
+                updated_count = commits_to_update.update(
+                    author_name=new_name
+                )
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Updated {updated_count} commits from "{name}" to "{new_name}"',
+                    'new_name': new_name,
+                    'updated_count': updated_count
+                })
+                
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error updating individual developer: {str(e)}'
+                })
+                
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error updating developer name: {str(e)}'
+        })
 

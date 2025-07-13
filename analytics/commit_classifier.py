@@ -2,6 +2,7 @@
 Commit classification service
 """
 import re
+import requests
 from typing import Tuple
 
 
@@ -53,6 +54,101 @@ def classify_commit(message: str) -> str:
         return 'chore'  # Short messages are usually maintenance
     
     return 'other'
+
+
+def classify_commit_with_ollama_fallback(message: str) -> str:
+    """
+    Classify a commit message using simple classifier first, then Ollama as fallback
+    
+    Args:
+        message: Commit message to classify
+        
+    Returns:
+        Category: 'fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other'
+    """
+    # First try the simple classifier
+    simple_result = classify_commit(message)
+    
+    # If simple classifier returns 'other', try Ollama
+    if simple_result == 'other':
+        return classify_commit_ollama(message)
+    
+    return simple_result
+
+
+def classify_commit_ollama(message: str) -> str:
+    """
+    Classify a commit message using Ollama LLM
+    
+    Args:
+        message: Commit message to classify
+        
+    Returns:
+        Category: 'fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other'
+    """
+    # Ollama configuration
+    OLLAMA_URL = "http://localhost:11434"
+    MODEL_NAME = "gemma3:1b"
+    
+    prompt = f"""Classify this git commit message:
+
+"{message}"
+
+Categories: test, fix, feature, docs, refactor, style, perf, ci, chore, other
+
+Answer with only one word:"""
+
+    try:
+        # Call Ollama API
+        payload = {
+            "model": MODEL_NAME,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.3,
+                "num_predict": 10
+            }
+        }
+        
+        response = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=30)
+        response.raise_for_status()
+        
+        result = response.json()
+        llm_response = result.get('response', '').strip().lower()
+        
+        # Extract the category from response
+        for category in ['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'perf', 'ci', 'chore', 'other']:
+            if category in llm_response:
+                return category
+        
+        # Handle common variations that the LLM might use
+        variations = {
+            'update': 'chore',
+            'change': 'refactor',
+            'modify': 'refactor',
+            'improve': 'feature',
+            'enhance': 'feature',
+            'add': 'feature',
+            'remove': 'refactor',
+            'delete': 'refactor',
+            'clean': 'refactor',
+            'cleanup': 'refactor',
+            'optimize': 'perf',
+            'speed': 'perf',
+            'fast': 'perf',
+            'slow': 'perf'
+        }
+        
+        for variation, category in variations.items():
+            if variation in llm_response.lower():
+                return category
+        
+        # If no category found in LLM response, return 'other'
+        return 'other'
+        
+    except Exception as e:
+        # If Ollama fails, return 'other'
+        return 'other'
 
 
 def classify_commit_with_confidence(message: str) -> Tuple[str, float]:

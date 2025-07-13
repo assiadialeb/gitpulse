@@ -3,10 +3,25 @@
 {% block title %}{{ developer.name }} - Developer Stats - GitPulse{% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container mx-auto px-4 py-8">
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">{{ developer.name }}</h1>
+            <div class="flex items-center space-x-3 mb-2">
+                <h1 class="text-3xl font-bold text-gray-900" id="developer-name">{{ developer.name }}</h1>
+                <button class="text-gray-400 hover:text-gray-600 transition-colors duration-200" id="edit-name-btn" onclick="startEditName()" title="Edit name">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="name-edit-form" class="hidden mb-2">
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="new-name-input" class="input input-bordered" value="{{ developer.name }}" placeholder="Enter new name">
+                    <button class="btn btn-sm btn-success" onclick="saveName()">Save</button>
+                    <button class="btn btn-sm btn-outline" onclick="cancelEditName()">Cancel</button>
+                </div>
+            </div>
             <p class="text-gray-600">{{ developer.email }}</p>
             {% if is_group %}
                 <p class="text-sm text-gray-500">{{ identities|length }} identities in this group</p>
@@ -211,6 +226,65 @@
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// Name editing functionality
+function startEditName() {
+    document.getElementById('edit-name-btn').classList.add('hidden');
+    document.getElementById('name-edit-form').classList.remove('hidden');
+    document.getElementById('new-name-input').focus();
+    document.getElementById('new-name-input').select();
+}
+
+function cancelEditName() {
+    document.getElementById('edit-name-btn').classList.remove('hidden');
+    document.getElementById('name-edit-form').classList.add('hidden');
+    document.getElementById('new-name-input').value = document.getElementById('developer-name').textContent;
+}
+
+function saveName() {
+    const newName = document.getElementById('new-name-input').value.trim();
+    if (!newName) {
+        alert('Please enter a valid name');
+        return;
+    }
+    
+    const developerId = '{{ developer_id }}';
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`/developers/${developerId}/update-name/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+        },
+        body: `new_name=${encodeURIComponent(newName)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('developer-name').textContent = newName;
+            document.getElementById('edit-name-btn').classList.remove('hidden');
+            document.getElementById('name-edit-form').classList.add('hidden');
+            
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'alert alert-success mb-4';
+            successDiv.textContent = data.message;
+            document.querySelector('.container').insertBefore(successDiv, document.querySelector('.container').firstChild);
+            
+            // Remove success message after 3 seconds
+            setTimeout(() => {
+                successDiv.remove();
+            }, 3000);
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while updating the name');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Bubble Chart
     const ctx = document.getElementById('activityChart');

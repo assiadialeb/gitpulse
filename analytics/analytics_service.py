@@ -231,10 +231,10 @@ class AnalyticsService:
             
             if group:
                 group_id = group['group_id']
-                author_key = f"{group['primary_name']} ({group['primary_email']})"
+                author_key = group['primary_name']
             else:
                 # Fallback for ungrouped developers
-                author_key = f"{commit.author_name} ({commit.author_email})"
+                author_key = commit.author_name
             
             author_stats[author_key]['additions'] += commit.additions
             author_stats[author_key]['deletions'] += commit.deletions
@@ -266,13 +266,14 @@ class AnalyticsService:
                 'net_lines': stats['additions'] - stats['deletions']
             })
         
-        # Sort by name (case-insensitive), then by additions percentage
-        distribution.sort(key=lambda x: (x['author'].lower(), -x['additions_percentage']))
+        # Sort by net lines in descending order (top contributors first)
+        distribution.sort(key=lambda x: -x['net_lines'])
         
+        # Return only top 10 contributors
         return {
             'total_additions': total_additions,
             'total_deletions': total_deletions,
-            'distribution': distribution
+            'distribution': distribution[:10]
         }
     
     def get_commit_quality_metrics(self) -> Dict:
