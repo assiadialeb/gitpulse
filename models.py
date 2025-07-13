@@ -1,7 +1,7 @@
 """
 MongoDB models for GitPulse using mongoengine
 """
-from mongoengine import Document, StringField, DateTimeField, IntField, ListField, ReferenceField, DictField
+from mongoengine import Document, StringField, DateTimeField, IntField, ListField, ReferenceField, DictField, BooleanField
 from datetime import datetime, timezone
 from django.contrib.auth.models import User
 
@@ -12,7 +12,28 @@ class GitHubUser(Document):
     name = StringField()
     email = StringField()
     avatar_url = StringField()
+    
+    # Additional profile information
+    bio = StringField()
+    company = StringField()
+    blog = StringField()
+    location = StringField()
+    hireable = BooleanField()
+    
+    # Statistics
+    public_repos = IntField(default=0)
+    public_gists = IntField(default=0)
+    followers = IntField(default=0)
+    following = IntField(default=0)
+    
+    # Emails list
+    emails = ListField(DictField(), default=list)
+    
+    # Timestamps
+    github_created_at = DateTimeField()
+    github_updated_at = DateTimeField()
     created_at = DateTimeField(default=lambda: datetime.now(timezone.utc))
+    updated_at = DateTimeField(default=lambda: datetime.now(timezone.utc))
     
     meta = {'collection': 'github_users'}
 

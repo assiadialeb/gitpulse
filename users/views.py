@@ -7,6 +7,8 @@ from django.views.generic import CreateView
 from django.contrib.auth.models import User
 from .forms import CustomUserCreationForm, CustomAuthenticationForm, UserProfileForm
 from .models import UserProfile
+from .services import GitHubUserService
+from models import GitHubUser
 
 
 def login_view(request):
@@ -63,18 +65,55 @@ def logout_view(request):
 
 @login_required
 def profile_view(request):
-    """User profile view"""
+    """User profile view with GitHub data sync"""
+    github_user = None
+    sync_error = None
+    
     if request.method == 'POST':
         form = UserProfileForm(request.POST, instance=request.user.userprofile)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Profile updated successfully!')
+            profile = form.save()
+            
+            # If GitHub username was provided, sync data
+            if profile.github_username:
+                try:
+                    # Check if user has GitHub token
+                    github_service = GitHubUserService(request.user.id)
+                    
+                    # Sync user data from GitHub
+                    github_user = github_service.sync_user_data(profile.github_username)
+                    
+                    messages.success(request, f'Profile updated and GitHub data synced for {profile.github_username}!')
+                    
+                except ValueError as e:
+                    sync_error = str(e)
+                    messages.warning(request, f'Profile updated but GitHub sync failed: {sync_error}')
+                    
+                except Exception as e:
+                    sync_error = str(e)
+                    messages.error(request, f'Error syncing GitHub data: {sync_error}')
+            
+            else:
+                messages.success(request, 'Profile updated successfully!')
+            
             return redirect('users:profile')
-        # Remove the else block that was adding messages.error
     else:
         form = UserProfileForm(instance=request.user.userprofile)
+        
+        # Try to get existing GitHub user data
+        if request.user.userprofile.github_username:
+            try:
+                github_user = GitHubUser.objects(login=request.user.userprofile.github_username).first()
+            except Exception:
+                pass
     
-    return render(request, 'users/profile.html', {'form': form})
+    context = {
+        'form': form,
+        'github_user': github_user,
+        'sync_error': sync_error
+    }
+    
+    return render(request, 'users/profile.html', context)
 
 
 def home_view(request):
