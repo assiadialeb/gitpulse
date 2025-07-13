@@ -322,7 +322,6 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
         task_id: Optional task ID for progress tracking
     """
     logger.info(f"Starting background indexing for application {application_id}, user {user_id}")
-    
     try:
         # Get application and repositories
         application = Application.objects.get(id=application_id, owner_id=user_id)
@@ -370,45 +369,6 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                     'full'  # Always do full sync for indexing
                 )
                 
-                # Check if rate limit was hit
-                if repo_result.get('rate_limit_hit'):
-                    logger.warning(f"Rate limit hit during indexing of {app_repo.github_repo_name}")
-                    
-                    # Get user's GitHub username for rate limit service
-                    try:
-                        github_token = GitHubToken.objects.get(user_id=user_id)
-                        github_username = github_token.github_username
-                    except GitHubToken.DoesNotExist:
-                        github_username = f"user_{user_id}"
-                    
-                    # Handle rate limit with automatic restart
-                    task_data = {
-                        'application_id': application_id,
-                        'user_id': user_id,
-                        'task_id': task_id
-                    }
-                    
-                    # Create a rate limit error for handling
-                    rate_limit_error = GitHubRateLimitError("Rate limit exceeded during indexing")
-                    
-                    restart_info = RateLimitService.handle_rate_limit_error(
-                        user_id=user_id,
-                        github_username=github_username,
-                        error=rate_limit_error,
-                        task_type='indexing',
-                        task_data=task_data,
-                        original_task_id=task_id
-                    )
-                    
-                    # Return restart information
-                    results['rate_limit_hit'] = True
-                    results['restart_info'] = restart_info
-                    results['completed_at'] = datetime.utcnow().isoformat()
-                    results['success'] = False
-                    
-                    logger.info(f"Rate limit hit during indexing. Restart scheduled: {restart_info}")
-                    return results
-                
                 results['repositories_synced'] += 1
                 results['total_commits_new'] += repo_result['commits_new']
                 results['total_commits_updated'] += repo_result['commits_updated']
@@ -422,6 +382,37 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                 logger.error(error_msg)
                 results['errors'].append(error_msg)
         
+        # Auto-group developers after successful sync
+        if results['repositories_synced'] > 0:
+            try:
+                logger.info("Starting automatic developer grouping...")
+                from .developer_grouping_service import DeveloperGroupingService
+                grouping_service = DeveloperGroupingService()
+                grouping_result = grouping_service.auto_group_developers()
+                if grouping_result['success']:
+                    logger.info(f"Developer grouping completed: {grouping_result['groups_created']} groups processed")
+                    results['developer_groups_processed'] = grouping_result['groups_created']
+                else:
+                    logger.warning(f"Developer grouping failed: {grouping_result.get('error', 'Unknown error')}")
+                    results['developer_groups_processed'] = 0
+            except Exception as e:
+                logger.error(f"Error during developer grouping: {e}")
+                results['developer_groups_processed'] = 0
+        else:
+            results['developer_groups_processed'] = 0
+
+        # Batch quality metrics analysis after developer grouping
+        try:
+            logger.info("Starting batch commit quality analysis...")
+            from .quality_service import QualityAnalysisService
+            quality_service = QualityAnalysisService()
+            processed = quality_service.analyze_commits_for_application(application_id)
+            logger.info(f"Batch quality analysis completed: {processed} commits processed")
+            results['quality_metrics_processed'] = processed
+        except Exception as e:
+            logger.error(f"Error during batch quality analysis: {e}")
+            results['quality_metrics_processed'] = 0
+
         results['completed_at'] = datetime.utcnow().isoformat()
         results['success'] = True
         
