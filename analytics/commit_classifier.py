@@ -91,7 +91,7 @@ def classify_commit_ollama(message: str) -> str:
     OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'localhost')
     OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
     OLLAMA_URL = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}"
-    MODEL_NAME = "gemma3:1b"
+    MODEL_NAME = "gemma3:4b"
     
     prompt = f"""Classify this git commit message:
 
