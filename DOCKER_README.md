@@ -1,156 +1,168 @@
-# GitPulse Docker Setup
+# GitPulse with Docker and Ollama
 
-This Docker setup provides a complete GitPulse environment with all necessary services running in containers.
+This setup includes GitPulse with automatic commit classification using Ollama LLM.
 
-## Services Included
+## Services
 
-- **Django Application**: The main GitPulse web application
-- **MongoDB**: Database for storing application data
-- **Redis**: Cache and task queue backend
-
-## Prerequisites
-
-- Docker
-- Docker Compose
+- **web**: Django application (port 8000)
+- **mongodb**: MongoDB database (port 27017)
+- **redis**: Redis cache (port 6379)
+- **ollama**: Ollama LLM service with gemma3:1b model (port 11434)
 
 ## Quick Start
 
-1. **Clone the repository** (if not already done):
-   ```bash
-   git clone <repository-url>
-   cd GitPulse
-   ```
-
-2. **Start all services**:
+1. **Start all services:**
    ```bash
    docker-compose up -d
    ```
 
-3. **Access the application**:
-   - Web application: http://localhost:8000
-   - MongoDB: localhost:27017
-   - Redis: localhost:6379
+2. **Check service status:**
+   ```bash
+   docker-compose ps
+   ```
 
-## First Time Setup
+3. **View logs:**
+   ```bash
+   docker-compose logs -f web
+   ```
 
-If this is your first time running GitPulse, you'll need to create a superuser:
+4. **Access the application:**
+   - Web interface: http://localhost:8000
+   - Ollama API: http://localhost:11434
 
-```bash
-docker-compose exec web python manage.py createsuperuser
-```
+## Ollama Integration
 
-## Data Persistence
+### Automatic Model Installation
+The Ollama service automatically:
+- Starts the Ollama server
+- Downloads the `gemma3:1b` model (~2GB)
+- Makes the model available for commit classification
 
-The following data is persisted across container restarts:
+### Commit Classification
+The application uses a hybrid approach:
+1. **Simple classifier** (fast, ~50% accuracy)
+2. **Ollama LLM** (slower, higher accuracy for difficult cases)
 
-- **MongoDB data**: Stored in Docker volume `mongodb_data`
-- **Redis data**: Stored in Docker volume `redis_data`
-- **SQLite database**: Mounted from `./db.sqlite3`
-- **Application data**: Mounted from `./data/`
-- **Logs**: Mounted from `./logs/`
+### Model Management
+- **Check available models:**
+  ```bash
+  curl http://localhost:11434/api/tags
+  ```
 
-## Management Commands
+- **Pull additional models:**
+  ```bash
+  curl -X POST http://localhost:11434/api/pull -d '{"name": "model_name"}'
+  ```
 
-### View logs
-```bash
-# All services
-docker-compose logs
+- **Remove models:**
+  ```bash
+  curl -X DELETE http://localhost:11434/api/delete -d '{"name": "model_name"}'
+  ```
 
-# Specific service
-docker-compose logs web
-docker-compose logs mongodb
-docker-compose logs redis
-```
+## Configuration
 
-### Run Django management commands
-```bash
-docker-compose exec web python manage.py <command>
-```
+### Environment Variables
+- `OLLAMA_HOST`: Ollama service hostname (default: ollama)
+- `OLLAMA_PORT`: Ollama service port (default: 11434)
 
-### Access database shell
-```bash
-# MongoDB
-docker-compose exec mongodb mongosh gitpulse
-
-# Redis
-docker-compose exec redis redis-cli
-```
-
-### Stop services
-```bash
-docker-compose down
-```
-
-### Stop and remove volumes (⚠️ This will delete all data)
-```bash
-docker-compose down -v
-```
-
-## Environment Variables
-
-The following environment variables can be customized:
-
-- `MONGODB_HOST`: MongoDB host (default: mongodb)
-- `MONGODB_PORT`: MongoDB port (default: 27017)
-- `MONGODB_NAME`: MongoDB database name (default: gitpulse)
-- `REDIS_HOST`: Redis host (default: redis)
-- `REDIS_PORT`: Redis port (default: 6379)
+### Volumes
+- `ollama_data`: Persists Ollama models and configuration
+- `mongodb_data`: Persists MongoDB data
+- `redis_data`: Persists Redis data
 
 ## Troubleshooting
 
-### Services not starting
-1. Check if ports are already in use:
+### Ollama Service Issues
+1. **Check if Ollama is running:**
    ```bash
-   lsof -i :8000
-   lsof -i :27017
-   lsof -i :6379
+   docker-compose logs ollama
    ```
 
-2. Check container logs:
+2. **Restart Ollama service:**
    ```bash
-   docker-compose logs
+   docker-compose restart ollama
    ```
 
-### Database connection issues
-1. Ensure MongoDB is running:
+3. **Check model availability:**
    ```bash
-   docker-compose ps mongodb
+   curl http://localhost:11434/api/tags
    ```
 
-2. Check MongoDB logs:
+### Model Download Issues
+If the model download fails:
+1. **Manual download:**
    ```bash
-   docker-compose logs mongodb
+   docker-compose exec ollama ollama pull gemma3:1b
    ```
 
-### Redis connection issues
-1. Ensure Redis is running:
+2. **Check disk space:**
    ```bash
-   docker-compose ps redis
+   docker system df
    ```
 
-2. Check Redis logs:
-   ```bash
-   docker-compose logs redis
-   ```
+### Performance Notes
+- **First startup**: Model download takes 5-10 minutes
+- **Memory usage**: gemma3:1b requires ~4GB RAM
+- **CPU usage**: LLM inference is CPU-intensive
 
 ## Development
 
-For development, you can mount the source code as a volume by modifying the `docker-compose.yml`:
+### Local Development without Docker
+If you want to run the application locally but use Docker for Ollama:
 
-```yaml
-volumes:
-  - .:/app
-```
+1. **Start only Ollama:**
+   ```bash
+   docker-compose up -d ollama
+   ```
 
-This will allow you to make changes to the code without rebuilding the container.
+2. **Run Django locally:**
+   ```bash
+   python manage.py runserver
+   ```
+
+3. **Update settings:**
+   ```python
+   # In your local settings
+   OLLAMA_HOST = 'localhost'
+   OLLAMA_PORT = '11434'
+   ```
 
 ## Production Considerations
 
-For production deployment, consider:
+1. **Resource requirements:**
+   - Minimum 8GB RAM
+   - 10GB free disk space
+   - 4+ CPU cores recommended
 
-1. Using a production WSGI server (Gunicorn, uWSGI)
-2. Setting up a reverse proxy (Nginx)
-3. Using environment-specific settings
-4. Implementing proper logging
-5. Setting up monitoring and health checks
-6. Using secrets management for sensitive data 
+2. **Security:**
+   - Ollama API is exposed on port 11434
+   - Consider firewall rules for production
+
+3. **Monitoring:**
+   - Monitor Ollama memory usage
+   - Check model availability regularly
+   - Log classification performance
+
+## Commands Reference
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+
+# View logs
+docker-compose logs -f
+
+# Restart specific service
+docker-compose restart ollama
+
+# Execute commands in container
+docker-compose exec web python manage.py shell
+docker-compose exec ollama ollama list
+
+# Clean up
+docker-compose down -v  # Removes volumes
+docker system prune     # Removes unused images
+``` 

@@ -16,9 +16,12 @@ services:
       - MONGODB_NAME=gitpulse
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - OLLAMA_HOST=ollama
+      - OLLAMA_PORT=11434
     depends_on:
       - mongodb
       - redis
+      - ollama
     command: ["./start.sh"]
     restart: unless-stopped
 
@@ -52,8 +55,34 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    command: >
+      sh -c "
+        ollama serve &
+        sleep 10 &&
+        ollama pull gemma3:1b &&
+        wait
+      "
+
 volumes:
   mongodb_data:
     driver: local
   redis_data:
+    driver: local
+  ollama_data:
     driver: local 
