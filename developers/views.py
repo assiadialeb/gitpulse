@@ -564,6 +564,159 @@ def _generate_quality_metrics_data(commits_query):
             'no_ticket_commits': 0
         }
 
+
+def _generate_quality_metrics_by_month(commits_query):
+    """Generate quality metrics data by month for a developer (sans lookup, tout depuis developer_quality_metrics)"""
+    import calendar
+    from pymongo import MongoClient
+    try:
+        # Connexion MongoDB
+        client = MongoClient('localhost', 27017)
+        db = client['gitpulse']
+        quality_collection = db['developer_quality_metrics']
+
+        # Récupérer les SHAs des commits concernés
+        commit_shas = [commit.sha for commit in commits_query]
+        if not commit_shas:
+            return {'labels': [], 'datasets': []}
+
+        # Pipeline d'aggregation par mois
+        pipeline = [
+            {'$match': {'commit_sha': {'$in': commit_shas}}},
+            {'$addFields': {
+                'year': {'$year': '$commit_date'},
+                'month': {'$month': '$commit_date'}
+            }},
+            {'$group': {
+                '_id': {'year': '$year', 'month': '$month'},
+                'code_quality_scores': {'$push': '$code_quality_score'},
+                'impact_scores': {'$push': '$impact_score'},
+                'complexity_scores': {'$push': '$complexity_score'},
+                'real_code_commits': {'$sum': {'$cond': [{'$eq': ['$is_real_code', True]}, 1, 0]}},
+                'suspicious_commits': {'$sum': {'$cond': [{'$gt': [{'$size': {'$ifNull': ['$suspicious_patterns', []]}}, 0]}, 1, 0]}},
+                'doc_only_commits': {'$sum': {'$cond': [{'$eq': ['$is_documentation_only', True]}, 1, 0]}},
+                'config_only_commits': {'$sum': {'$cond': [{'$eq': ['$is_config_only', True]}, 1, 0]}},
+                'micro_commits': {'$sum': {'$cond': [{'$in': ['micro_commit', {'$ifNull': ['$suspicious_patterns', []]}]}, 1, 0]}},
+                'no_ticket_commits': {'$sum': {'$cond': [{'$in': ['no_ticket_reference', {'$ifNull': ['$suspicious_patterns', []]}]}, 1, 0]}},
+                'total_commits': {'$sum': 1}
+            }},
+            {'$sort': {'_id.year': 1, '_id.month': 1}}
+        ]
+        results = list(quality_collection.aggregate(pipeline))
+        if not results:
+            return {'labels': [], 'datasets': []}
+
+        labels = []
+        code_quality_data = []
+        impact_data = []
+        complexity_data = []
+        real_code_ratio = []
+        suspicious_ratio = []
+        doc_only_ratio = []
+        config_only_ratio = []
+        micro_commits_ratio = []
+        no_ticket_ratio = []
+
+        for result in results:
+            year = result['_id']['year']
+            month = result['_id']['month']
+            month_name = calendar.month_abbr[month]
+            labels.append(f"{month_name} {year}")
+            total = result.get('total_commits', 1) or 1
+            # Scores moyens
+            def avg(scores):
+                scores = [s for s in scores if s is not None]
+                return round(sum(scores)/len(scores), 1) if scores else 0
+            code_quality_data.append(avg(result.get('code_quality_scores', [])))
+            impact_data.append(avg(result.get('impact_scores', [])))
+            complexity_data.append(avg(result.get('complexity_scores', [])))
+            # Ratios (%)
+            real_code_ratio.append(round(result.get('real_code_commits', 0) / total * 100, 1))
+            suspicious_ratio.append(round(result.get('suspicious_commits', 0) / total * 100, 1))
+            doc_only_ratio.append(round(result.get('doc_only_commits', 0) / total * 100, 1))
+            config_only_ratio.append(round(result.get('config_only_commits', 0) / total * 100, 1))
+            micro_commits_ratio.append(round(result.get('micro_commits', 0) / total * 100, 1))
+            no_ticket_ratio.append(round(result.get('no_ticket_commits', 0) / total * 100, 1))
+
+        datasets = [
+            {
+                'label': 'Code Quality Score',
+                'data': code_quality_data,
+                'borderColor': '#2e7d32',
+                'backgroundColor': 'rgba(46, 125, 50, 0.8)',
+                'tension': 0.4,
+                'fill': 'false',
+            },
+            {
+                'label': 'Impact Score',
+                'data': impact_data,
+                'borderColor': '#1565c0',
+                'backgroundColor': 'rgba(21, 101, 192, 0.8)',
+                'tension': 0.4,
+                'fill': 'false',
+            },
+            {
+                'label': 'Complexity Score',
+                'data': complexity_data,
+                'borderColor': '#e65100',
+                'backgroundColor': 'rgba(230, 81, 0, 0.8)',
+                'tension': 0.4,
+                'fill': 'false',
+            },
+            {
+                'label': 'Real Code (%)',
+                'data': real_code_ratio,
+                'borderColor': '#1b5e20',
+                'backgroundColor': 'rgba(27, 94, 32, 0.8)',
+                'tension': 0.4,
+                'fill': 'false',
+            },
+            {
+                'label': 'Suspicious (%)',
+                'data': suspicious_ratio,
+                'borderColor': '#c62828',
+                'backgroundColor': 'rgba(198, 40, 40, 0.8)',
+                'tension': 0.4,
+                'fill': 'false',
+            },
+            {
+                'label': 'Doc Only (%)',
+                'data': doc_only_ratio,
+                'borderColor': '#f57f17',
+                'backgroundColor': 'rgba(245, 127, 23, 0.8)',
+                'tension': 0.4,
+                'fill': 'false',
+            },
+            {
+                'label': 'Config Only (%)',
+                'data': config_only_ratio,
+                'borderColor': '#00695c',
+                'backgroundColor': 'rgba(0, 105, 92, 0.8)',
+                'tension': 0.4,
+                'fill': 'false',
+            },
+            {
+                'label': 'Micro Commits (%)',
+                'data': micro_commits_ratio,
+                'borderColor': '#4e342e',
+                'backgroundColor': 'rgba(78, 52, 46, 0.8)',
+                'tension': 0.4,
+                'fill': 'false',
+            },
+            {
+                'label': 'No Ticket (%)',
+                'data': no_ticket_ratio,
+                'borderColor': '#424242',
+                'backgroundColor': 'rgba(66, 66, 66, 0.8)',
+                'tension': 0.4,
+                'fill': 'false',
+            },
+        ]
+        return {'labels': labels, 'datasets': datasets}
+    except Exception as e:
+        print(f"Error generating quality metrics by month: {e}")
+        return {'labels': [], 'datasets': []}
+
 @login_required
 def developer_detail(request, developer_id):
     """Show details for a specific developer or group"""
@@ -595,6 +748,7 @@ def developer_detail(request, developer_id):
                 commit_type_distribution = _generate_commit_type_distribution(Commit.objects(query))
                 commit_frequency = _generate_commit_frequency_data(Commit.objects(query))
                 quality_metrics = _generate_quality_metrics_data(Commit.objects(query))
+                quality_metrics_by_month = _generate_quality_metrics_by_month(Commit.objects(query))
                 
                 # Prepare doughnut chart data
                 doughnut_colors = {
@@ -632,6 +786,7 @@ def developer_detail(request, developer_id):
                     'is_group': True,
                     'commit_frequency': commit_frequency,
                     'quality_metrics': quality_metrics,
+                    'quality_metrics_by_month': quality_metrics_by_month,
                 }
                 # Prépare la légende après
                 legend_data = []
@@ -708,6 +863,7 @@ def developer_detail(request, developer_id):
                 'is_group': False,
                 'commit_frequency': commit_frequency,
                 'quality_metrics': quality_metrics,
+                'quality_metrics_by_month': quality_metrics_by_month,
             }
             # Prépare la légende après
             legend_data = []

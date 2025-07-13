@@ -278,6 +278,25 @@
         </div>
     </div>
 
+    <!-- Quality Metrics by Month Chart -->
+    <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+            <h2 class="card-title text-xl">📈 Quality Metrics by Month</h2>
+            <p class="text-sm text-gray-600 mb-4">All metrics over time</p>
+            {% if quality_metrics_by_month.labels %}
+            <div class="relative" style="height: 400px;">
+                <canvas id="qualityMetricsChart"></canvas>
+            </div>
+
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-gray-500">No quality metrics data available by month</p>
+                <p class="text-sm text-gray-400 mt-2">Debug: quality_metrics_by_month = {{ quality_metrics_by_month }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Activity Bubble Chart -->
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
@@ -494,6 +513,78 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         }
                     }
+                }
+            }
+        });
+    }
+    
+    // Quality Metrics by Month Chart
+    const qualityMetricsCtx = document.getElementById('qualityMetricsChart');
+    console.log('Quality metrics canvas found:', qualityMetricsCtx);
+    if (qualityMetricsCtx) {
+        const qualityMetricsData = {{ quality_metrics_by_month|safe }};
+        console.log('Quality metrics by month data:', qualityMetricsData);
+        console.log('Labels:', qualityMetricsData.labels);
+        console.log('Datasets:', qualityMetricsData.datasets);
+        
+        // Utiliser tous les datasets pour un seul graphique
+        const allDatasets = qualityMetricsData.datasets.map(ds => ({
+            ...ds,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 8
+        }));
+        
+        // Graphique unique (ligne)
+        const qualityChart = new Chart(qualityMetricsCtx, {
+            type: 'line',
+            data: {
+                labels: qualityMetricsData.labels,
+                datasets: allDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 15
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const value = context.parsed.y;
+                                return `${label}: ${value}/100`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Month'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Score (0-100)'
+                        },
+                        min: 0,
+                        max: 100
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
                 }
             }
         });
