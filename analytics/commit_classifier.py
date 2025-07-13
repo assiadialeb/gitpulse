@@ -86,8 +86,11 @@ def classify_commit_ollama(message: str) -> str:
     Returns:
         Category: 'fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other'
     """
-    # Ollama configuration
-    OLLAMA_URL = "http://localhost:11434"
+    # Ollama configuration from environment variables
+    import os
+    OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'localhost')
+    OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
+    OLLAMA_URL = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}"
     MODEL_NAME = "gemma3:1b"
     
     prompt = f"""Classify this git commit message:
