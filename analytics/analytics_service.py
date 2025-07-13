@@ -21,7 +21,7 @@ class AnalyticsService:
     
     def get_developer_activity(self, days: int = 30) -> Dict:
         """
-        Get developer activity metrics with grouped developers
+        Get developer activity metrics for this specific application
         
         Args:
             days: Number of days to analyze (default: 30)
@@ -32,8 +32,8 @@ class AnalyticsService:
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
-        # Get grouped developers
-        grouped_developers = self.grouping_service.get_grouped_developers()
+        # Get grouped developers for this application only
+        grouped_developers = self.grouping_service.get_grouped_developers_for_application(self.application_id)
         
         # Create mapping from email to group
         email_to_group = {}
@@ -369,9 +369,9 @@ class AnalyticsService:
         total_additions = sum(commit.additions for commit in commits)
         total_deletions = sum(commit.deletions for commit in commits)
         
-        # Count unique authors using grouped developers
-        grouped_developers = self.grouping_service.get_grouped_developers()
-        unique_authors = len(grouped_developers)
+        # Count unique authors using all developers (grouped + ungrouped) for this specific application
+        all_developers = self.grouping_service.get_all_developers_for_application(self.application_id)
+        unique_authors = len(all_developers)
         
         # Calculate average commits per day
         if first_commit and last_commit:
