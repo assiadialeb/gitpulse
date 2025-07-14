@@ -14,7 +14,7 @@ from applications.models import Application
 logger = logging.getLogger(__name__)
 from .analytics_service import AnalyticsService
 from analytics.sync_service import SyncService
-from analytics.models import DeveloperGroup, DeveloperAlias
+from analytics.models import Developer, DeveloperAlias
 from github.models import GitHubToken
 
 
@@ -214,25 +214,25 @@ def get_indexing_progress(request, application_id):
         }) 
 
 @login_required
-def delete_group(request, application_id, group_id):
-    """Delete a developer group"""
+def delete_developer(request, application_id, developer_id):
+    """Delete a developer"""
     application = get_object_or_404(Application, id=application_id, owner=request.user)
     
     try:
-        from .models import DeveloperGroup
-        group = DeveloperGroup.objects.get(id=group_id, application_id=application_id)
-        group_name = group.primary_name
-        group.delete()
+        from .models import Developer
+        developer = Developer.objects.get(id=developer_id, application_id=application_id)
+        developer_name = developer.primary_name
+        developer.delete()
         
         return JsonResponse({
             'success': True,
-            'message': f'Developer group "{group_name}" deleted successfully'
+            'message': f'Developer "{developer_name}" deleted successfully'
         })
         
-    except DeveloperGroup.DoesNotExist:
+    except Developer.DoesNotExist:
         return JsonResponse({
             'success': False,
-            'error': 'Developer group not found'
+            'error': 'Developer not found'
         })
     except Exception as e:
         return JsonResponse({
@@ -242,8 +242,8 @@ def delete_group(request, application_id, group_id):
 
 
 @login_required
-def rename_group(request, application_id, group_id):
-    """Rename a developer group"""
+def rename_developer(request, application_id, developer_id):
+    """Rename a developer"""
     application = get_object_or_404(Application, id=application_id, owner=request.user)
     
     if request.method != 'POST':
@@ -253,8 +253,8 @@ def rename_group(request, application_id, group_id):
         })
     
     try:
-        from .models import DeveloperGroup
-        group = DeveloperGroup.objects.get(id=group_id, application_id=application_id)
+        from .models import Developer
+        developer = Developer.objects.get(id=developer_id, application_id=application_id)
         
         new_name = request.POST.get('new_name')
         if not new_name:
@@ -263,19 +263,19 @@ def rename_group(request, application_id, group_id):
                 'error': 'New name is required'
             })
         
-        old_name = group.primary_name
-        group.primary_name = new_name
-        group.save()
+        old_name = developer.primary_name
+        developer.primary_name = new_name
+        developer.save()
         
         return JsonResponse({
             'success': True,
-            'message': f'Developer group renamed from "{old_name}" to "{new_name}"'
+            'message': f'Developer renamed from "{old_name}" to "{new_name}"'
         })
         
-    except DeveloperGroup.DoesNotExist:
+    except Developer.DoesNotExist:
         return JsonResponse({
             'success': False,
-            'error': 'Developer group not found'
+            'error': 'Developer not found'
         })
     except Exception as e:
         return JsonResponse({
@@ -303,20 +303,20 @@ def api_auto_group_developers(request, application_id):
     return JsonResponse({'error': 'Method not allowed'}, status=405) 
 
 @login_required
-def api_merge_existing_groups(request, application_id):
-    """API endpoint to merge existing groups that should be combined"""
+def api_merge_existing_developers(request, application_id):
+    """API endpoint to merge existing developers that should be combined"""
     if request.method == 'POST':
         try:
             from .developer_grouping_service import DeveloperGroupingService
             
             grouping_service = DeveloperGroupingService(application_id)
-            result = grouping_service.merge_existing_groups()
+            result = grouping_service.merge_existing_developers()
             
             return JsonResponse(result)
         except Exception as e:
             return JsonResponse({
                 'success': False,
-                'error': f'Error merging groups: {str(e)}'
+                'error': f'Error merging developers: {str(e)}'
             }, status=500)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405) 

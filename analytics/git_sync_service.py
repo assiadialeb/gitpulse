@@ -7,11 +7,13 @@ from typing import List, Dict, Optional, Tuple
 from django.db import transaction
 from mongoengine import Q
 from django.core.exceptions import ObjectDoesNotExist
+from pymongo import MongoClient
 
 from .models import Commit, SyncLog, RepositoryStats, FileChange
 from .git_service import GitService, GitServiceError
 from applications.models import Application, ApplicationRepository
 from .commit_classifier import classify_commit_with_files
+from analytics.models import DeveloperAlias
 
 logger = logging.getLogger(__name__)
 
@@ -76,13 +78,18 @@ class GitSyncService:
         # Auto-group developers after successful sync
         if results['repositories_synced'] > 0:
             try:
+                # Create missing aliases first
+                logger.info("Creating missing aliases...")
+                aliases_created = create_missing_aliases_for_application(application_id)
+                logger.info(f"Created {aliases_created} missing aliases")
+                
                 logger.info("Starting automatic developer grouping...")
                 from .developer_grouping_service import DeveloperGroupingService
                 grouping_service = DeveloperGroupingService()
                 grouping_result = grouping_service.auto_group_developers()
                 if grouping_result['success']:
-                    logger.info(f"Developer grouping completed: {grouping_result['groups_created']} groups processed")
-                    results['developer_groups_processed'] = grouping_result['groups_created']
+                    logger.info(f"Developer grouping completed: {grouping_result['developers_created']} developers processed")
+                    results['developer_groups_processed'] = grouping_result['developers_created']
                 else:
                     logger.warning(f"Developer grouping failed: {grouping_result.get('error', 'Unknown error')}")
                     results['developer_groups_processed'] = 0
@@ -164,13 +171,18 @@ class GitSyncService:
         # Auto-group developers after successful sync
         if results['repositories_synced'] > 0:
             try:
+                # Create missing aliases first
+                logger.info("Creating missing aliases...")
+                aliases_created = create_missing_aliases_for_application(application_id)
+                logger.info(f"Created {aliases_created} missing aliases")
+                
                 logger.info("Starting automatic developer grouping...")
                 from .developer_grouping_service import DeveloperGroupingService
                 grouping_service = DeveloperGroupingService()
                 grouping_result = grouping_service.auto_group_developers()
                 if grouping_result['success']:
-                    logger.info(f"Developer grouping completed: {grouping_result['groups_created']} groups processed")
-                    results['developer_groups_processed'] = grouping_result['groups_created']
+                    logger.info(f"Developer grouping completed: {grouping_result['developers_created']} developers processed")
+                    results['developer_groups_processed'] = grouping_result['developers_created']
                 else:
                     logger.warning(f"Developer grouping failed: {grouping_result.get('error', 'Unknown error')}")
                     results['developer_groups_processed'] = 0
@@ -457,3 +469,46 @@ class GitSyncService:
     def cleanup(self):
         """Clean up all cloned repositories"""
         self.git_service.cleanup_all_repositories() 
+
+def create_missing_aliases_for_application(application_id: int):
+    """Create missing aliases for all unique authors in an application"""
+    logger.info(f"Creating missing aliases for application {application_id}...")
+    
+    # Get all unique authors from commits
+    client = MongoClient('localhost', 27017)
+    db = client['gitpulse']
+    
+    # Extract unique authors from commits
+    unique_authors = set()
+    for commit in db.commits.find({'application_id': application_id}):
+        author_key = f"{commit.get('author_name', '')}|{commit.get('author_email', '')}"
+        unique_authors.add(author_key)
+    
+    logger.info(f"Found {len(unique_authors)} unique authors")
+    
+    # Create missing aliases
+    created_count = 0
+    for author_key in unique_authors:
+        name, email = author_key.split('|', 1)
+        
+        # Check if alias already exists
+        existing_alias = DeveloperAlias.objects(
+            name=name,
+            email=email
+        ).first()
+        
+        if not existing_alias:
+            # Create new alias
+            alias = DeveloperAlias(
+                name=name,
+                email=email,
+                first_seen=datetime.utcnow(),  # Will be updated with actual dates later
+                last_seen=datetime.utcnow(),
+                commit_count=1
+            )
+            alias.save()
+            created_count += 1
+            logger.info(f"Created alias: {name} ({email})")
+    
+    logger.info(f"Created {created_count} new aliases")
+    return created_count 

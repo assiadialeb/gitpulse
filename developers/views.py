@@ -1,1226 +1,708 @@
-
-
-
-import urllib.parse
-from datetime import datetime, timedelta
-import json
-from collections import defaultdict
-
+"""
+Views for developers app
+"""
 from django.shortcuts import render, get_object_or_404, redirect
-from django.core.paginator import Paginator
-from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
-from .models import DeveloperGroup, DeveloperIdentity
-from analytics.models import Commit
-import base64
+from django.http import JsonResponse, Http404
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import authenticate
+import json
+import re
+from collections import Counter
+from datetime import datetime, timedelta
 
-@login_required
-def list_groups(request):
-    """Retourne la liste de tous les groupes existants (id, nom, email) pour sélection côté frontend."""
-    from analytics.models import DeveloperGroup
-    try:
-        groups = DeveloperGroup.objects.all()
-        data = []
-        for group in groups:
-            try:
-                # Utiliser les bons champs MongoDB
-                name = getattr(group, 'primary_name', '') or ''
-                email = getattr(group, 'primary_email', '') or ''
-                
-                # S'assurer que les chaînes sont bien des chaînes UTF-8 valides
-                if isinstance(name, bytes):
-                    name = name.decode('utf-8', errors='replace')
-                if isinstance(email, bytes):
-                    email = email.decode('utf-8', errors='replace')
-                
-                # Nettoyer les caractères problématiques
-                name = str(name).replace('\x00', '').strip()
-                email = str(email).replace('\x00', '').strip()
-                
-                # S'assurer que l'ID est une chaîne valide
-                group_id = str(group.id)
-                if not group_id or group_id == 'None':
-                    continue
-                
-                data.append({
-                    'id': group_id,
-                    'name': name,
-                    'email': email
-                })
-            except Exception as group_error:
-                print(f"Error processing group {getattr(group, 'id', 'unknown')}: {str(group_error)}")
-                continue
-        
-        return JsonResponse({'groups': data}, safe=False)
-    except Exception as e:
-        print(f"Error in list_groups: {str(e)}")
-        return JsonResponse({'error': 'Failed to load groups', 'details': str(e)}, status=500)
+from analytics.models import Developer, DeveloperAlias
+from applications.models import Application
 
 
 @login_required
-@require_http_methods(["POST"])
-def merge_group(request):
-    """Fusionne tous les alias du groupe source dans le groupe cible, puis supprime le groupe source."""
-    from analytics.models import DeveloperGroup, DeveloperAlias
-    try:
-        data = json.loads(request.body)
-        source_group_id = data.get('source_group_id')
-        target_group_id = data.get('target_group_id')
-        if not source_group_id or not target_group_id:
-            return JsonResponse({'error': 'source_group_id et target_group_id requis'}, status=400)
-        if source_group_id == target_group_id:
-            return JsonResponse({'error': 'Les deux groupes doivent être différents'}, status=400)
-        source_group = DeveloperGroup.objects.get(id=source_group_id)
-        target_group = DeveloperGroup.objects.get(id=target_group_id)
-        # Rattacher tous les alias du groupe source au groupe cible
-        updated = DeveloperAlias.objects(group=source_group).update(set__group=target_group)
-        # Supprimer le groupe source
-        source_group.delete()
-        return JsonResponse({'success': True, 'aliases_moved': updated})
-    except DeveloperGroup.DoesNotExist:
-        return JsonResponse({'error': 'Groupe introuvable'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-@login_required
-@require_http_methods(["POST"])
-def add_identity_to_group(request):
-    """Ajoute une identité individuelle (nom/email) à un groupe existant."""
-    from analytics.models import DeveloperGroup, DeveloperAlias
-    try:
-        data = json.loads(request.body)
-        group_id = data.get('group_id')
-        name = data.get('name')
-        email = data.get('email')
-        if not group_id or not name or not email:
-            return JsonResponse({'error': 'group_id, name et email requis'}, status=400)
-        group = DeveloperGroup.objects.get(id=group_id)
-        # Vérifier si l'alias existe déjà
-        exists = DeveloperAlias.objects(group=group, name=name, email=email).first()
-        if exists:
-            return JsonResponse({'error': 'Cette identité existe déjà dans ce groupe'}, status=400)
-        # Créer le nouvel alias
-        alias = DeveloperAlias(group=group, name=name, email=email)
-        alias.save()
-        return JsonResponse({'success': True, 'alias_id': str(alias.id)})
-    except DeveloperGroup.DoesNotExist:
-        return JsonResponse({'error': 'Groupe introuvable'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-
-@login_required
-def developer_list(request):
-    """List all developers with grouping information"""
-    from analytics.developer_grouping_service import DeveloperGroupingService
+def list_developers(request):
+    """List all developers with simple search functionality"""
+    # Get all developers from MongoDB
+    developers = Developer.objects.all().order_by('primary_name')
     
-    # Get grouped developers (both auto and manual)
-    grouping_service = DeveloperGroupingService()
-    grouped_developers = grouping_service.get_grouped_developers()
-    
-    # Create a set of grouped developer keys for filtering
-    grouped_developers_set = set()
-    for group in grouped_developers:
-        for alias in group['aliases']:
-            dev_key = f"{alias['name']}|{alias['email']}"
-            grouped_developers_set.add(dev_key)
-    
-    # Get all individual developers from commits
-    from analytics.models import Commit
-    commits = Commit.objects.all()
-    
-    # Extract unique developers from commits
-    seen_developers = set()
-    all_individual_developers = []
-    
-    for commit in commits:
-        # Create a unique key for this developer
-        dev_key = f"{commit.author_name}|{commit.author_email}"
-        
-        if dev_key not in seen_developers:
-            seen_developers.add(dev_key)
-            
-            # Create URL-safe encoded ID for the developer
-            dev_data = f"{commit.author_name}|{commit.author_email}"
-            # Use proper URL encoding
-            encoded_data = urllib.parse.quote(dev_data, safe='')
-            developer = {
-                'name': commit.author_name,
-                'email': commit.author_email,
-                'commit_count': 1,  # Will be updated
-                'first_seen': commit.authored_date,
-                'last_seen': commit.authored_date,
-                'is_grouped': False,
-                'group_id': f"individual_{encoded_data}"
-            }
-            all_individual_developers.append(developer)
-        else:
-            # Update existing developer
-            for dev in all_individual_developers:
-                if f"{dev['name']}|{dev['email']}" == dev_key:
-                    dev['commit_count'] += 1
-                    if commit.authored_date < dev['first_seen']:
-                        dev['first_seen'] = commit.authored_date
-                    if commit.authored_date > dev['last_seen']:
-                        dev['last_seen'] = commit.authored_date
-                    break
-    
-    # Combine grouped and individual developers
-    all_developers = []
-    
-    # Add grouped developers
-    for developer in grouped_developers:
-        developer['is_grouped'] = True
-        # Normalize keys for template compatibility
-        developer['name'] = developer.get('primary_name', '')
-        developer['email'] = developer.get('primary_email', '')
-        # Preserve the group_id for the template
-        developer['group_id'] = developer.get('group_id', '')
-        all_developers.append(developer)
-    
-    # Add individual developers (not already in groups)
-    for developer in all_individual_developers:
-        dev_key = f"{developer['name']}|{developer['email']}"
-        if dev_key not in grouped_developers_set:
-            developer['application'] = {
-                'id': 0,  # Global
-                'name': 'All Applications'
-            }
-            developer['is_grouped'] = False
-            all_developers.append(developer)
-    
-    # Get search parameter
-    search_term = request.GET.get('search', '').strip().lower()
-    
-    # Filter developers based on search term
-    if search_term:
-        filtered_developers = []
-        for developer in all_developers:
-            name = developer.get('name', '').lower()
-            email = developer.get('email', '').lower()
-            first_seen = developer.get('first_seen', '').strftime('%b %d, %Y').lower() if developer.get('first_seen') else ''
-            last_seen = developer.get('last_seen', '').strftime('%b %d, %Y').lower() if developer.get('last_seen') else ''
-            
-            if (search_term in name or 
-                search_term in email or 
-                search_term in first_seen or 
-                search_term in last_seen):
-                filtered_developers.append(developer)
-        all_developers = filtered_developers
-    
-    # Get sorting parameters
-    sort_by = request.GET.get('sort', 'name')  # Default sort by name
-    sort_order = request.GET.get('order', 'asc')  # Default ascending
-    
-    # Sort developers
-    if sort_by == 'name':
-        all_developers.sort(key=lambda x: x['name'].lower(), reverse=(sort_order == 'desc'))
-    elif sort_by == 'email':
-        all_developers.sort(key=lambda x: x['email'].lower(), reverse=(sort_order == 'desc'))
-    elif sort_by == 'first_seen':
-        all_developers.sort(key=lambda x: x.get('first_seen', datetime.min), reverse=(sort_order == 'desc'))
-    elif sort_by == 'last_seen':
-        all_developers.sort(key=lambda x: x.get('last_seen', datetime.min), reverse=(sort_order == 'desc'))
-    else:  # Default: sort by commit count
-        all_developers.sort(key=lambda x: x.get('commit_count', x.get('total_commits', 0)), reverse=(sort_order == 'desc'))
-    
-    # Paginate
-    paginator = Paginator(all_developers, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    # Count grouped vs ungrouped
-    grouped_count = len([d for d in all_developers if d.get('is_grouped', False)])
-    ungrouped_count = len(all_developers) - grouped_count
+    # Simple search filter
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        # For MongoDB, we need to use a different approach
+        developers = developers.filter(
+            primary_name__icontains=search_query
+        )
     
     context = {
-        'page_obj': page_obj,
-        'total_count': len(all_developers),
-        'grouped_count': grouped_count,
-        'ungrouped_count': ungrouped_count,
-        'sort_by': sort_by,
-        'sort_order': sort_order,
-        'search_term': search_term,
+        'developers': developers,
+        'search_query': search_query,
+        'total_count': developers.count(),
     }
     
     return render(request, 'developers/list.html', context)
 
 
-def _generate_commit_quality_data(commits_query):
-    """Generate commit quality metrics for a developer"""
-    import re
+def search_developers_ajax(request):
+    """AJAX endpoint for inline search"""
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        return JsonResponse({
+            'error': 'Authentication required',
+            'developers': [],
+            'total_count': 0,
+            'search_query': ''
+        }, status=401)
     
-    # Define patterns for generic vs explicit messages
-    generic_patterns = [
-        r'^wip$', r'^fix$', r'^update$', r'^cleanup$', r'^refactor$',
-        r'^typo$', r'^style$', r'^format$', r'^test$', r'^docs$',
-        r'^chore:', r'^feat:', r'^fix:', r'^docs:', r'^style:',
-        r'^refactor:', r'^test:', r'^chore\(', r'^feat\(', r'^fix\(',
-        r'^update\s+\w+$', r'^fix\s+\w+$', r'^add\s+\w+$'
-    ]
+    search_query = request.GET.get('q', '').strip()
     
-    explicit_count = 0
-    generic_count = 0
-    total_commits = 0
+    developers = Developer.objects.all().order_by('primary_name')
     
-    for commit in commits_query:
-        total_commits += 1
-        message = commit.message.lower().strip()
+    if search_query:
+        # For MongoDB, search in both name and email fields
+        # We'll filter by name first, then add email matches
+        name_matches = developers.filter(primary_name__icontains=search_query)
+        email_matches = developers.filter(primary_email__icontains=search_query)
         
-        # Check if message matches generic patterns
-        is_generic = False
-        for pattern in generic_patterns:
-            if re.match(pattern, message):
-                is_generic = True
-                break
+        # Combine results manually (avoid using | operator with MongoDB)
+        all_developers = list(developers)
+        matching_developers = []
         
-        if is_generic:
-            generic_count += 1
-        else:
-            explicit_count += 1
-    
-    if total_commits > 0:
-        explicit_ratio = (explicit_count / total_commits) * 100
-        generic_ratio = (generic_count / total_commits) * 100
+        for dev in all_developers:
+            name_match = search_query.lower() in (dev.primary_name or '').lower()
+            email_match = search_query.lower() in (dev.primary_email or '').lower()
+            if name_match or email_match:
+                matching_developers.append(dev)
+        
+        developers = matching_developers
     else:
-        explicit_ratio = 0
-        generic_ratio = 0
+        developers = list(developers)
     
-    return {
-        'total_commits': total_commits,
-        'explicit_commits': explicit_count,
-        'generic_commits': generic_count,
-        'explicit_ratio': round(explicit_ratio, 1),
-        'generic_ratio': round(generic_ratio, 1)
-    }
-
-def _generate_commit_type_distribution(commits_query):
-    """Generate commit type distribution for a developer"""
-    from analytics.commit_classifier import get_commit_type_stats
-    
-    return get_commit_type_stats(commits_query)
-
-
-def _generate_commit_frequency_data(commits_query):
-    """Generate commit frequency metrics for a developer"""
-    from analytics.analytics_service import AnalyticsService
-    
-    # Create a temporary analytics service instance
-    # We don't need application_id for this calculation
-    analytics_service = AnalyticsService(0)
-    
-    return analytics_service.get_developer_commit_frequency(commits_query)
-
-def _generate_polar_chart_data(commits_query):
-    """Generate polar area chart data for repositories by net lines added"""
-    from collections import defaultdict
-    
-    # Group commits by repository and calculate net lines added
-    repo_stats = defaultdict(lambda: {'additions': 0, 'deletions': 0})
-    
-    for commit in commits_query:
-        repo_name = commit.repository_full_name
-        repo_stats[repo_name]['additions'] += commit.additions
-        repo_stats[repo_name]['deletions'] += commit.deletions
-    
-    # Calculate net lines added and prepare chart data
-    chart_data = []
-    colors = [
-        'rgba(34, 197, 94, 0.7)',   # green
-        'rgba(59, 130, 246, 0.7)',  # blue
-        'rgba(168, 85, 247, 0.7)',  # purple
-        'rgba(239, 68, 68, 0.7)',   # red
-        'rgba(245, 158, 11, 0.7)',  # orange
-        'rgba(16, 185, 129, 0.7)',  # emerald
-        'rgba(236, 72, 153, 0.7)',  # pink
-        'rgba(99, 102, 241, 0.7)',  # indigo
-    ]
-    
-    for i, (repo_name, stats) in enumerate(repo_stats.items()):
-        net_lines = stats['additions'] - stats['deletions']
-        if net_lines > 0:  # Only show positive net lines
-            chart_data.append({
-                'label': repo_name,
-                'data': [net_lines],
-                'backgroundColor': colors[i % len(colors)],
-                'borderColor': colors[i % len(colors)].replace('0.7', '1'),
-                'borderWidth': 2
-            })
-    
-    return chart_data
-
-def _generate_chart_data(commits_query, days_back=120):
-    """Generate bubble chart data from commits for the last N days"""
-    from datetime import datetime, timedelta
-    
-    # Calculate date range
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=days_back)
-    
-    # Get commits in date range
-    commits = commits_query.filter(authored_date__gte=start_date).order_by('authored_date')
-    
-    # Group by repository and hour
-    activity_data = defaultdict(lambda: defaultdict(int))
-    total_changes = defaultdict(lambda: defaultdict(int))
-    
-    for commit in commits:
-        # Get date and hour
-        commit_date = commit.authored_date.date()
-        commit_hour = commit.authored_date.hour
-        repository = commit.repository_full_name
-        
-        # Count commits
-        activity_data[repository][(commit_date, commit_hour)] += 1
-        
-        # Sum additions/deletions for bubble size
-        changes = (commit.additions or 0) + (commit.deletions or 0)
-        total_changes[repository][(commit_date, commit_hour)] += changes
-    
-    # Generate datasets for Chart.js
-    datasets = []
-    colors = [
-        'rgba(59, 130, 246, 0.7)',   # Blue
-        'rgba(16, 185, 129, 0.7)',   # Green
-        'rgba(245, 158, 11, 0.7)',   # Yellow
-        'rgba(239, 68, 68, 0.7)',    # Red
-        'rgba(139, 92, 246, 0.7)',   # Purple
-        'rgba(6, 182, 212, 0.7)',    # Cyan
-        'rgba(132, 204, 22, 0.7)',   # Lime
-        'rgba(249, 115, 22, 0.7)'    # Orange
-    ]
-    
-    for i, (repository, data) in enumerate(activity_data.items()):
-        color = colors[i % len(colors)]
-        dataset = {
-            'label': repository,
-            'data': [],
-            'backgroundColor': color,
-            'borderColor': color.replace('0.7', '1.0'),  # Solid border
-            'borderWidth': 1
-        }
-        
-        for (date, hour), commit_count in data.items():
-            # Calculate bubble size based on changes (fallback to commit count)
-            changes = total_changes[repository][(date, hour)]
-            bubble_size = max(changes / 100, commit_count * 5)  # Scale appropriately
-            
-            # Convert date to days ago for simpler x-axis
-            days_ago = (end_date.date() - date).days
-            
-            dataset['data'].append({
-                'x': days_ago,
-                'y': hour,
-                'r': bubble_size,
-                'repository': repository,
-                'commit_count': commit_count,
-                'changes': changes
-            })
-        
-        datasets.append(dataset)
-    
-    return datasets, start_date, end_date
-
-def _generate_quality_metrics_data(commits_query):
-    """Generate quality metrics data from MongoDB collection"""
-    from pymongo import MongoClient
-    from datetime import datetime, timedelta, timezone
-    
-    try:
-        # Connect to MongoDB
-        client = MongoClient('localhost', 27017)
-        db = client['gitpulse']
-        quality_collection = db['developer_quality_metrics']
-        
-        # Get commit SHAs from the commits query
-        commit_shas = [commit.sha for commit in commits_query]
-        
-        if not commit_shas:
-            return {
-                'total_commits': 0,
-                'avg_code_quality': 0,
-                'avg_impact': 0,
-                'avg_complexity': 0,
-                'suspicious_commits': 0,
-                'suspicious_ratio': 0,
-                'real_code_commits': 0,
-                'real_code_ratio': 0,
-                'doc_only_commits': 0,
-                'config_only_commits': 0,
-                'micro_commits': 0,
-                'no_ticket_commits': 0
-            }
-        
-        # Query MongoDB for quality metrics
-        pipeline = [
-            {
-                '$match': {
-                    'commit_sha': {'$in': commit_shas}
-                }
-            },
-            {
-                '$group': {
-                    '_id': None,
-                    'total_commits': {'$sum': 1},
-                    'avg_code_quality': {'$avg': '$code_quality_score'},
-                    'avg_impact': {'$avg': '$impact_score'},
-                    'avg_complexity': {'$avg': '$complexity_score'},
-                    'suspicious_commits': {
-                        '$sum': {
-                            '$cond': [
-                                {
-                                    '$gt': [
-                                        {
-                                            '$size': {
-                                                '$filter': {
-                                                    'input': '$suspicious_patterns',
-                                                    'cond': {'$ne': ['$$this', 'no_ticket_reference']}
-                                                }
-                                            }
-                                        },
-                                        0
-                                    ]
-                                },
-                                1,
-                                0
-                            ]
-                        }
-                    },
-                    'real_code_commits': {
-                        '$sum': {'$cond': ['$is_real_code', 1, 0]}
-                    },
-                    'doc_only_commits': {
-                        '$sum': {'$cond': ['$is_documentation_only', 1, 0]}
-                    },
-                    'config_only_commits': {
-                        '$sum': {'$cond': ['$is_config_only', 1, 0]}
-                    },
-                    'micro_commits': {
-                        '$sum': {'$cond': [{'$in': ['micro_commit', '$suspicious_patterns']}, 1, 0]}
-                    },
-                    'no_ticket_commits': {
-                        '$sum': {'$cond': [{'$in': ['no_ticket_reference', '$suspicious_patterns']}, 1, 0]}
-                    }
-                }
-            }
-        ]
-        
-        result = list(quality_collection.aggregate(pipeline))
-        
-        if not result:
-            return {
-                'total_commits': 0,
-                'avg_code_quality': 0,
-                'avg_impact': 0,
-                'avg_complexity': 0,
-                'suspicious_commits': 0,
-                'suspicious_ratio': 0,
-                'real_code_commits': 0,
-                'real_code_ratio': 0,
-                'doc_only_commits': 0,
-                'config_only_commits': 0,
-                'micro_commits': 0,
-                'no_ticket_commits': 0
-            }
-        
-        data = result[0]
-        total_commits = data.get('total_commits', 0)
-        
-        return {
-            'total_commits': total_commits,
-            'avg_code_quality': round(data.get('avg_code_quality', 0), 1),
-            'avg_impact': round(data.get('avg_impact', 0), 1),
-            'avg_complexity': round(data.get('avg_complexity', 0), 1),
-            'suspicious_commits': data.get('suspicious_commits', 0),
-            'suspicious_ratio': round((data.get('suspicious_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'real_code_commits': data.get('real_code_commits', 0),
-            'real_code_ratio': round((data.get('real_code_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'doc_only_commits': data.get('doc_only_commits', 0),
-            'doc_only_ratio': round((data.get('doc_only_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'config_only_commits': data.get('config_only_commits', 0),
-            'config_only_ratio': round((data.get('config_only_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'micro_commits': data.get('micro_commits', 0),
-            'micro_commits_ratio': round((data.get('micro_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'no_ticket_commits': data.get('no_ticket_commits', 0),
-            'no_ticket_ratio': round((data.get('no_ticket_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1)
-        }
-        
-    except Exception as e:
-        print(f"Error generating quality metrics: {e}")
-        return {
-            'total_commits': 0,
-            'avg_code_quality': 0,
-            'avg_impact': 0,
-            'avg_complexity': 0,
-            'suspicious_commits': 0,
-            'suspicious_ratio': 0,
-            'real_code_commits': 0,
-            'real_code_ratio': 0,
-            'doc_only_commits': 0,
-            'config_only_commits': 0,
-            'micro_commits': 0,
-            'no_ticket_commits': 0
-        }
-
-
-def _generate_quality_metrics_by_month(commits_query):
-    """Generate quality metrics data by month for a developer (sans lookup, tout depuis developer_quality_metrics)"""
-    import calendar
-    from pymongo import MongoClient
-    try:
-        # Connexion MongoDB
-        client = MongoClient('localhost', 27017)
-        db = client['gitpulse']
-        quality_collection = db['developer_quality_metrics']
-
-        # Récupérer les SHAs des commits concernés
-        commit_shas = [commit.sha for commit in commits_query]
-        if not commit_shas:
-            return {'labels': [], 'datasets': []}
-
-        # Pipeline d'aggregation par mois
-        pipeline = [
-            {'$match': {'commit_sha': {'$in': commit_shas}}},
-            {'$addFields': {
-                'year': {'$year': '$commit_date'},
-                'month': {'$month': '$commit_date'}
-            }},
-            {'$group': {
-                '_id': {'year': '$year', 'month': '$month'},
-                'code_quality_scores': {'$push': '$code_quality_score'},
-                'impact_scores': {'$push': '$impact_score'},
-                'complexity_scores': {'$push': '$complexity_score'},
-                'real_code_commits': {'$sum': {'$cond': [{'$eq': ['$is_real_code', True]}, 1, 0]}},
-                'suspicious_commits': {'$sum': {'$cond': [{'$gt': [{'$size': {'$ifNull': ['$suspicious_patterns', []]}}, 0]}, 1, 0]}},
-                'doc_only_commits': {'$sum': {'$cond': [{'$eq': ['$is_documentation_only', True]}, 1, 0]}},
-                'config_only_commits': {'$sum': {'$cond': [{'$eq': ['$is_config_only', True]}, 1, 0]}},
-                'micro_commits': {'$sum': {'$cond': [{'$in': ['micro_commit', {'$ifNull': ['$suspicious_patterns', []]}]}, 1, 0]}},
-                'no_ticket_commits': {'$sum': {'$cond': [{'$in': ['no_ticket_reference', {'$ifNull': ['$suspicious_patterns', []]}]}, 1, 0]}},
-                'total_commits': {'$sum': 1}
-            }},
-            {'$sort': {'_id.year': 1, '_id.month': 1}}
-        ]
-        results = list(quality_collection.aggregate(pipeline))
-        if not results:
-            return {'labels': [], 'datasets': []}
-
-        labels = []
-        code_quality_data = []
-        impact_data = []
-        complexity_data = []
-        real_code_ratio = []
-        suspicious_ratio = []
-        doc_only_ratio = []
-        config_only_ratio = []
-        micro_commits_ratio = []
-        no_ticket_ratio = []
-
-        for result in results:
-            year = result['_id']['year']
-            month = result['_id']['month']
-            month_name = calendar.month_abbr[month]
-            labels.append(f"{month_name} {year}")
-            total = result.get('total_commits', 1) or 1
-            # Scores moyens
-            def avg(scores):
-                scores = [s for s in scores if s is not None]
-                return round(sum(scores)/len(scores), 1) if scores else 0
-            code_quality_data.append(avg(result.get('code_quality_scores', [])))
-            impact_data.append(avg(result.get('impact_scores', [])))
-            complexity_data.append(avg(result.get('complexity_scores', [])))
-            # Ratios (%)
-            real_code_ratio.append(round(result.get('real_code_commits', 0) / total * 100, 1))
-            suspicious_ratio.append(round(result.get('suspicious_commits', 0) / total * 100, 1))
-            doc_only_ratio.append(round(result.get('doc_only_commits', 0) / total * 100, 1))
-            config_only_ratio.append(round(result.get('config_only_commits', 0) / total * 100, 1))
-            micro_commits_ratio.append(round(result.get('micro_commits', 0) / total * 100, 1))
-            no_ticket_ratio.append(round(result.get('no_ticket_commits', 0) / total * 100, 1))
-
-        datasets = [
-            {
-                'label': 'Code Quality Score',
-                'data': code_quality_data,
-                'borderColor': '#2e7d32',
-                'backgroundColor': 'rgba(46, 125, 50, 0.8)',
-                'tension': 0.4,
-                'fill': 'false',
-            },
-            {
-                'label': 'Impact Score',
-                'data': impact_data,
-                'borderColor': '#1565c0',
-                'backgroundColor': 'rgba(21, 101, 192, 0.8)',
-                'tension': 0.4,
-                'fill': 'false',
-            },
-            {
-                'label': 'Complexity Score',
-                'data': complexity_data,
-                'borderColor': '#e65100',
-                'backgroundColor': 'rgba(230, 81, 0, 0.8)',
-                'tension': 0.4,
-                'fill': 'false',
-            },
-            {
-                'label': 'Real Code (%)',
-                'data': real_code_ratio,
-                'borderColor': '#1b5e20',
-                'backgroundColor': 'rgba(27, 94, 32, 0.8)',
-                'tension': 0.4,
-                'fill': 'false',
-            },
-            {
-                'label': 'Suspicious (%)',
-                'data': suspicious_ratio,
-                'borderColor': '#c62828',
-                'backgroundColor': 'rgba(198, 40, 40, 0.8)',
-                'tension': 0.4,
-                'fill': 'false',
-            },
-            {
-                'label': 'Doc Only (%)',
-                'data': doc_only_ratio,
-                'borderColor': '#f57f17',
-                'backgroundColor': 'rgba(245, 127, 23, 0.8)',
-                'tension': 0.4,
-                'fill': 'false',
-            },
-            {
-                'label': 'Config Only (%)',
-                'data': config_only_ratio,
-                'borderColor': '#00695c',
-                'backgroundColor': 'rgba(0, 105, 92, 0.8)',
-                'tension': 0.4,
-                'fill': 'false',
-            },
-            {
-                'label': 'Micro Commits (%)',
-                'data': micro_commits_ratio,
-                'borderColor': '#4e342e',
-                'backgroundColor': 'rgba(78, 52, 46, 0.8)',
-                'tension': 0.4,
-                'fill': 'false',
-            },
-            {
-                'label': 'No Ticket (%)',
-                'data': no_ticket_ratio,
-                'borderColor': '#424242',
-                'backgroundColor': 'rgba(66, 66, 66, 0.8)',
-                'tension': 0.4,
-                'fill': 'false',
-            },
-        ]
-        return {'labels': labels, 'datasets': datasets}
-    except Exception as e:
-        print(f"Error generating quality metrics by month: {e}")
-        return {'labels': [], 'datasets': []}
-
-@login_required
-def developer_detail(request, developer_id):
-    """Show details for a specific developer or group"""
-    try:
-        # Check if this is a MongoDB group ID (24 character hex string)
-        if len(developer_id) == 24 and all(c in '0123456789abcdef' for c in developer_id.lower()):
-            # MongoDB group ID - get the group and its aliases
-            from analytics.models import DeveloperGroup, DeveloperAlias
-            try:
-                group = DeveloperGroup.objects.get(id=developer_id)
-                aliases = DeveloperAlias.objects.filter(group=group)
-                
-                # Build query for exact name/email pairs
-                from mongoengine.queryset.visitor import Q
-                query = Q()
-                for alias in aliases:
-                    query |= Q(author_name__iexact=alias.name, author_email__iexact=alias.email)
-                
-                commits = Commit.objects(query).order_by('-authored_date')
-                
-                # Get first and last commit dates from all commits (not just the 50 most recent)
-                first_commit = Commit.objects(query).order_by('authored_date').first()
-                last_commit = Commit.objects(query).order_by('-authored_date').first()
-                
-                # Generate chart data
-                chart_data, min_date, max_date = _generate_chart_data(Commit.objects(query))
-                polar_chart_data = _generate_polar_chart_data(Commit.objects(query))
-                commit_quality = _generate_commit_quality_data(Commit.objects(query))
-                commit_type_distribution = _generate_commit_type_distribution(Commit.objects(query))
-                commit_frequency = _generate_commit_frequency_data(Commit.objects(query))
-                quality_metrics = _generate_quality_metrics_data(Commit.objects(query))
-                quality_metrics_by_month = _generate_quality_metrics_by_month(Commit.objects(query))
-                
-                # Prepare doughnut chart data
-                doughnut_colors = {
-                    'fix': '#4caf50',
-                    'feature': '#2196f3',
-                    'docs': '#ffeb3b',
-                    'refactor': '#ff9800',
-                    'test': '#9c27b0',
-                    'style': '#00bcd4',
-                    'chore': '#607d8b',
-                    'other': '#bdbdbd',
-                }
-                
-                context = {
-                    'developer': {
-                        'name': group.primary_name,
-                        'email': group.primary_email,
-                        'github_id': group.github_id,
-                        'commit_count': commits.count(),
-                        'is_group': True
-                    },
-                    'developer_id': developer_id,
-                    'identities': aliases,
-                    'chart_data': json.dumps(chart_data),
-                    'polar_chart_data': json.dumps(polar_chart_data),
-                    'commit_quality': commit_quality,
-                    'commit_type_distribution': commit_type_distribution,
-                    'commit_type_labels': json.dumps(list(commit_type_distribution['counts'].keys())),
-                    'commit_type_values': json.dumps(list(commit_type_distribution['counts'].values())),
-                    'doughnut_colors': doughnut_colors,
-                    'min_date': min_date,
-                    'max_date': max_date,
-                    'first_commit': first_commit,
-                    'last_commit': last_commit,
-                    'is_group': True,
-                    'commit_frequency': commit_frequency,
-                    'quality_metrics': quality_metrics,
-                    'quality_metrics_by_month': quality_metrics_by_month,
-                }
-                # Prépare la légende après
-                legend_data = []
-                for label, count in commit_type_distribution['counts'].items():
-                    color = doughnut_colors.get(label, '#bdbdbd')
-                    legend_data.append({'label': label, 'count': count, 'color': color})
-                context['commit_type_legend'] = legend_data
-            except DeveloperGroup.DoesNotExist:
-                return redirect('developers:list')
-        else:
-            # Assume it's an individual developer (URL encoded name|email)
-            try:
-                # Use proper URL decoding
-                decoded = urllib.parse.unquote(developer_id)
-                name, email = decoded.split('|', 1)
-                
-                # Remove 'individual_' prefix if present
-                if name.startswith('individual_'):
-                    name = '_'.join(name.split('_')[1:])  # Remove 'individual_' prefix
-                    
-            except Exception:
-                return redirect('developers:list')
-            print(f"[DEBUG] Recherche commits pour name='{name}', email='{email}'")
-            
-            # Use same logic as groups: exact name/email pair
-            from mongoengine.queryset.visitor import Q
-            query = Q(author_name__iexact=name, author_email__iexact=email)
-            commits = Commit.objects(query).order_by('-authored_date')
-            print(f"[DEBUG] Nb commits trouvés: {commits.count()}")
-            
-            # Get first and last commit dates from all commits (not just the 50 most recent)
-            first_commit = Commit.objects(query).order_by('authored_date').first()
-            last_commit = Commit.objects(query).order_by('-authored_date').first()
-            
-            # Generate chart data
-            chart_data, min_date, max_date = _generate_chart_data(Commit.objects(query))
-            polar_chart_data = _generate_polar_chart_data(Commit.objects(query))
-            commit_quality = _generate_commit_quality_data(Commit.objects(query))
-            commit_type_distribution = _generate_commit_type_distribution(Commit.objects(query))
-            commit_frequency = _generate_commit_frequency_data(Commit.objects(query))
-            quality_metrics = _generate_quality_metrics_data(Commit.objects(query))
-            
-            # Prepare doughnut chart data
-            doughnut_colors = {
-                'fix': '#4caf50',
-                'feature': '#2196f3',
-                'docs': '#ffeb3b',
-                'refactor': '#ff9800',
-                'test': '#9c27b0',
-                'style': '#00bcd4',
-                'chore': '#607d8b',
-                'other': '#bdbdbd',
-            }
-            
-            context = {
-                'developer': {
-                    'name': name,
-                    'email': email,
-                    'commit_count': commits.count(),
-                    'is_group': False
-                },
-                'developer_id': developer_id,
-                'chart_data': json.dumps(chart_data),
-                'polar_chart_data': json.dumps(polar_chart_data),
-                'commit_quality': commit_quality,
-                'commit_type_distribution': commit_type_distribution,
-                'commit_type_labels': json.dumps(list(commit_type_distribution['counts'].keys())),
-                'commit_type_values': json.dumps(list(commit_type_distribution['counts'].values())),
-                'doughnut_colors': doughnut_colors,
-                'min_date': min_date,
-                'max_date': max_date,
-                'first_commit': first_commit,
-                'last_commit': last_commit,
-                'is_group': False,
-                'commit_frequency': commit_frequency,
-                'quality_metrics': quality_metrics,
-                'quality_metrics_by_month': quality_metrics_by_month,
-            }
-            # Prépare la légende après
-            legend_data = []
-            for label, count in commit_type_distribution['counts'].items():
-                color = doughnut_colors.get(label, '#bdbdbd')
-                legend_data.append({'label': label, 'count': count, 'color': color})
-            context['commit_type_legend'] = legend_data
-    except Exception as e:
-        print(f"Error processing developer: {str(e)}")
-        return redirect('developers:list')
-    
-    return render(request, 'developers/detail.html', context)
-
-import base64
-import urllib.parse
-from datetime import datetime
-
-from django.shortcuts import render, get_object_or_404, redirect
-from django.core.paginator import Paginator
-from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
-from django.contrib.auth.decorators import login_required
-from .models import DeveloperGroup, DeveloperIdentity
-from analytics.models import Commit
-import json
-from django.views.decorators.http import require_POST
-
-@login_required
-@require_http_methods(["POST"])
-def merge_group(request):
-    """Fusionne tous les alias du groupe source dans le groupe cible, puis supprime le groupe source."""
-    from analytics.models import DeveloperGroup, DeveloperAlias
-    try:
-        data = json.loads(request.body)
-        source_group_id = data.get('source_group_id')
-        target_group_id = data.get('target_group_id')
-        if not source_group_id or not target_group_id:
-            return JsonResponse({'error': 'source_group_id et target_group_id requis'}, status=400)
-        if source_group_id == target_group_id:
-            return JsonResponse({'error': 'Les deux groupes doivent être différents'}, status=400)
-        source_group = DeveloperGroup.objects.get(id=source_group_id)
-        target_group = DeveloperGroup.objects.get(id=target_group_id)
-        # Rattacher tous les alias du groupe source au groupe cible
-        updated = DeveloperAlias.objects(group=source_group).update(set__group=target_group)
-        # Supprimer le groupe source
-        source_group.delete()
-        return JsonResponse({'success': True, 'aliases_moved': updated})
-    except DeveloperGroup.DoesNotExist:
-        return JsonResponse({'error': 'Groupe introuvable'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-@login_required
-@require_http_methods(["POST"])
-def add_identity_to_group(request):
-    """Ajoute une identité individuelle (nom/email) à un groupe existant."""
-    from analytics.models import DeveloperGroup, DeveloperAlias
-    try:
-        data = json.loads(request.body)
-        group_id = data.get('group_id')
-        name = data.get('name')
-        email = data.get('email')
-        if not group_id or not name or not email:
-            return JsonResponse({'error': 'group_id, name et email requis'}, status=400)
-        group = DeveloperGroup.objects.get(id=group_id)
-        # Vérifier si l'alias existe déjà
-        exists = DeveloperAlias.objects(group=group, name=name, email=email).first()
-        if exists:
-            return JsonResponse({'error': 'Cette identité existe déjà dans ce groupe'}, status=400)
-        # Créer le nouvel alias
-        alias = DeveloperAlias(group=group, name=name, email=email)
-        alias.save()
-        return JsonResponse({'success': True, 'alias_id': str(alias.id)})
-    except DeveloperGroup.DoesNotExist:
-        return JsonResponse({'error': 'Groupe introuvable'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-
-@login_required
-def sync_from_mongo(request):
-    """Sync developer data from MongoDB (placeholder for now)"""
-    messages.success(request, "Developer data is extracted directly from commits. No sync needed.")
-    return redirect('developers:list')
-
-
-@login_required
-def create_group(request):
-    """Create a new empty developer group"""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            name = data.get('name')
-            email = data.get('email')
-            
-            if not name or not email:
-                return JsonResponse({'error': 'Name and email are required'}, status=400)
-            
-            # Import the models
-            from analytics.models import DeveloperGroup
-            
-            # Check if a group with this name/email already exists
-            existing_group = DeveloperGroup.objects.filter(
-                primary_name=name,
-                primary_email=email
-            ).first()
-            
-            if existing_group:
-                return JsonResponse({'error': 'A group with this name and email already exists'}, status=400)
-            
-            # Create a new empty group
-            new_group = DeveloperGroup(
-                primary_name=name,
-                primary_email=email
-            )
-            new_group.save()
-            
-            return JsonResponse({
-                'success': True,
-                'group_id': str(new_group.id),
-                'group_name': name,
-                'group_email': email
-            })
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-    
-    return JsonResponse({'error': 'POST method required'}, status=405)
-
-
-@login_required
-def search_developers(request):
-    """AJAX endpoint for searching developers"""
-    from analytics.developer_grouping_service import DeveloperGroupingService
-    
-    search_term = request.GET.get('q', '').strip().lower()
-    page = request.GET.get('page', 1)
-    sort_by = request.GET.get('sort', 'name')
-    sort_order = request.GET.get('order', 'asc')
-    
-    # Get grouped developers
-    grouping_service = DeveloperGroupingService()
-    grouped_developers = grouping_service.get_grouped_developers()
-    
-    # Create a set of grouped developer keys for filtering
-    grouped_developers_set = set()
-    for group in grouped_developers:
-        for alias in group['aliases']:
-            dev_key = f"{alias['name']}|{alias['email']}"
-            grouped_developers_set.add(dev_key)
-    
-    # Get all individual developers from commits
-    from analytics.models import Commit
-    commits = Commit.objects.all()
-    
-    # Extract unique developers from commits
-    seen_developers = set()
-    all_individual_developers = []
-    
-    for commit in commits:
-        dev_key = f"{commit.author_name}|{commit.author_email}"
-        
-        if dev_key not in seen_developers:
-            seen_developers.add(dev_key)
-            
-            dev_data = f"{commit.author_name}|{commit.author_email}"
-            encoded_data = urllib.parse.quote(dev_data, safe='')
-            developer = {
-                'name': commit.author_name,
-                'email': commit.author_email,
-                'commit_count': 1,
-                'first_seen': commit.authored_date,
-                'last_seen': commit.authored_date,
-                'is_grouped': False,
-                'group_id': f"individual_{encoded_data}"
-            }
-            all_individual_developers.append(developer)
-        else:
-            for dev in all_individual_developers:
-                if f"{dev['name']}|{dev['email']}" == dev_key:
-                    dev['commit_count'] += 1
-                    if commit.authored_date < dev['first_seen']:
-                        dev['first_seen'] = commit.authored_date
-                    if commit.authored_date > dev['last_seen']:
-                        dev['last_seen'] = commit.authored_date
-                    break
-    
-    # Combine grouped and individual developers
-    all_developers = []
-    
-    for developer in grouped_developers:
-        developer['is_grouped'] = True
-        developer['name'] = developer.get('primary_name', '')
-        developer['email'] = developer.get('primary_email', '')
-        developer['group_id'] = developer.get('group_id', '')
-        all_developers.append(developer)
-    
-    for developer in all_individual_developers:
-        dev_key = f"{developer['name']}|{developer['email']}"
-        if dev_key not in grouped_developers_set:
-            developer['application'] = {
-                'id': 0,
-                'name': 'All Applications'
-            }
-            developer['is_grouped'] = False
-            all_developers.append(developer)
-    
-    # Filter by search term
-    if search_term:
-        filtered_developers = []
-        for developer in all_developers:
-            name = developer.get('name', '').lower()
-            email = developer.get('email', '').lower()
-            first_seen = developer.get('first_seen', '').strftime('%b %d, %Y').lower() if developer.get('first_seen') else ''
-            last_seen = developer.get('last_seen', '').strftime('%b %d, %Y').lower() if developer.get('last_seen') else ''
-            
-            if (search_term in name or 
-                search_term in email or 
-                search_term in first_seen or 
-                search_term in last_seen):
-                filtered_developers.append(developer)
-        all_developers = filtered_developers
-    
-    # Sort developers
-    if sort_by == 'name':
-        all_developers.sort(key=lambda x: x['name'].lower(), reverse=(sort_order == 'desc'))
-    elif sort_by == 'email':
-        all_developers.sort(key=lambda x: x['email'].lower(), reverse=(sort_order == 'desc'))
-    elif sort_by == 'first_seen':
-        all_developers.sort(key=lambda x: x.get('first_seen', datetime.min), reverse=(sort_order == 'desc'))
-    elif sort_by == 'last_seen':
-        all_developers.sort(key=lambda x: x.get('last_seen', datetime.min), reverse=(sort_order == 'desc'))
-    else:
-        all_developers.sort(key=lambda x: x.get('commit_count', x.get('total_commits', 0)), reverse=(sort_order == 'desc'))
-    
-    # Paginate
-    paginator = Paginator(all_developers, 20)
-    page_obj = paginator.get_page(page)
-    
-    # Prepare data for JSON response
+    # Convert to list for JSON serialization
     developers_data = []
-    for dev in page_obj:
+    for dev in developers:
         developers_data.append({
-            'name': dev['name'],
-            'email': dev['email'],
-            'first_seen': dev.get('first_seen', '').strftime('%b %d, %Y') if dev.get('first_seen') else '',
-            'last_seen': dev.get('last_seen', '').strftime('%b %d, %Y') if dev.get('last_seen') else '',
-            'is_grouped': dev.get('is_grouped', False),
-            'group_id': dev.get('group_id', ''),
-            'commit_count': dev.get('commit_count', 0)
+            'id': str(dev.id),
+            'name': dev.primary_name or 'Unknown',
+            'email': dev.primary_email or 'No email',
+            'github_id': dev.github_id or '—',
+            'detail_url': f'/developers/{dev.id}/'
         })
     
     return JsonResponse({
         'developers': developers_data,
-        'total_count': len(all_developers),
-        'grouped_count': len([d for d in all_developers if d.get('is_grouped', False)]),
-        'ungrouped_count': len(all_developers) - len([d for d in all_developers if d.get('is_grouped', False)]),
-        'has_previous': page_obj.has_previous(),
-        'has_next': page_obj.has_next(),
-        'current_page': page_obj.number,
-        'total_pages': page_obj.paginator.num_pages
+        'total_count': len(developers_data),
+        'search_query': search_query
     })
 
 
 @login_required
-def add_to_group(request):
-    """Add developer to group"""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            developer_id = data.get('developer_id')
-            group_id = data.get('group_id')
-            
-            if not developer_id or not group_id:
-                return JsonResponse({'error': 'Developer ID and Group ID are required'}, status=400)
-            
-            # For now, just return success - in a real implementation, you'd store this in the database
-            return JsonResponse({'success': True})
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+@require_http_methods(["POST"])
+def update_developer_name(request, developer_id):
+    """Update developer name via AJAX"""
+    try:
+        from bson import ObjectId
+        
+        # Convert string to ObjectId
+        object_id = ObjectId(developer_id)
+        developer = Developer.objects(id=object_id).first()
+    except (ValueError, TypeError):
+        # If the ID is not a valid ObjectId, try to find by string
+        developer = Developer.objects(id=developer_id).first()
     
-    return JsonResponse({'error': 'POST method required'}, status=405)
+    if developer is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Developer not found'
+        }, status=404)
+    
+    # Get the new name from POST data
+    new_name = request.POST.get('new_name', '').strip()
+    
+    if not new_name:
+        return JsonResponse({
+            'success': False,
+            'error': 'Name cannot be empty'
+        }, status=400)
+    
+    # Update the developer name
+    old_name = developer.primary_name
+    developer.primary_name = new_name
+    developer.save()
+    
+    return JsonResponse({
+        'success': True,
+        'message': f'Developer name updated from "{old_name}" to "{new_name}"',
+        'new_name': new_name
+    })
 
 
 @login_required
-@require_POST
-def update_developer_name(request, developer_id):
-    """Update developer name (for both individual and group developers)"""
+@require_http_methods(["POST"])
+def merge_developers(request):
+    """Merge multiple developers into one primary developer"""
+    import json
+    from bson import ObjectId
+    
     try:
-        new_name = request.POST.get('new_name', '').strip()
-        if not new_name:
+        # Check if request body is empty
+        if not request.body:
             return JsonResponse({
                 'success': False,
-                'error': 'New name is required'
-            })
+                'error': 'Empty request body'
+            }, status=400)
         
-        # Check if this is a MongoDB group ID (24 character hex string)
-        if len(developer_id) == 24 and all(c in '0123456789abcdef' for c in developer_id.lower()):
-            # MongoDB group ID - update the group
-            from analytics.models import DeveloperGroup
+        data = json.loads(request.body)
+        primary_developer_id = data.get('primary_developer_id')
+        other_developer_ids = data.get('other_developer_ids', [])
+        
+        if not primary_developer_id or not other_developer_ids:
+            return JsonResponse({
+                'success': False,
+                'error': 'Missing required parameters'
+            }, status=400)
+        
+        # Get the primary developer
+        try:
+            primary_object_id = ObjectId(primary_developer_id)
+            primary_developer = Developer.objects(id=primary_object_id).first()
+        except (ValueError, TypeError):
+            primary_developer = Developer.objects(id=primary_developer_id).first()
+        
+        if not primary_developer:
+            return JsonResponse({
+                'success': False,
+                'error': 'Primary developer not found'
+            }, status=404)
+        
+        # Get other developers
+        other_developers = []
+        for dev_id in other_developer_ids:
             try:
-                group = DeveloperGroup.objects.get(id=developer_id)
-                old_name = group.primary_name
-                group.primary_name = new_name
-                group.save()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Developer group renamed from "{old_name}" to "{new_name}"',
-                    'new_name': new_name
-                })
-                
-            except DeveloperGroup.DoesNotExist:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Developer group not found'
-                })
-        else:
-            # Individual developer - update all commits with this name/email
-            try:
-                # Use proper URL decoding
-                decoded = urllib.parse.unquote(developer_id)
-                name, email = decoded.split('|', 1)
-                
-                # Remove 'individual_' prefix if present
-                if name.startswith('individual_'):
-                    name = '_'.join(name.split('_')[1:])
-                
-                # Update all commits with this name/email combination
-                from analytics.models import Commit
-                from mongoengine.queryset.visitor import Q
-                
-                commits_to_update = Commit.objects.filter(
-                    author_name__iexact=name,
-                    author_email__iexact=email
+                object_id = ObjectId(dev_id)
+                developer = Developer.objects(id=object_id).first()
+            except (ValueError, TypeError):
+                developer = Developer.objects(id=dev_id).first()
+            
+            if developer:
+                other_developers.append(developer)
+        
+        if not other_developers:
+            return JsonResponse({
+                'success': False,
+                'error': 'No valid developers to merge'
+            }, status=400)
+        
+        # Perform the merge
+        try:
+            # For each other developer, create aliases and link them to the primary developer
+            for other_dev in other_developers:
+                # Create alias for the other developer's primary identity
+                alias = DeveloperAlias(
+                    developer=primary_developer,
+                    name=other_dev.primary_name,
+                    email=other_dev.primary_email,
+                    first_seen=other_dev.created_at,
+                    last_seen=other_dev.updated_at,
+                    commit_count=0  # Will be calculated from commits
                 )
+                alias.save()
                 
-                updated_count = commits_to_update.update(
-                    author_name=new_name
-                )
+                # Move all existing aliases of the other developer to the primary developer
+                existing_aliases = DeveloperAlias.objects(developer=other_dev)
+                for existing_alias in existing_aliases:
+                    existing_alias.developer = primary_developer
+                    existing_alias.save()
                 
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Updated {updated_count} commits from "{name}" to "{new_name}"',
-                    'new_name': new_name,
-                    'updated_count': updated_count
-                })
-                
-            except Exception as e:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Error updating individual developer: {str(e)}'
-                })
-                
+                # Delete the other developer
+                other_dev.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully merged {len(other_developers)} developer(s) into {primary_developer.primary_name}'
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error during merge: {str(e)}'
+            }, status=500)
+            
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        }, status=400)
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': f'Error updating developer name: {str(e)}'
-        })
+            'error': f'Unexpected error: {str(e)}'
+        }, status=500)
+
+
+def _calculate_detailed_quality_metrics(commits):
+    """Calculate detailed quality metrics for a developer's commits"""
+    if not commits:
+        return {
+            'total_commits': 0,
+            'real_code_commits': 0,
+            'real_code_ratio': 0,
+            'suspicious_commits': 0,
+            'suspicious_ratio': 0,
+            'doc_only_commits': 0,
+            'doc_only_ratio': 0,
+            'config_only_commits': 0,
+            'config_only_ratio': 0,
+            'micro_commits': 0,
+            'micro_commits_ratio': 0,
+            'no_ticket_commits': 0,
+            'no_ticket_ratio': 0,
+            'avg_code_quality': 0,
+            'avg_impact': 0,
+            'avg_complexity': 0
+        }
+    
+    total_commits = commits.count()
+    real_code_commits = 0
+    suspicious_commits = 0
+    doc_only_commits = 0
+    config_only_commits = 0
+    micro_commits = 0
+    no_ticket_commits = 0
+    quality_scores = []
+    impact_scores = []
+    complexity_scores = []
+    
+    for commit in commits:
+        # Check for real code (has code files)
+        has_code_files = False
+        has_doc_only = True
+        has_config_only = True
+        
+        for file_change in commit.files_changed:
+            filename = file_change.filename.lower()
+            
+            # Check for code files
+            if any(ext in filename for ext in ['.py', '.js', '.ts', '.java', '.cpp', '.c', '.go', '.rs', '.php', '.rb']):
+                has_code_files = True
+                has_doc_only = False
+                has_config_only = False
+            
+            # Check for test files
+            elif any(pattern in filename for pattern in ['test', 'spec', 'specs', '_test.', '.test.']):
+                has_code_files = True
+                has_doc_only = False
+                has_config_only = False
+            
+            # Check for documentation files
+            elif any(ext in filename for ext in ['.md', '.txt', '.rst', '.adoc', 'readme', 'docs/', 'documentation/']):
+                has_doc_only = has_doc_only and not has_code_files
+            
+            # Check for configuration files
+            elif any(ext in filename for ext in ['.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.config', 'package.json', 'requirements.txt', 'pom.xml', 'build.gradle']):
+                has_config_only = has_config_only and not has_code_files
+        
+        # Count different types of commits
+        if has_code_files:
+            real_code_commits += 1
+        
+        if has_doc_only:
+            doc_only_commits += 1
+        
+        if has_config_only:
+            config_only_commits += 1
+        
+        # Check for micro commits (≤2 changes)
+        if commit.total_changes <= 2:
+            micro_commits += 1
+        
+        # Check for no ticket reference
+        if not re.search(r'#[0-9]+', commit.message):
+            no_ticket_commits += 1
+        
+        # Calculate quality scores (simplified)
+        code_quality = 50  # Base score
+        if has_code_files:
+            code_quality += 40
+        if commit.total_changes > 10:
+            code_quality += 15
+        quality_scores.append(min(100, code_quality))
+        
+        # Calculate impact score
+        impact_score = 40  # Base score
+        if commit.total_changes > 20:
+            impact_score += 40
+        elif commit.total_changes > 10:
+            impact_score += 30
+        elif commit.total_changes > 5:
+            impact_score += 20
+        impact_scores.append(min(100, impact_score))
+        
+        # Calculate complexity score
+        complexity_score = 30  # Base score
+        if commit.commit_type == 'feature':
+            complexity_score += 40
+        elif commit.commit_type == 'fix':
+            complexity_score += 35
+        elif commit.commit_type == 'refactor':
+            complexity_score += 30
+        complexity_scores.append(min(100, complexity_score))
+    
+    # Calculate ratios
+    real_code_ratio = (real_code_commits / total_commits * 100) if total_commits > 0 else 0
+    suspicious_ratio = (suspicious_commits / total_commits * 100) if total_commits > 0 else 0
+    doc_only_ratio = (doc_only_commits / total_commits * 100) if total_commits > 0 else 0
+    config_only_ratio = (config_only_commits / total_commits * 100) if total_commits > 0 else 0
+    micro_commits_ratio = (micro_commits / total_commits * 100) if total_commits > 0 else 0
+    no_ticket_ratio = (no_ticket_commits / total_commits * 100) if total_commits > 0 else 0
+    
+    # Calculate averages
+    avg_code_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0
+    avg_impact = sum(impact_scores) / len(impact_scores) if impact_scores else 0
+    avg_complexity = sum(complexity_scores) / len(complexity_scores) if complexity_scores else 0
+    
+    return {
+        'total_commits': total_commits,
+        'real_code_commits': real_code_commits,
+        'real_code_ratio': round(real_code_ratio, 1),
+        'suspicious_commits': suspicious_commits,
+        'suspicious_ratio': round(suspicious_ratio, 1),
+        'doc_only_commits': doc_only_commits,
+        'doc_only_ratio': round(doc_only_ratio, 1),
+        'config_only_commits': config_only_commits,
+        'config_only_ratio': round(config_only_ratio, 1),
+        'micro_commits': micro_commits,
+        'micro_commits_ratio': round(micro_commits_ratio, 1),
+        'no_ticket_commits': no_ticket_commits,
+        'no_ticket_ratio': round(no_ticket_ratio, 1),
+        'avg_code_quality': round(avg_code_quality, 1),
+        'avg_impact': round(avg_impact, 1),
+        'avg_complexity': round(avg_complexity, 1)
+    }
+
+
+def _calculate_commit_type_distribution(commits):
+    """Calculate commit type distribution for a developer"""
+    if not commits:
+        return {
+            'total': 0,
+            'types': {},
+            'labels': [],
+            'values': [],
+            'legend': []
+        }
+    
+    # Count commit types
+    type_counts = Counter()
+    for commit in commits:
+        type_counts[commit.commit_type] += 1
+    
+    total_commits = sum(type_counts.values())
+    
+    # Define colors for each type
+    colors = {
+        'fix': '#4caf50',
+        'feature': '#2196f3',
+        'docs': '#ffeb3b',
+        'refactor': '#ff9800',
+        'test': '#9c27b0',
+        'style': '#00bcd4',
+        'chore': '#607d8b',
+        'other': '#bdbdbd'
+    }
+    
+    # Create data for Chart.js
+    labels = []
+    values = []
+    legend = []
+    
+    for commit_type in ['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other']:
+        count = type_counts.get(commit_type, 0)
+        if count > 0:
+            labels.append(commit_type.title())
+            values.append(count)
+            legend.append({
+                'label': commit_type.title(),
+                'count': count,
+                'color': colors.get(commit_type, '#bdbdbd')
+            })
+    
+    return {
+        'total': total_commits,
+        'types': dict(type_counts),
+        'labels': labels,
+        'values': values,
+        'legend': legend
+    }
+
+
+def _calculate_quality_metrics_by_month(commits):
+    """Calculate quality metrics by month for the last 12 months"""
+    if not commits:
+        return {
+            'labels': [],
+            'datasets': []
+        }
+    
+    # Get commits from the last 12 months
+    now = datetime.utcnow()
+    months_data = {}
+    
+    for i in range(12):
+        month_start = now - timedelta(days=30 * (i + 1))
+        month_end = now - timedelta(days=30 * i)
+        month_key = month_start.strftime('%Y-%m')
+        
+        month_commits = commits.filter(
+            authored_date__gte=month_start,
+            authored_date__lt=month_end
+        )
+        
+        if month_commits.count() > 0:
+            # Calculate average scores for this month
+            quality_scores = []
+            impact_scores = []
+            complexity_scores = []
+            
+            for commit in month_commits:
+                # Simplified quality calculation
+                quality_score = 50  # Base
+                if commit.total_changes > 10:
+                    quality_score += 20
+                quality_scores.append(min(100, quality_score))
+                
+                impact_score = 40  # Base
+                if commit.total_changes > 20:
+                    impact_score += 30
+                elif commit.total_changes > 10:
+                    impact_score += 20
+                impact_scores.append(min(100, impact_score))
+                
+                complexity_score = 30  # Base
+                if commit.commit_type == 'feature':
+                    complexity_score += 30
+                elif commit.commit_type == 'fix':
+                    complexity_score += 25
+                complexity_scores.append(min(100, complexity_score))
+            
+            months_data[month_key] = {
+                'quality': sum(quality_scores) / len(quality_scores) if quality_scores else 0,
+                'impact': sum(impact_scores) / len(impact_scores) if impact_scores else 0,
+                'complexity': sum(complexity_scores) / len(complexity_scores) if complexity_scores else 0
+            }
+    
+    # Sort months chronologically
+    sorted_months = sorted(months_data.keys())
+    
+    return {
+        'labels': sorted_months,
+        'datasets': [
+            {
+                'label': 'Code Quality',
+                'data': [months_data[month]['quality'] for month in sorted_months],
+                'borderColor': '#10B981',
+                'backgroundColor': 'rgba(16, 185, 129, 0.1)',
+                'tension': 0.4
+            },
+            {
+                'label': 'Impact Score',
+                'data': [months_data[month]['impact'] for month in sorted_months],
+                'borderColor': '#3B82F6',
+                'backgroundColor': 'rgba(59, 130, 246, 0.1)',
+                'tension': 0.4
+            },
+            {
+                'label': 'Complexity Score',
+                'data': [months_data[month]['complexity'] for month in sorted_months],
+                'borderColor': '#F59E0B',
+                'backgroundColor': 'rgba(245, 158, 11, 0.1)',
+                'tension': 0.4
+            }
+        ]
+    }
+
+
+@login_required
+def developer_detail(request, developer_id):
+    """Afficher le détail d'un développeur (MongoEngine)"""
+    from bson import ObjectId
+    from analytics.analytics_service import AnalyticsService
+    import re
+    
+    try:
+        # Convert string to ObjectId
+        object_id = ObjectId(developer_id)
+        developer = Developer.objects(id=object_id).first()
+    except (ValueError, TypeError):
+        # If the ID is not a valid ObjectId, try to find by string
+        developer = Developer.objects(id=developer_id).first()
+    
+    if developer is None:
+        raise Http404("Developer not found")
+    
+    # Récupérer les alias associés
+    aliases = DeveloperAlias.objects(developer=developer)
+    
+    # Get detailed developer stats using analytics service
+    # For global developer stats, we'll use a dummy application_id
+    analytics = AnalyticsService(0)  # Pass 0 for global stats
+    developer_stats = analytics.get_developer_detailed_stats(str(developer.id))
+    
+    print(f"DEBUG: Developer ID: {developer.id}")
+    print(f"DEBUG: Developer name: {developer.primary_name}")
+    print(f"DEBUG: Developer email: {developer.primary_email}")
+    print(f"DEBUG: Developer stats success: {developer_stats.get('success', False)}")
+    print(f"DEBUG: Developer stats: {developer_stats}")
+    
+    if developer_stats.get('success', False):
+        # Create a developer object with the fields expected by the template
+        developer_for_template = type('Developer', (), {
+            'name': developer.primary_name,
+            'email': developer.primary_email,
+            'commit_count': developer_stats.get('total_commits', 0),
+            'is_developer': True,
+            'github_id': developer.github_id,
+            'aliases': aliases
+        })()
+        
+        # Get commits for this developer
+        from analytics.models import Commit
+        alias_emails = [alias.email for alias in aliases]
+        developer_commits = Commit.objects.filter(author_email__in=alias_emails)
+        
+        # Calculate detailed quality metrics
+        detailed_quality_metrics = _calculate_detailed_quality_metrics(developer_commits)
+        
+        # Calculate commit type distribution
+        commit_type_data = _calculate_commit_type_distribution(developer_commits)
+        
+        # Calculate quality metrics by month
+        quality_metrics_by_month = _calculate_quality_metrics_by_month(developer_commits)
+        
+        # Format polar chart data for Chart.js
+        polar_chart_data = []
+        for repo in developer_stats.get('top_repositories', []):
+            net_lines = repo.get('additions', 0) - repo.get('deletions', 0)
+            polar_chart_data.append({
+                'label': repo['name'],
+                'data': [net_lines],
+                'backgroundColor': f'rgba({hash(repo["name"]) % 256}, {(hash(repo["name"]) >> 8) % 256}, {(hash(repo["name"]) >> 16) % 256}, 0.6)',
+                'borderColor': f'rgba({hash(repo["name"]) % 256}, {(hash(repo["name"]) >> 8) % 256}, {(hash(repo["name"]) >> 16) % 256}, 1)',
+                'borderWidth': 2
+            })
+        if not polar_chart_data:
+            polar_chart_data = []
+
+        # --- Correction: Activity Heatmap chart_data ---
+        from datetime import datetime, timedelta
+        import pytz
+        import random
+        # Only keep commits from the last 120 days
+        now = datetime.utcnow().replace(tzinfo=None)
+        cutoff = now - timedelta(days=120)
+        commits_120d = [c for c in developer_commits if c.authored_date and c.authored_date.replace(tzinfo=None) >= cutoff]
+        # Group by repo, then by (days_ago, hour)
+        repo_bubbles = {}
+        for commit in commits_120d:
+            repo = commit.repository_full_name or 'unknown'
+            commit_dt = commit.authored_date.replace(tzinfo=None)
+            days_ago = (now.date() - commit_dt.date()).days
+            hour = commit_dt.hour
+            key = (days_ago, hour)
+            if repo not in repo_bubbles:
+                repo_bubbles[repo] = {}
+            if key not in repo_bubbles[repo]:
+                repo_bubbles[repo][key] = {'commits': 0, 'changes': 0}
+            repo_bubbles[repo][key]['commits'] += 1
+            repo_bubbles[repo][key]['changes'] += (commit.additions or 0) + (commit.deletions or 0)
+        # Color palette (daisyUI green, blue, orange, purple, pink, etc.)
+        palette = [
+            {'bg': 'rgba(16, 185, 129, 0.6)', 'border': 'rgba(16, 185, 129, 1)'}, # green
+            {'bg': 'rgba(59, 130, 246, 0.6)', 'border': 'rgba(59, 130, 246, 1)'}, # blue
+            {'bg': 'rgba(245, 158, 11, 0.6)', 'border': 'rgba(245, 158, 11, 1)'}, # orange
+            {'bg': 'rgba(139, 92, 246, 0.6)', 'border': 'rgba(139, 92, 246, 1)'}, # purple
+            {'bg': 'rgba(236, 72, 153, 0.6)', 'border': 'rgba(236, 72, 153, 1)'}, # pink
+            {'bg': 'rgba(34, 197, 94, 0.6)', 'border': 'rgba(34, 197, 94, 1)'},   # emerald
+        ]
+        chart_data = []
+        for i, (repo, bubbles) in enumerate(repo_bubbles.items()):
+            color = palette[i % len(palette)]
+            dataset = {
+                'label': repo,
+                'data': [],
+                'backgroundColor': color['bg'],
+                'borderColor': color['border'],
+                'borderWidth': 1
+            }
+            for (days_ago, hour), data in bubbles.items():
+                dataset['data'].append({
+                    'x': days_ago,
+                    'y': hour,
+                    'r': min(5 + data['commits'] * 2, 20),
+                    'commit_count': data['commits'],
+                    'changes': data['changes']
+                })
+            chart_data.append(dataset)
+        # --- Fin correction ---
+
+        context = {
+            'developer': developer_for_template,
+            'developer_id': str(developer.id),
+            'aliases': aliases,
+            'commit_frequency': analytics.get_developer_commit_frequency(analytics.commits.filter(author_email__in=[alias.email for alias in aliases])),
+            'commit_quality': developer_stats.get('commit_quality', {}),
+            'quality_metrics': detailed_quality_metrics,
+            'first_commit': None,  # Will be set if available
+            'last_commit': None,   # Will be set if available
+            'polar_chart_data': polar_chart_data,
+            'quality_metrics_by_month': quality_metrics_by_month,
+            'chart_data': chart_data,
+            'commit_type_distribution': commit_type_data,
+            'commit_type_labels': commit_type_data['labels'],
+            'commit_type_values': commit_type_data['values'],
+            'commit_type_legend': commit_type_data['legend']
+        }
+        
+        # Set first and last commit if available
+        if developer_stats.get('first_commit_date'):
+            from analytics.models import Commit
+            first_commit = Commit.objects.filter(author_email__in=[alias.email for alias in aliases]).order_by('authored_date').first()
+            if first_commit:
+                context['first_commit'] = first_commit
+        
+        if developer_stats.get('last_commit_date'):
+            from analytics.models import Commit
+            last_commit = Commit.objects.filter(author_email__in=[alias.email for alias in aliases]).order_by('-authored_date').first()
+            if last_commit:
+                context['last_commit'] = last_commit
+    else:
+        # Fallback if stats calculation fails
+        developer_for_template = type('Developer', (), {
+            'name': developer.primary_name,
+            'email': developer.primary_email,
+            'commit_count': 0,
+            'is_developer': True,
+            'github_id': developer.github_id,
+            'aliases': aliases
+        })()
+        
+        context = {
+            'developer': developer_for_template,
+            'developer_id': str(developer.id),
+            'aliases': aliases,
+            'commit_frequency': {'avg_commits_per_day': 0},
+            'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
+            'quality_metrics': {'total_commits': 0},
+            'first_commit': None,
+            'last_commit': None,
+            'polar_chart_data': [],
+            'quality_metrics_by_month': {'labels': [], 'datasets': []},
+            'chart_data': [],
+            'commit_type_distribution': {'total': 0, 'types': {}},
+            'commit_type_labels': [],
+            'commit_type_values': [],
+            'commit_type_legend': []
+        }
+    
+    print(f"DEBUG: Final polar_chart_data: {context.get('polar_chart_data', [])}")
+    print(f"DEBUG: Final chart_data: {context.get('chart_data', [])}")
+    print(f"DEBUG: Final quality_metrics_by_month: {context.get('quality_metrics_by_month', {})}")
+    
+    return render(request, 'developers/detail.html', context)
 

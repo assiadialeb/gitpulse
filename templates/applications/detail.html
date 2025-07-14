@@ -5,6 +5,7 @@
 {% csrf_token %}
 
 {% block content %}
+
 <!-- Custom full-height layout that bypasses main container -->
 <div class="fixed inset-0 pt-16 bg-light-gray overflow-hidden">
     <div class="flex h-full">
@@ -188,9 +189,9 @@
                                 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
                                 <script>
                                     const commitTypeData = {
-                                        labels: {{ commit_type_labels|safe }},
+                                        labels: {{ commit_type_labels|default:'[]'|safe }},
                                         datasets: [{
-                                            data: {{ commit_type_values|safe }},
+                                            data: {{ commit_type_values|default:'[]'|safe }},
                                             backgroundColor: [
                                                 '#4caf50', // fix
                                                 '#2196f3', // feature
@@ -835,7 +836,7 @@ function initializeBubbleChart() {
     const ctx = document.getElementById('bubbleChart');
     if (!ctx) return;
     
-    const chartData = {{ bubble_chart.datasets|safe }};
+    const chartData = {{ bubble_chart_data|default:'[]'|safe }};
     
     new Chart(ctx, {
         type: 'bubble',

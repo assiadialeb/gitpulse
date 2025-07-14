@@ -16,17 +16,17 @@ class FileChange(EmbeddedDocument):
     patch = fields.StringField()  # Optional patch content
 
 
-class DeveloperGroup(Document):
+class Developer(Document):
     """MongoDB document for grouping developers with multiple usernames/emails"""
     # Primary identifier
     primary_name = fields.StringField(required=True)
     primary_email = fields.StringField(required=True)
     github_id = fields.StringField()  # GitHub user ID if available
     
-    # Application context (None for global groups)
+    # Application context (None for global developers)
     application_id = fields.IntField(required=False, null=True)
     
-    # Group metadata
+    # Developer metadata
     created_at = fields.DateTimeField(default=datetime.utcnow)
     updated_at = fields.DateTimeField(default=datetime.utcnow)
     is_auto_grouped = fields.BooleanField(default=True)  # True if auto-detected, False if manual
@@ -36,7 +36,7 @@ class DeveloperGroup(Document):
     
     # MongoDB settings
     meta = {
-        'collection': 'developer_groups',
+        'collection': 'developers',
         'indexes': [
             'application_id',
             'primary_email',
@@ -52,8 +52,8 @@ class DeveloperGroup(Document):
 
 class DeveloperAlias(Document):
     """MongoDB document for storing developer aliases/identities"""
-    # Link to developer group
-    group = fields.ReferenceField(DeveloperGroup, required=True)
+    # Link to developer (optional - can be None if not grouped yet)
+    developer = fields.ReferenceField(Developer, required=False)
     
     # Identity information
     name = fields.StringField(required=True)
@@ -68,7 +68,7 @@ class DeveloperAlias(Document):
     meta = {
         'collection': 'developer_aliases',
         'indexes': [
-            'group',
+            'developer',
             'email',
             'name',
             ('email', 'name'),

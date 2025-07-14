@@ -14,7 +14,7 @@ urlpatterns = [
     path('api/application/<int:application_id>/commit-quality/', views.api_commit_quality, name='api_commit_quality'),
     path('api/application/<int:application_id>/commit-types/', views.api_commit_types, name='api_commit_types'),
     path('api/applications/<int:application_id>/auto-group-developers/', views.api_auto_group_developers, name='api_auto_group_developers'),
-    path('api/applications/<int:application_id>/merge-existing-groups/', views.api_merge_existing_groups, name='api_merge_existing_groups'),
+    path('api/applications/<int:application_id>/merge-existing-developers/', views.api_merge_existing_developers, name='api_merge_existing_developers'),
     path('api/applications/<int:application_id>/manual-group-developers/', views.api_manual_group_developers, name='api_manual_group_developers'),
     
     # Indexing endpoints

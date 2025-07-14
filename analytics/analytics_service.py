@@ -48,12 +48,12 @@ class AnalyticsService:
             group = email_to_group.get(commit.author_email)
             
             if group:
-                group_id = group['group_id']
-                if group_id not in commits_per_group:
-                    commits_per_group[group_id] = {
+                developer_id = group['developer_id']
+                if developer_id not in commits_per_group:
+                    commits_per_group[developer_id] = {
                         'name': group['primary_name'],
                         'email': group['primary_email'],
-                        'group_id': group_id,
+                        'group_id': developer_id,
                         'confidence_score': group['confidence_score'],
                         'aliases_count': len(group['aliases']),
                         'commits': 0,
@@ -63,10 +63,10 @@ class AnalyticsService:
                         'aliases': group['aliases']
                     }
                 
-                commits_per_group[group_id]['commits'] += 1
-                commits_per_group[group_id]['additions'] += commit.additions
-                commits_per_group[group_id]['deletions'] += commit.deletions
-                commits_per_group[group_id]['files_changed'] += len(commit.files_changed)
+                commits_per_group[developer_id]['commits'] += 1
+                commits_per_group[developer_id]['additions'] += commit.additions
+                commits_per_group[developer_id]['deletions'] += commit.deletions
+                commits_per_group[developer_id]['files_changed'] += len(commit.files_changed)
             else:
                 # Fallback for ungrouped developers
                 dev_key = f"{commit.author_name} ({commit.author_email})"
@@ -212,8 +212,8 @@ class AnalyticsService:
         Returns:
             Dictionary with code distribution metrics
         """
-        # Get grouped developers
-        grouped_developers = self.grouping_service.get_grouped_developers()
+        # Get grouped developers for this specific application
+        grouped_developers = self.grouping_service.get_grouped_developers_for_application(self.application_id)
         
         # Create mapping from email to group
         email_to_group = {}
@@ -230,7 +230,7 @@ class AnalyticsService:
             group = email_to_group.get(commit.author_email)
             
             if group:
-                group_id = group['group_id']
+                group_id = group['developer_id']
                 author_key = group['primary_name']
             else:
                 # Fallback for ungrouped developers
@@ -575,31 +575,31 @@ class AnalyticsService:
         """
         return self.grouping_service.manually_group_developers(group_data)
     
-    def get_developer_detailed_stats(self, group_id: str) -> Dict:
+    def get_developer_detailed_stats(self, developer_id: str) -> Dict:
         """
-        Get detailed statistics for a specific developer group
+        Get detailed statistics for a specific developer
         
         Args:
-            group_id: The MongoDB ObjectId of the developer group
+            developer_id: The MongoDB ObjectId of the developer
             
         Returns:
             Dictionary with detailed developer statistics
         """
-        from .models import DeveloperGroup, DeveloperAlias
+        from .models import Developer, DeveloperAlias
         
-        # Get the developer group (global grouping, no application_id filter)
+        # Get the developer (global grouping, no application_id filter)
         try:
-            group = DeveloperGroup.objects.get(id=group_id)
+            developer = Developer.objects.get(id=developer_id)
         except:
             return {
-                'error': 'Developer group not found',
+                'error': 'Developer not found',
                 'success': False
             }
         
-        # Get all aliases for this group
-        aliases = DeveloperAlias.objects.filter(group=group)
+        # Get all aliases for this developer
+        aliases = DeveloperAlias.objects.filter(developer=developer)
         
-        # Get all commits for this developer group (global, from all applications)
+        # Get all commits for this developer (global, from all applications)
         alias_emails = [alias.email for alias in aliases]
         from .models import Commit
         developer_commits = Commit.objects.filter(author_email__in=alias_emails)
@@ -667,11 +667,11 @@ class AnalyticsService:
         
         return {
             'success': True,
-            'group_id': group_id,
-            'primary_name': group.primary_name,
-            'primary_email': group.primary_email,
-            'confidence_score': group.confidence_score,
-            'is_auto_grouped': group.is_auto_grouped,
+            'developer_id': developer_id,
+            'primary_name': developer.primary_name,
+            'primary_email': developer.primary_email,
+            'confidence_score': developer.confidence_score,
+            'is_auto_grouped': developer.is_auto_grouped,
             'aliases': [
                 {
                     'name': alias.name,

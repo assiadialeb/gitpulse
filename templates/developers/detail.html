@@ -23,18 +23,18 @@
                 </div>
             </div>
             <p class="text-gray-600">{{ developer.email }}</p>
-            {% if is_group %}
-                <p class="text-sm text-gray-500">{{ identities|length }} identities in this group</p>
+            {% if developer.is_developer %}
+                <p class="text-sm text-gray-500">{{ developer.aliases|length }} aliases for this developer</p>
                 {% if developer.github_id %}
                     <p class="text-sm text-blue-600">GitHub ID: {{ developer.github_id }}</p>
                 {% endif %}
                 <p class="text-sm text-gray-400">
-                    {% for identity in identities %}
-                        {{ identity.email }}{% if not forloop.last %}, {% endif %}
+                    {% for alias in developer.aliases %}
+                        {{ alias.email }}{% if not forloop.last %}, {% endif %}
                     {% endfor %}
                 </p>
             {% else %}
-                <p class="text-sm text-gray-500">Individual Developer</p>
+                <p class="text-sm text-gray-500">Individual Alias</p>
             {% endif %}
         </div>
         <a href="{% url 'developers:list' %}" class="btn btn-outline">
@@ -291,7 +291,6 @@
             {% else %}
             <div class="text-center py-8">
                 <p class="text-gray-500">No quality metrics data available by month</p>
-                <p class="text-sm text-gray-400 mt-2">Debug: quality_metrics_by_month = {{ quality_metrics_by_month }}</p>
             </div>
             {% endif %}
         </div>

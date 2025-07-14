@@ -72,11 +72,17 @@ def application_detail(request, pk):
         # Get application quality metrics
         application_quality_metrics = _generate_application_quality_metrics(application)
         
+        # Get analytics data
+        overall_stats = analytics.get_overall_stats()
+        developer_activity = analytics.get_developer_activity(days=30)
+        
+
+        
         context = {
             'application': application,
             'repositories': repositories,
-            'overall_stats': analytics.get_overall_stats(),
-            'developer_activity': analytics.get_developer_activity(days=30),
+            'overall_stats': overall_stats,
+            'developer_activity': developer_activity,
             'activity_heatmap': analytics.get_activity_heatmap(days=90),
             'bubble_chart': analytics.get_bubble_chart_data(days=30),
             'code_distribution': analytics.get_code_distribution(),
@@ -96,13 +102,28 @@ def application_detail(request, pk):
             'other': '#bdbdbd',
         }
         context['doughnut_colors'] = doughnut_colors
-        context['commit_type_labels'] = json.dumps(list(context['commit_types']['counts'].keys()))
-        context['commit_type_values'] = json.dumps(list(context['commit_types']['counts'].values()))
+        # Robust preparation for JS variables
+        commit_types = context.get('commit_types') or {}
+        counts = commit_types.get('counts') if isinstance(commit_types, dict) else None
+        if counts and isinstance(counts, dict):
+            labels = list(counts.keys())
+            values = list(counts.values())
+        else:
+            labels = []
+            values = []
+        context['commit_type_labels'] = json.dumps(labels)
+        context['commit_type_values'] = json.dumps(values)
         legend_data = []
-        for label, count in context['commit_types']['counts'].items():
+        for label, count in (counts.items() if counts else []):
             color = context['doughnut_colors'].get(label, '#bdbdbd')
             legend_data.append({'label': label, 'count': count, 'color': color})
         context['commit_type_legend'] = legend_data
+        # Robust JS variables for charts
+        bubble_chart = context.get('bubble_chart') or {}
+        context['bubble_chart_data'] = json.dumps(bubble_chart.get('datasets', []))
+        activity_heatmap = context.get('activity_heatmap') or {}
+        context['activity_heatmap_data'] = json.dumps(activity_heatmap.get('daily_activity', []))
+        context['debug_stats'] = overall_stats
     except ImportError:
         # If analytics app is not available, provide empty data
         context = {
@@ -114,7 +135,17 @@ def application_detail(request, pk):
             'bubble_chart': {'bubbles': [], 'max_commits': 0},
             'code_distribution': {'distribution': []},
             'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
+            'commit_types': {'counts': {}},
+            'commit_frequency': {'avg_commits_per_day': 0, 'recent_activity_score': 0, 'consistency_score': 0, 'overall_frequency_score': 0, 'commits_last_30_days': 0, 'commits_last_90_days': 0, 'days_since_last_commit': None, 'active_days': 0, 'total_days': 0},
+            'application_quality_metrics': {'total_commits': 0, 'real_code_commits': 0, 'real_code_ratio': 0, 'suspicious_commits': 0, 'suspicious_ratio': 0, 'doc_only_commits': 0, 'doc_only_ratio': 0, 'config_only_commits': 0, 'config_only_ratio': 0, 'micro_commits': 0, 'micro_commits_ratio': 0, 'no_ticket_commits': 0, 'no_ticket_ratio': 0, 'avg_code_quality': 0, 'avg_impact': 0, 'avg_complexity': 0},
         }
+        # Robust JS variables for charts (even in import error case)
+        context['commit_type_labels'] = json.dumps([])
+        context['commit_type_values'] = json.dumps([])
+        context['bubble_chart_data'] = json.dumps([])
+        context['activity_heatmap_data'] = json.dumps([])
+        context['commit_type_legend'] = []
+        context['debug_stats'] = context['overall_stats']
     except Exception as e:
         # If analytics service fails, provide empty data
         context = {
@@ -126,7 +157,17 @@ def application_detail(request, pk):
             'bubble_chart': {'bubbles': [], 'max_commits': 0},
             'code_distribution': {'distribution': []},
             'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
+            'commit_types': {'counts': {}},
+            'commit_frequency': {'avg_commits_per_day': 0, 'recent_activity_score': 0, 'consistency_score': 0, 'overall_frequency_score': 0, 'commits_last_30_days': 0, 'commits_last_90_days': 0, 'days_since_last_commit': None, 'active_days': 0, 'total_days': 0},
+            'application_quality_metrics': {'total_commits': 0, 'real_code_commits': 0, 'real_code_ratio': 0, 'suspicious_commits': 0, 'suspicious_ratio': 0, 'doc_only_commits': 0, 'doc_only_ratio': 0, 'config_only_commits': 0, 'config_only_ratio': 0, 'micro_commits': 0, 'micro_commits_ratio': 0, 'no_ticket_commits': 0, 'no_ticket_ratio': 0, 'avg_code_quality': 0, 'avg_impact': 0, 'avg_complexity': 0},
         }
+        # Robust JS variables for charts (even in error case)
+        context['commit_type_labels'] = json.dumps([])
+        context['commit_type_values'] = json.dumps([])
+        context['bubble_chart_data'] = json.dumps([])
+        context['activity_heatmap_data'] = json.dumps([])
+        context['commit_type_legend'] = []
+        context['debug_stats'] = context['overall_stats']
     
     return render(request, 'applications/detail.html', context)
 
