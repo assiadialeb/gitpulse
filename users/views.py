@@ -68,6 +68,7 @@ def profile_view(request):
     """User profile view with GitHub data sync"""
     github_user = None
     sync_error = None
+    github_organizations = None
     
     if request.method == 'POST':
         form = UserProfileForm(request.POST, instance=request.user.userprofile)
@@ -83,6 +84,12 @@ def profile_view(request):
                     # Sync user data from GitHub
                     github_user = github_service.sync_user_data(profile.github_username)
                     
+                    # Récupérer les organisations si superuser
+                    if request.user.is_superuser:
+                        try:
+                            github_organizations = github_service.get_authenticated_user_organizations()
+                        except Exception:
+                            github_organizations = None
                     messages.success(request, f'Profile updated and GitHub data synced for {profile.github_username}!')
                     
                 except ValueError as e:
@@ -106,11 +113,19 @@ def profile_view(request):
                 github_user = GitHubUser.objects(login=request.user.userprofile.github_username).first()
             except Exception:
                 pass
+        # Récupérer les organisations si superuser
+        if request.user.is_superuser:
+            try:
+                github_service = GitHubUserService(request.user.id)
+                github_organizations = github_service.get_authenticated_user_organizations()
+            except Exception:
+                github_organizations = None
     
     context = {
         'form': form,
         'github_user': github_user,
-        'sync_error': sync_error
+        'sync_error': sync_error,
+        'github_organizations': github_organizations
     }
     
     return render(request, 'users/profile.html', context)

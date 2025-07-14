@@ -1,6 +1,6 @@
-{% extends 'base/base.html' %}
+{% extends "base/base.html" %}
 
-{% block title %}My Profile - GitPulse{% endblock %}
+{% block title %}My Profile - GitPulse{% endblock title %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto space-y-8">
@@ -92,7 +92,7 @@
                 <!-- Profile Header -->
                 <div class="flex items-start space-x-6 mb-8">
                     {% if github_user.avatar_url %}
-                    <img src="{{ github_user.avatar_url }}" alt="{{ github_user.name|default:github_user.login }}" class="w-24 h-24 rounded-2xl shadow-soft">
+                    <img src="{{ github_user.avatar_url }}" alt="{{ github_user.name|default:github_user.login }}" class="w-24 h-24 rounded-2xl shadow-soft" width="96" height="96">
                     {% else %}
                     <div class="w-24 h-24 bg-gradient-to-r from-gray-400 to-gray-500 rounded-2xl flex items-center justify-center">
                         <span class="text-white font-bold text-2xl">{{ github_user.login|first|upper }}</span>
@@ -195,6 +195,35 @@
                 </div>
             </div>
 
+            {% if github_organizations %}
+            <div class="card-modern p-8">
+                <div class="flex items-center mb-6">
+                    <div class="w-12 h-12 bg-gradient-to-r from-primary-blue to-primary-green rounded-xl flex items-center justify-center mr-4">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-7 9 7v7a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4a2 2 0 00-2-2h-2a2 2 0 00-2 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-dark-gray">Organizations</h2>
+                        <p class="text-medium-gray">Organizations you belong to</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {% for org in github_organizations %}
+                    <div class="flex items-center p-4 bg-light-gray rounded-xl">
+                        <img src="{{ org.avatar_url }}" alt="{{ org.login }}" class="w-10 h-10 rounded-full mr-4" width="40" height="40">
+                        <div>
+                            <a href="{{ org.html_url }}" target="_blank" class="font-semibold text-primary-blue hover:underline">{{ org.login }}</a>
+                            {% if org.description %}
+                            <div class="text-sm text-medium-gray">{{ org.description }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Emails Section -->
             {% if github_user.emails %}
             <div class="card-modern p-8">
@@ -265,4 +294,4 @@
         </div>
     </div>
 </div>
-{% endblock %} 
+{% endblock content %} 
