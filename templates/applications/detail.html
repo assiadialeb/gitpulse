@@ -703,6 +703,13 @@ document.addEventListener('DOMContentLoaded', function() {
             closeSlideover();
         }
     });
+    
+    // Auto-sort the code distribution table by Net Lines (column 5) in descending order
+    const codeDistributionTable = document.getElementById('code-distribution-table');
+    if (codeDistributionTable) {
+        // Sort by Net Lines column (index 5) in descending order
+        sortTable(5);
+    }
 });
 
 function startIndexing(applicationId) {
