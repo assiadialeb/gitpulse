@@ -246,3 +246,33 @@ def get_commit_type_stats(commits) -> dict:
         'percentages': percentages,
         'total': total
     } 
+
+
+def classify_commit_with_files(message: str, files: list) -> str:
+    """
+    Classify a commit using both the message and the list of modified files.
+    - Si tous les fichiers sont de la doc, retourne 'docs'.
+    - Si tous les fichiers sont infra/config, retourne 'chore'.
+    - Sinon, applique la logique standard sur le message.
+    """
+    if not files or not isinstance(files, list):
+        return classify_commit_with_ollama_fallback(message)
+
+    doc_exts = {'.md', '.rst', '.adoc', '.markdown', '.txt'}
+    chore_exts = {'.tf', '.tfvars', '.yml', '.yaml', '.json', '.env', '.ini', '.cfg', '.lock', '.dockerfile', '.gitignore', '.gitattributes', '.sh', '.bat', '.ps1'}
+    
+    def get_ext(f):
+        f = f.lower()
+        if f.startswith('dockerfile'):
+            return '.dockerfile'
+        return '.' + f.split('.')[-1] if '.' in f else ''
+
+    exts = set(get_ext(f) for f in files)
+    # Si tous les fichiers sont de la doc
+    if exts and all(e in doc_exts for e in exts):
+        return 'docs'
+    # Si tous les fichiers sont infra/config
+    if exts and all(e in chore_exts for e in exts):
+        return 'chore'
+    # Sinon, logique standard
+    return classify_commit_with_ollama_fallback(message) 

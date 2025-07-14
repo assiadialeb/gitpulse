@@ -1,6 +1,6 @@
-{% extends 'base/base.html' %}
+{% extends "base/base.html" %}
 
-{% block title %}GitHub Admin - GitPulse{% endblock %}
+{% block title %}GitHub Admin - GitPulse{% endblock title %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto space-y-8">
@@ -252,8 +252,8 @@
                         </svg>
                     </div>
                     <div>
-                        <h3 class="font-semibold text-dark-gray">Auto Index Repository</h3>
-                        <p class="text-medium-gray text-sm">Automatically index new repositories</p>
+                        <h3 class="font-semibold text-dark-gray">Auto Index New Commits</h3>
+                        <p class="text-medium-gray text-sm">GitPulse will index new commits for your configured Applications every night</p>
                     </div>
                 </div>
                 <input type="checkbox" class="toggle toggle-primary" />
@@ -268,8 +268,8 @@
                         </svg>
                     </div>
                     <div>
-                        <h3 class="font-semibold text-dark-gray">Auto Merge Developer Identity</h3>
-                        <p class="text-medium-gray text-sm">Automatically merge developer identities</p>
+                        <h3 class="font-semibold text-dark-gray">Auto Merge Developer Aliases</h3>
+                        <p class="text-medium-gray text-sm">GitPulse will attempt to merge all aliases (identities) of a developer</p>
                     </div>
                 </div>
                 <input type="checkbox" class="toggle toggle-primary" />
@@ -293,4 +293,4 @@
         </div>
     </div>
 </div>
-{% endblock %} 
+{% endblock content %} 

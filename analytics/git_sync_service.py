@@ -11,6 +11,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from .models import Commit, SyncLog, RepositoryStats, FileChange
 from .git_service import GitService, GitServiceError
 from applications.models import Application, ApplicationRepository
+from .commit_classifier import classify_commit_with_files
 
 logger = logging.getLogger(__name__)
 
@@ -339,9 +340,11 @@ class GitSyncService:
                 # Parse commit data
                 parsed_data = self._parse_commit_data(commit_data, repo_full_name, application_id)
                 
-                # Add commit classification with Ollama fallback
-                from .commit_classifier import classify_commit_with_ollama_fallback
-                parsed_data['commit_type'] = classify_commit_with_ollama_fallback(commit_data.get('message', ''))
+                # Add commit classification with files (docs/chore auto)
+                parsed_data['commit_type'] = classify_commit_with_files(
+                    commit_data.get('message', ''),
+                    [f['filename'] for f in commit_data.get('files_changed', [])]
+                )
                 
                 # Store or update commit
                 if existing_commit:
