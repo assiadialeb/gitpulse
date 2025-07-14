@@ -299,7 +299,7 @@
     <!-- Activity Bubble Chart -->
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h2 class="card-title">🕐 Activity Heatmap (Last 120 Days)</h2>
+            <h2 class="card-title">🕐 Activity Heatmap (Last 365 Days)</h2>
             
             {% if chart_data %}
             <!-- Repository Legend -->
@@ -318,7 +318,7 @@
             </p>
             {% else %}
             <div class="text-center py-8">
-                <p class="text-gray-500">No activity data available for the last 120 days</p>
+                <p class="text-gray-500">No activity data available for the last 365 days</p>
             </div>
             {% endif %}
         </div>
@@ -431,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         reverse: true,
                         min: 0,
-                        max: 120
+                        max: 365
                     },
                     y: {
                         type: 'linear',

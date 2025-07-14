@@ -593,13 +593,13 @@ def developer_detail(request, developer_id):
         from datetime import datetime, timedelta
         import pytz
         import random
-        # Only keep commits from the last 120 days
+        # Only keep commits from the last 365 days
         now = datetime.utcnow().replace(tzinfo=None)
-        cutoff = now - timedelta(days=120)
-        commits_120d = [c for c in developer_commits if c.authored_date and c.authored_date.replace(tzinfo=None) >= cutoff]
+        cutoff = now - timedelta(days=365)
+        commits_365d = [c for c in developer_commits if c.authored_date and c.authored_date.replace(tzinfo=None) >= cutoff]
         # Group by repo, then by (days_ago, hour)
         repo_bubbles = {}
-        for commit in commits_120d:
+        for commit in commits_365d:
             repo = commit.repository_full_name or 'unknown'
             commit_dt = commit.authored_date.replace(tzinfo=None)
             days_ago = (now.date() - commit_dt.date()).days
