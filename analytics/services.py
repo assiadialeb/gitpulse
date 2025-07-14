@@ -19,27 +19,58 @@ def cleanup_application_data(application_id: int) -> Dict:
         'commits_deleted': 0,
         'sync_logs_deleted': 0,
         'repository_stats_deleted': 0,
+        'quality_metrics_deleted': 0,
         'total_deleted': 0
     }
     
     try:
         # Delete all commits for this application
-        commits_deleted = Commit.objects(application_id=application_id).delete()
+        commits_deleted = Commit.objects.filter(application_id=application_id).delete()
         results['commits_deleted'] = commits_deleted
         
         # Delete all sync logs for this application
-        sync_logs_deleted = SyncLog.objects(application_id=application_id).delete()
+        sync_logs_deleted = SyncLog.objects.filter(application_id=application_id).delete()
         results['sync_logs_deleted'] = sync_logs_deleted
         
         # Delete all repository stats for this application
-        repo_stats_deleted = RepositoryStats.objects(application_id=application_id).delete()
+        repo_stats_deleted = RepositoryStats.objects.filter(application_id=application_id).delete()
         results['repository_stats_deleted'] = repo_stats_deleted
+        
+        # Delete all quality metrics for this application
+        from pymongo import MongoClient
+        client = MongoClient('localhost', 27017)
+        db = client['gitpulse']
+        quality_collection = db['developer_quality_metrics']
+        
+        # Get repository names for this application to filter quality metrics
+        from applications.models import Application
+        try:
+            application = Application.objects.get(id=application_id)
+            repository_names = list(application.repositories.values_list('github_repo_name', flat=True))
+            
+            if repository_names:
+                # Delete quality metrics for repositories in this application
+                quality_result = quality_collection.delete_many({
+                    'repository': {'$in': repository_names}
+                })
+                results['quality_metrics_deleted'] = int(quality_result.deleted_count)
+            else:
+                results['quality_metrics_deleted'] = 0
+        except Application.DoesNotExist:
+            # Application already deleted, try to delete by application_id if it exists in quality metrics
+            quality_result = quality_collection.delete_many({
+                'application_id': application_id
+            })
+            results['quality_metrics_deleted'] = int(quality_result.deleted_count)
+        
+        client.close()
         
         # Calculate total
         results['total_deleted'] = (
             results['commits_deleted'] + 
             results['sync_logs_deleted'] + 
-            results['repository_stats_deleted']
+            results['repository_stats_deleted'] +
+            results['quality_metrics_deleted']
         )
         
         return results
@@ -64,27 +95,42 @@ def cleanup_repository_data(repository_full_name: str) -> Dict:
         'commits_deleted': 0,
         'sync_logs_deleted': 0,
         'repository_stats_deleted': 0,
+        'quality_metrics_deleted': 0,
         'total_deleted': 0
     }
     
     try:
         # Delete all commits for this repository
-        commits_deleted = Commit.objects(repository_full_name=repository_full_name).delete()
+        commits_deleted = Commit.objects.filter(repository_full_name=repository_full_name).delete()
         results['commits_deleted'] = commits_deleted
         
         # Delete all sync logs for this repository
-        sync_logs_deleted = SyncLog.objects(repository_full_name=repository_full_name).delete()
+        sync_logs_deleted = SyncLog.objects.filter(repository_full_name=repository_full_name).delete()
         results['sync_logs_deleted'] = sync_logs_deleted
         
         # Delete repository stats for this repository
-        repo_stats_deleted = RepositoryStats.objects(repository_full_name=repository_full_name).delete()
+        repo_stats_deleted = RepositoryStats.objects.filter(repository_full_name=repository_full_name).delete()
         results['repository_stats_deleted'] = repo_stats_deleted
+        
+        # Delete quality metrics for this repository
+        from pymongo import MongoClient
+        client = MongoClient('localhost', 27017)
+        db = client['gitpulse']
+        quality_collection = db['developer_quality_metrics']
+        
+        quality_result = quality_collection.delete_many({
+            'repository': repository_full_name
+        })
+        results['quality_metrics_deleted'] = int(quality_result.deleted_count)
+        
+        client.close()
         
         # Calculate total
         results['total_deleted'] = (
             results['commits_deleted'] + 
             results['sync_logs_deleted'] + 
-            results['repository_stats_deleted']
+            results['repository_stats_deleted'] +
+            results['quality_metrics_deleted']
         )
         
         return results

@@ -108,23 +108,25 @@ class DeveloperGroupingService:
             
             for normalized_name, developers in name_groups.items():
                 if len(developers) > 1:
-                    # Use the most common name as the primary name
-                    name_counts = defaultdict(int)
-                    for dev in developers:
-                        name_counts[dev['name']] += 1
-                    
-                    # Use the name with the most occurrences, or the longest if tied
-                    primary_name = max(name_counts.items(), key=lambda x: (x[1], len(x[0])))[0]
-                    
-                    developers_to_create.append({
-                        'type': 'name',
-                        'key': normalized_name,
-                        'developers': developers,
-                        'primary_name': primary_name,
-                        'primary_email': developers[0]['email']
-                    })
-                    for dev in developers:
-                        processed_developers.add(dev['name'] + '|' + dev['email'])
+                    # Additional validation: check if emails are from same domain
+                    if self._validate_name_grouping(developers):
+                        # Use the most common name as the primary name
+                        name_counts = defaultdict(int)
+                        for dev in developers:
+                            name_counts[dev['name']] += 1
+                        
+                        # Use the name with the most occurrences, or the longest if tied
+                        primary_name = max(name_counts.items(), key=lambda x: (x[1], len(x[0])))[0]
+                        
+                        developers_to_create.append({
+                            'type': 'name',
+                            'key': normalized_name,
+                            'developers': developers,
+                            'primary_name': primary_name,
+                            'primary_email': developers[0]['email']
+                        })
+                        for dev in developers:
+                            processed_developers.add(dev['name'] + '|' + dev['email'])
             
             # Step 3: Group by GitHub ID (only unprocessed developers)
             github_groups = defaultdict(list)
@@ -137,15 +139,17 @@ class DeveloperGroupingService:
             
             for github_id, developers in github_groups.items():
                 if len(developers) > 1:
-                    developers_to_create.append({
-                        'type': 'github_id',
-                        'key': github_id,
-                        'developers': developers,
-                        'primary_name': developers[0]['name'],
-                        'primary_email': developers[0]['email']
-                    })
-                    for dev in developers:
-                        processed_developers.add(dev['name'] + '|' + dev['email'])
+                    # Additional validation for GitHub ID grouping
+                    if self._validate_github_grouping(developers):
+                        developers_to_create.append({
+                            'type': 'github_id',
+                            'key': github_id,
+                            'developers': developers,
+                            'primary_name': developers[0]['name'],
+                            'primary_email': developers[0]['email']
+                        })
+                        for dev in developers:
+                            processed_developers.add(dev['name'] + '|' + dev['email'])
             
             # Create the developers
             for developer_data in developers_to_create:
@@ -294,13 +298,24 @@ class DeveloperGroupingService:
             if existing_alias:
                 return existing_alias.developer
         
-        # Si aucun developer trouvé par email, chercher par nom similaire
+        # Si aucun developer trouvé par email, chercher par similarité de noms
         if developers:
             # Use the first developer's name as reference
             primary_name = developers[0]['name']
-            existing_developer = Developer.objects.filter(primary_name=primary_name).first()
-            if existing_developer:
-                return existing_developer
+            
+            # Get all existing developers
+            existing_developers = Developer.objects.all()
+            
+            # Check for name similarity with existing developers
+            for existing_dev in existing_developers:
+                if self._names_are_similar(primary_name, existing_dev.primary_name):
+                    return existing_dev
+            
+            # If no similarity found, check if any of the developer emails match existing developer emails
+            for dev in developers:
+                for existing_dev in existing_developers:
+                    if dev['email'].lower() == existing_dev.primary_email.lower():
+                        return existing_dev
         
         return None
     
@@ -815,3 +830,109 @@ class DeveloperGroupingService:
                 'success': False,
                 'error': f'Error merging developers: {str(e)}'
             } 
+
+    def _validate_name_grouping(self, developers: List[Dict]) -> bool:
+        """
+        Validate if a name-based grouping is legitimate
+        
+        Args:
+            developers: List of developers to validate
+            
+        Returns:
+            True if grouping is valid, False otherwise
+        """
+        if len(developers) < 2:
+            return False
+        
+        # Check if emails are from similar domains (same company/organization)
+        email_domains = set()
+        for dev in developers:
+            domain = dev['email'].split('@')[1] if '@' in dev['email'] else ''
+            email_domains.add(domain)
+        
+        # If all emails are from the same domain, it's likely legitimate
+        if len(email_domains) == 1:
+            return True
+        
+        # If emails are from different domains, be more strict
+        # Check if names are very similar (not just sharing words)
+        names = [dev['name'] for dev in developers]
+        
+        # Check if any two names are very similar
+        for i, name1 in enumerate(names):
+            for j, name2 in enumerate(names[i+1:], i+1):
+                # Use stricter similarity check for cross-domain grouping
+                if self._names_are_very_similar(name1, name2):
+                    return True
+        
+        # If names are not very similar and emails are from different domains, reject
+        return False
+    
+    def _validate_github_grouping(self, developers: List[Dict]) -> bool:
+        """
+        Validate if a GitHub ID-based grouping is legitimate
+        
+        Args:
+            developers: List of developers to validate
+            
+        Returns:
+            True if grouping is valid, False otherwise
+        """
+        if len(developers) < 2:
+            return False
+        
+        # GitHub ID grouping is generally reliable, but check for obvious mismatches
+        names = [dev['name'] for dev in developers]
+        
+        # Check if names are at least somewhat similar
+        for i, name1 in enumerate(names):
+            for j, name2 in enumerate(names[i+1:], i+1):
+                if self._names_are_similar(name1, name2):
+                    return True
+        
+        # If names are completely different, be cautious
+        return False
+    
+    def _names_are_very_similar(self, name1: str, name2: str) -> bool:
+        """
+        Check if two names are very similar (stricter than _names_are_similar)
+        
+        Args:
+            name1: First name
+            name2: Second name
+            
+        Returns:
+            True if names are very similar
+        """
+        norm1 = self._normalize_name(name1)
+        norm2 = self._normalize_name(name2)
+        
+        # Exact match
+        if norm1 == norm2:
+            return True
+        
+        # One name contains the other (but be more strict)
+        if len(norm1) > 5 and len(norm2) > 5:  # Only for longer names
+            if norm1 in norm2 or norm2 in norm1:
+                return True
+        
+        # Check if they share significant words (stricter)
+        words1 = set(norm1.split())
+        words2 = set(norm2.split())
+        
+        # If they share at least one significant word (4+ characters)
+        significant_words1 = {w for w in words1 if len(w) >= 4}
+        significant_words2 = {w for w in words2 if len(w) >= 4}
+        
+        shared_words = significant_words1 & significant_words2
+        
+        # Require at least 2 shared significant words or 1 very long word
+        if len(shared_words) >= 2:
+            return True
+        
+        # Check for very long shared words (likely surnames)
+        very_long_words = {w for w in shared_words if len(w) >= 6}
+        if len(very_long_words) >= 1:
+            return True
+        
+        return False 
