@@ -343,6 +343,10 @@ class SyncService:
                 
                 results['commits_processed'] += 1
                 
+            except GitHubRateLimitError as e:
+                # Re-raise rate limit errors to stop processing
+                logger.error(f"Rate limit exceeded processing commit {commit_data.get('sha', 'unknown')}: {e}")
+                raise
             except Exception as e:
                 logger.error(f"Error processing commit {commit_data.get('sha', 'unknown')}: {e}")
                 results['commits_skipped'] += 1
