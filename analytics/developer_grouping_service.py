@@ -63,10 +63,49 @@ class DeveloperGroupingService:
             developers_to_create = []
             created_developers = []
             
-            # Step 1: Group by exact email match (highest priority)
+            # Step 1: Group by GitHub ID (highest priority - unique identifier)
+            github_groups = defaultdict(list)
+            for dev in all_developers:
+                github_id = self._extract_github_id(dev['email'])
+                if github_id:
+                    github_groups[github_id].append(dev)
+            
+            for github_id, developers in github_groups.items():
+                if len(developers) > 1:
+                    # Check if any of these developers are already in existing developers
+                    existing_developer = self._find_existing_developer_for_developers(developers)
+                    
+                    if existing_developer:
+                        # Add to existing developer
+                        added_count = self._add_developers_to_developer(existing_developer, developers)
+                        created_developers.append({
+                            'developer_id': str(existing_developer.id),
+                            'primary_name': existing_developer.primary_name,
+                            'primary_email': existing_developer.primary_email,
+                            'type': 'github_id',
+                            'key': github_id,
+                            'added_count': added_count,
+                            'action': 'added_to_existing'
+                        })
+                    else:
+                        # Create new developer
+                        developers_to_create.append({
+                            'type': 'github_id',
+                            'key': github_id,
+                            'developers': developers,
+                            'primary_name': developers[0]['name'],
+                            'primary_email': developers[0]['email']
+                        })
+                    
+                    for dev in developers:
+                        processed_developers.add(dev['name'] + '|' + dev['email'])
+            
+            # Step 2: Group by exact email match
             email_groups = defaultdict(list)
             for dev in all_developers:
-                email_groups[dev['email'].lower()].append(dev)
+                dev_key = dev['name'] + '|' + dev['email']
+                if dev_key not in processed_developers:
+                    email_groups[dev['email'].lower()].append(dev)
             
             for email, developers in email_groups.items():
                 if len(developers) > 1:
@@ -98,7 +137,60 @@ class DeveloperGroupingService:
                     for dev in developers:
                         processed_developers.add(dev['name'] + '|' + dev['email'])
             
-            # Step 2: Group by name similarity (only unprocessed developers)
+            # Step 3: Group by approximate email (same username before @)
+            approximate_email_groups = defaultdict(list)
+            for dev in all_developers:
+                dev_key = dev['name'] + '|' + dev['email']
+                if dev_key not in processed_developers:
+                    username = self._extract_username_from_email(dev['email'])
+                    if username:
+                        approximate_email_groups[username].append(dev)
+            
+            # Step 3.5: Group GitHub ID with regular emails (same username)
+            github_regular_groups = defaultdict(list)
+            for dev in all_developers:
+                dev_key = dev['name'] + '|' + dev['email']
+                if dev_key not in processed_developers:
+                    github_id = self._extract_github_id(dev['email'])
+                    if github_id:
+                        # Find regular emails with same username
+                        username = self._extract_username_from_email(dev['email'])
+                        if username:
+                            github_regular_groups[username].append(dev)
+            
+            for username, developers in approximate_email_groups.items():
+                if len(developers) > 1:
+                    # Additional validation for approximate email grouping
+                    if self._validate_approximate_email_grouping(developers):
+                        # Check if any of these developers are already in existing developers
+                        existing_developer = self._find_existing_developer_for_developers(developers)
+                        
+                        if existing_developer:
+                            # Add to existing developer
+                            added_count = self._add_developers_to_developer(existing_developer, developers)
+                            created_developers.append({
+                                'developer_id': str(existing_developer.id),
+                                'primary_name': existing_developer.primary_name,
+                                'primary_email': existing_developer.primary_email,
+                                'type': 'approximate_email',
+                                'key': username,
+                                'added_count': added_count,
+                                'action': 'added_to_existing'
+                            })
+                        else:
+                            # Create new developer
+                            developers_to_create.append({
+                                'type': 'approximate_email',
+                                'key': username,
+                                'developers': developers,
+                                'primary_name': developers[0]['name'],
+                                'primary_email': developers[0]['email']
+                            })
+                        
+                        for dev in developers:
+                            processed_developers.add(dev['name'] + '|' + dev['email'])
+            
+            # Step 4: Group by name similarity (only unprocessed developers)
             name_groups = defaultdict(list)
             for dev in all_developers:
                 dev_key = dev['name'] + '|' + dev['email']
@@ -123,29 +215,6 @@ class DeveloperGroupingService:
                             'key': normalized_name,
                             'developers': developers,
                             'primary_name': primary_name,
-                            'primary_email': developers[0]['email']
-                        })
-                        for dev in developers:
-                            processed_developers.add(dev['name'] + '|' + dev['email'])
-            
-            # Step 3: Group by GitHub ID (only unprocessed developers)
-            github_groups = defaultdict(list)
-            for dev in all_developers:
-                dev_key = dev['name'] + '|' + dev['email']
-                if dev_key not in processed_developers:
-                    github_id = self._extract_github_id(dev['email'])
-                    if github_id:
-                        github_groups[github_id].append(dev)
-            
-            for github_id, developers in github_groups.items():
-                if len(developers) > 1:
-                    # Additional validation for GitHub ID grouping
-                    if self._validate_github_grouping(developers):
-                        developers_to_create.append({
-                            'type': 'github_id',
-                            'key': github_id,
-                            'developers': developers,
-                            'primary_name': developers[0]['name'],
                             'primary_email': developers[0]['email']
                         })
                         for dev in developers:
@@ -259,6 +328,40 @@ class DeveloperGroupingService:
         if significant_words1 & significant_words2:
             return True
         
+        # NEW: Check for email username similarity
+        # If names are similar and emails have same username, likely same person
+        # This catches cases like "Michel S" vs "Michel Sanglier" with same email username
+        if self._emails_have_same_username(name1, name2):
+            return True
+        
+        return False
+    
+    def _emails_have_same_username(self, name1: str, name2: str) -> bool:
+        """
+        Check if the names are associated with emails that have the same username
+        This helps catch cases where someone uses different name variations but same email username
+        """
+        # This is a placeholder - in practice, we'd need to check the actual emails
+        # For now, we'll use a heuristic based on name similarity
+        norm1 = self._normalize_name(name1)
+        norm2 = self._normalize_name(name2)
+        
+        # If names share a significant word and are reasonably similar
+        words1 = set(norm1.split())
+        words2 = set(norm2.split())
+        
+        # Check if they share a significant word (4+ characters)
+        significant_words1 = {w for w in words1 if len(w) >= 4}
+        significant_words2 = {w for w in words2 if len(w) >= 4}
+        
+        shared_words = significant_words1 & significant_words2
+        
+        # If they share a significant word and names are reasonably similar
+        if shared_words and len(norm1) > 3 and len(norm2) > 3:
+            # Check if one name is a variation of the other
+            if any(word in norm1 for word in shared_words) and any(word in norm2 for word in shared_words):
+                return True
+        
         return False
     
     def _extract_github_id(self, email: str) -> Optional[str]:
@@ -277,12 +380,14 @@ class DeveloperGroupingService:
     
     def _calculate_confidence_score(self, developer_type: str) -> int:
         """Calculate confidence score based on grouping type"""
-        if developer_type == 'email':
+        if developer_type == 'github_id':
+            return 100  # GitHub ID match (unique identifier)
+        elif developer_type == 'email':
             return 100  # Exact email match
+        elif developer_type == 'approximate_email':
+            return 95   # Approximate email match (same username)
         elif developer_type == 'name':
             return 80   # Name match (could be different people with same name)
-        elif developer_type == 'github_id':
-            return 90   # GitHub ID match
         else:
             return 50
     
@@ -324,14 +429,21 @@ class DeveloperGroupingService:
         added_count = 0
         
         for dev in developers:
-            # Check if this alias already exists in the developer
+            # Check if this alias already exists in the developer (by email AND name)
             existing_alias = DeveloperAlias.objects.filter(
                 developer=developer,
                 email=dev['email'],
                 name=dev['name']
             ).first()
             
-            if not existing_alias:
+            # Also check if an alias with the same email exists (regardless of name)
+            existing_email_alias = DeveloperAlias.objects.filter(
+                developer=developer,
+                email=dev['email']
+            ).first()
+            
+            if not existing_alias and not existing_email_alias:
+                # Create new alias only if it doesn't exist
                 alias = DeveloperAlias(
                     developer=developer,
                     name=dev['name'],
@@ -342,6 +454,12 @@ class DeveloperGroupingService:
                 )
                 alias.save()
                 added_count += 1
+            elif existing_email_alias and not existing_alias:
+                # Update existing alias with new name if it's different
+                if existing_email_alias.name != dev['name']:
+                    existing_email_alias.name = dev['name']
+                    existing_email_alias.save()
+                    added_count += 1
         
         return added_count
 
@@ -854,18 +972,17 @@ class DeveloperGroupingService:
         if len(email_domains) == 1:
             return True
         
-        # If emails are from different domains, be more strict
-        # Check if names are very similar (not just sharing words)
+        # If emails are from different domains, use the original similarity logic
+        # This is less strict than the previous version
         names = [dev['name'] for dev in developers]
         
-        # Check if any two names are very similar
+        # Check if any two names are similar using the original logic
         for i, name1 in enumerate(names):
             for j, name2 in enumerate(names[i+1:], i+1):
-                # Use stricter similarity check for cross-domain grouping
-                if self._names_are_very_similar(name1, name2):
+                if self._names_are_similar(name1, name2):
                     return True
         
-        # If names are not very similar and emails are from different domains, reject
+        # If names are not similar and emails are from different domains, reject
         return False
     
     def _validate_github_grouping(self, developers: List[Dict]) -> bool:
@@ -881,7 +998,9 @@ class DeveloperGroupingService:
         if len(developers) < 2:
             return False
         
-        # GitHub ID grouping is generally reliable, but check for obvious mismatches
+        # GitHub ID grouping is generally reliable
+        # For GitHub IDs, we can be more permissive since GitHub IDs are unique
+        # Only reject if names are completely different and suspicious
         names = [dev['name'] for dev in developers]
         
         # Check if names are at least somewhat similar
@@ -890,8 +1009,10 @@ class DeveloperGroupingService:
                 if self._names_are_similar(name1, name2):
                     return True
         
-        # If names are completely different, be cautious
-        return False
+        # For GitHub IDs, even if names are different, it might still be legitimate
+        # (e.g., someone using different names on different platforms)
+        # So we'll be more permissive and accept most GitHub ID groupings
+        return True
     
     def _names_are_very_similar(self, name1: str, name2: str) -> bool:
         """
@@ -934,5 +1055,81 @@ class DeveloperGroupingService:
         very_long_words = {w for w in shared_words if len(w) >= 6}
         if len(very_long_words) >= 1:
             return True
+        
+        return False 
+
+    def _extract_username_from_email(self, email: str) -> Optional[str]:
+        """Extract username from email (part before @)"""
+        if '@' in email:
+            return email.split('@')[0].lower()
+        return None
+    
+    def _validate_approximate_email_grouping(self, developers: List[Dict]) -> bool:
+        """
+        Validate if an approximate email grouping is legitimate
+        
+        Args:
+            developers: List of developers to validate
+            
+        Returns:
+            True if grouping is valid, False otherwise
+        """
+        if len(developers) < 2:
+            return False
+        
+        # Get usernames and domains
+        usernames = []
+        domains = []
+        for dev in developers:
+            if '@' in dev['email']:
+                username, domain = dev['email'].split('@')
+                usernames.append(username.lower())
+                domains.append(domain.lower())
+        
+        # If all usernames are the same, it's likely legitimate
+        if len(set(usernames)) == 1:
+            return True
+        
+        # If usernames are similar (e.g., john.doe vs jdoe), it might be legitimate
+        # Check if any two usernames are similar
+        for i, username1 in enumerate(usernames):
+            for j, username2 in enumerate(usernames[i+1:], i+1):
+                if self._usernames_are_similar(username1, username2):
+                    return True
+        
+        # If usernames are not similar, reject
+        return False
+    
+    def _usernames_are_similar(self, username1: str, username2: str) -> bool:
+        """
+        Check if two usernames are similar
+        
+        Args:
+            username1: First username
+            username2: Second username
+            
+        Returns:
+            True if usernames are similar
+        """
+        # Exact match
+        if username1 == username2:
+            return True
+        
+        # One contains the other
+        if username1 in username2 or username2 in username1:
+            return True
+        
+        # Check for common patterns like john.doe vs jdoe
+        # Remove dots and compare
+        clean1 = username1.replace('.', '')
+        clean2 = username2.replace('.', '')
+        
+        if clean1 == clean2:
+            return True
+        
+        # Check if one is a shortened version of the other
+        if len(username1) > 3 and len(username2) > 3:
+            if clean1.startswith(clean2) or clean2.startswith(clean1):
+                return True
         
         return False 

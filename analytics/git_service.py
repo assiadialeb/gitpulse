@@ -110,7 +110,7 @@ class GitService:
             repo_path = self.get_repo_path(repo_full_name)
             
             # Build git log command
-            cmd = ['git', 'log', '--pretty=format:%H|%an|%ae|%cn|%ce|%at|%ct|%s', '--no-merges']
+            cmd = ['git', 'log', '--all', '--pretty=format:%H|%an|%ae|%cn|%ce|%at|%ct|%s', '--no-merges']
             
             # Add date filter if specified
             if since_date:
