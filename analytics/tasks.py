@@ -336,11 +336,22 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                 'task_id': task_id
             }
         
-        # Initialize sync service
-        sync_service = GitSyncService(user_id)
+        # Choose indexing service based on configuration
+        from django.conf import settings
+        indexing_service = getattr(settings, 'INDEXING_SERVICE', 'git_local')
+        
+        if indexing_service == 'github_api':
+            from .sync_service import SyncService
+            sync_service = SyncService(user_id)
+            logger.info(f"Using GitHub API indexing service for application {application_id}")
+        else:
+            from .git_sync_service import GitSyncService
+            sync_service = GitSyncService(user_id)
+            logger.info(f"Using Git local indexing service for application {application_id}")
         
         results = {
             'application_id': application_id,
+            'indexing_service': indexing_service,
             'repositories_synced': 0,
             'total_commits_new': 0,
             'total_commits_updated': 0,
@@ -362,18 +373,31 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                     repo_url = f"https://github.com/{app_repo.github_repo_name}.git"
                     logger.warning(f"Missing github_repo_url for {app_repo.github_repo_name}, using generated URL: {repo_url}")
                 
-                repo_result = sync_service.sync_repository(
-                    app_repo.github_repo_name,
-                    repo_url,
-                    application_id,
-                    'full'  # Always do full sync for indexing
-                )
+                if indexing_service == 'github_api':
+                    # GitHub API service doesn't need repo_url
+                    repo_result = sync_service.sync_repository(
+                        app_repo.github_repo_name,
+                        application_id,
+                        'full'  # Always do full sync for indexing
+                    )
+                else:
+                    # Git local service needs repo_url
+                    repo_result = sync_service.sync_repository(
+                        app_repo.github_repo_name,
+                        repo_url,
+                        application_id,
+                        'full'  # Always do full sync for indexing
+                    )
                 
                 results['repositories_synced'] += 1
                 results['total_commits_new'] += repo_result['commits_new']
                 results['total_commits_updated'] += repo_result['commits_updated']
-                # Git local doesn't use API calls, so we don't track them
-                results['total_api_calls'] = 0
+                
+                # Track API calls only for GitHub API service
+                if indexing_service == 'github_api':
+                    results['total_api_calls'] += repo_result.get('api_calls', 0)
+                else:
+                    results['total_api_calls'] = 0
                 
                 logger.info(f"Completed {i}/{total_repos} repositories")
                 
@@ -382,54 +406,24 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                 logger.error(error_msg)
                 results['errors'].append(error_msg)
         
-        # Auto-group developers after successful sync
-        if results['repositories_synced'] > 0:
-            try:
-                # Create missing aliases first
-                logger.info("Creating missing aliases...")
-                from .git_sync_service import create_missing_aliases_for_application
-                aliases_created = create_missing_aliases_for_application(application_id)
-                logger.info(f"Created {aliases_created} missing aliases")
-                
-                logger.info("Starting automatic developer grouping...")
-                from .developer_grouping_service import DeveloperGroupingService
-                grouping_service = DeveloperGroupingService()
-                grouping_result = grouping_service.auto_group_developers()
-                if grouping_result['success']:
-                    logger.info(f"Developer grouping completed: {grouping_result['developers_created']} developers processed")
-                    results['developer_groups_processed'] = grouping_result['developers_created']
-                else:
-                    logger.warning(f"Developer grouping failed: {grouping_result.get('error', 'Unknown error')}")
-                    results['developer_groups_processed'] = 0
-            except Exception as e:
-                logger.error(f"Error during developer grouping: {e}")
-                results['developer_groups_processed'] = 0
-        else:
-            results['developer_groups_processed'] = 0
-
-        # Batch quality metrics analysis after developer grouping
+        # Run developer grouping after indexing
         try:
-            logger.info("Starting batch commit quality analysis...")
-            from .quality_service import QualityAnalysisService
-            quality_service = QualityAnalysisService()
-            processed = quality_service.analyze_commits_for_application(application_id)
-            logger.info(f"Batch quality analysis completed: {processed} commits processed")
-            results['quality_metrics_processed'] = processed
+            from .developer_grouping_service import DeveloperGroupingService
+            grouping_service = DeveloperGroupingService()
+            grouping_result = grouping_service.auto_group_developers()
+            logger.info(f"Developer grouping completed: {grouping_result}")
         except Exception as e:
-            logger.error(f"Error during batch quality analysis: {e}")
-            results['quality_metrics_processed'] = 0
-
-        results['completed_at'] = datetime.utcnow().isoformat()
-        results['success'] = True
+            logger.error(f"Developer grouping failed: {e}")
+            results['errors'].append(f"Developer grouping failed: {str(e)}")
         
+        results['completed_at'] = datetime.utcnow().isoformat()
         logger.info(f"Background indexing completed for application {application_id}: {results}")
         return results
         
     except Exception as e:
-        error_msg = f"Background indexing failed for application {application_id}: {str(e)}"
-        logger.error(error_msg)
+        logger.error(f"Background indexing failed for application {application_id}: {e}")
         return {
             'success': False,
-            'error': error_msg,
+            'error': str(e),
             'task_id': task_id
         } 

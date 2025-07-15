@@ -79,7 +79,7 @@ class DeveloperGroupingService:
                         # Add to existing developer
                         added_count = self._add_developers_to_developer(existing_developer, developers)
                         created_developers.append({
-                            'developer_id': str(existing_developer.id),
+                            'developer_id': str(existing_developer.pk),
                             'primary_name': existing_developer.primary_name,
                             'primary_email': existing_developer.primary_email,
                             'type': 'github_id',
@@ -116,7 +116,7 @@ class DeveloperGroupingService:
                         # Add to existing developer
                         added_count = self._add_developers_to_developer(existing_developer, developers)
                         created_developers.append({
-                            'developer_id': str(existing_developer.id),
+                            'developer_id': str(existing_developer.pk),
                             'primary_name': existing_developer.primary_name,
                             'primary_email': existing_developer.primary_email,
                             'type': 'email',
@@ -169,7 +169,7 @@ class DeveloperGroupingService:
                             # Add to existing developer
                             added_count = self._add_developers_to_developer(existing_developer, developers)
                             created_developers.append({
-                                'developer_id': str(existing_developer.id),
+                                'developer_id': str(existing_developer.pk),
                                 'primary_name': existing_developer.primary_name,
                                 'primary_email': existing_developer.primary_email,
                                 'type': 'approximate_email',
@@ -229,7 +229,7 @@ class DeveloperGroupingService:
                     # Add to existing developer
                     added_count = self._add_developers_to_developer(existing_developer, developer_data['developers'])
                     created_developers.append({
-                        'developer_id': str(existing_developer.id),
+                        'developer_id': str(existing_developer.pk),
                         'primary_name': existing_developer.primary_name,
                         'primary_email': existing_developer.primary_email,
                         'type': developer_data['type'],
@@ -240,7 +240,6 @@ class DeveloperGroupingService:
                 else:
                     # Create new developer
                     developer = Developer(
-                        application_id=None,  # Global developer
                         primary_name=developer_data['primary_name'],
                         primary_email=developer_data['primary_email'],
                         is_auto_grouped=True,
@@ -256,7 +255,7 @@ class DeveloperGroupingService:
                             alias.save()
                     
                     created_developers.append({
-                        'developer_id': str(developer.id),
+                        'developer_id': str(developer.pk),
                         'primary_name': developer.primary_name,
                         'primary_email': developer.primary_email,
                         'type': developer_data['type'],

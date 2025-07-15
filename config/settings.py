@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import mongoengine
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -82,9 +83,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 import os
 
 # MongoDB Configuration
-MONGODB_HOST = os.environ.get('MONGODB_HOST', 'localhost')
-MONGODB_PORT = int(os.environ.get('MONGODB_PORT', 27017))
-MONGODB_NAME = os.environ.get('MONGODB_NAME', 'gitpulse')
+MONGODB_HOST = config('MONGODB_HOST', default='localhost')
+MONGODB_PORT = int(config('MONGODB_PORT', default=27017))
+MONGODB_NAME = config('MONGODB_NAME', default='gitpulse')
 
 # Connect to MongoDB
 mongoengine.connect(
@@ -159,8 +160,16 @@ Q_CLUSTER = {
     'cpu_affinity': 1,
     'label': 'Django Q',
     'redis': {
-        'host': os.environ.get('REDIS_HOST', '127.0.0.1'),
-        'port': int(os.environ.get('REDIS_PORT', 6379)),
+        'host': config('REDIS_HOST', default='127.0.0.1'),
+        'port': int(config('REDIS_PORT', default=6379)),
         'db': 0,
     }
 }
+
+# GitPulse Configuration
+# Choose indexing service: 'git_local' or 'github_api'
+INDEXING_SERVICE = config('INDEXING_SERVICE', default='git_local')
+
+# GitHub API Configuration (only used if INDEXING_SERVICE = 'github_api')
+GITHUB_API_RATE_LIMIT_WARNING = int(config('GITHUB_API_RATE_LIMIT_WARNING', default=10))
+GITHUB_API_TIMEOUT = int(config('GITHUB_API_TIMEOUT', default=30))
