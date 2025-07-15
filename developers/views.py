@@ -561,19 +561,19 @@ def developer_detail(request, developer_id):
             'aliases': aliases
         })()
         
-        # Get commits for this developer
+        # Get commits for this developer (all applications)
         from analytics.models import Commit
         alias_emails = [alias.email for alias in aliases]
-        developer_commits = Commit.objects.filter(author_email__in=alias_emails)
-        
+        all_commits = Commit.objects.filter(author_email__in=alias_emails)
+
         # Calculate detailed quality metrics
-        detailed_quality_metrics = _calculate_detailed_quality_metrics(developer_commits)
+        detailed_quality_metrics = _calculate_detailed_quality_metrics(all_commits)
         
         # Calculate commit type distribution
-        commit_type_data = _calculate_commit_type_distribution(developer_commits)
+        commit_type_data = _calculate_commit_type_distribution(all_commits)
         
         # Calculate quality metrics by month
-        quality_metrics_by_month = _calculate_quality_metrics_by_month(developer_commits)
+        quality_metrics_by_month = _calculate_quality_metrics_by_month(all_commits)
         
         # Format polar chart data for Chart.js
         polar_chart_data = []
@@ -596,7 +596,7 @@ def developer_detail(request, developer_id):
         # Only keep commits from the last 365 days
         now = datetime.utcnow().replace(tzinfo=None)
         cutoff = now - timedelta(days=365)
-        commits_365d = [c for c in developer_commits if c.authored_date and c.authored_date.replace(tzinfo=None) >= cutoff]
+        commits_365d = [c for c in all_commits if c.authored_date and c.authored_date.replace(tzinfo=None) >= cutoff]
         # Group by repo, then by (days_ago, hour)
         repo_bubbles = {}
         for commit in commits_365d:
@@ -645,7 +645,7 @@ def developer_detail(request, developer_id):
             'developer': developer_for_template,
             'developer_id': str(developer.id),
             'aliases': aliases,
-            'commit_frequency': analytics.get_developer_commit_frequency(analytics.commits.filter(author_email__in=[alias.email for alias in aliases])),
+            'commit_frequency': analytics.get_developer_commit_frequency(all_commits),
             'commit_quality': developer_stats.get('commit_quality', {}),
             'quality_metrics': detailed_quality_metrics,
             'first_commit': None,  # Will be set if available
