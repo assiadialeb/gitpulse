@@ -66,6 +66,17 @@ class GitService:
             
             if result.returncode != 0:
                 raise GitServiceError(f"Failed to clone repository: {result.stderr}")
+
+            # Fetch all branches and prune deleted ones
+            fetch_result = subprocess.run(
+                ['git', 'fetch', '--all', '--prune'],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            if fetch_result.returncode != 0:
+                raise GitServiceError(f"Failed to fetch all branches: {fetch_result.stderr}")
             
             # Store in cache
             self.cloned_repos[repo_full_name] = repo_dir
