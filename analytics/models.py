@@ -1,8 +1,11 @@
 """
 MongoDB models for analytics data
 """
-from datetime import datetime
-from mongoengine import Document, EmbeddedDocument, fields
+from datetime import datetime, timezone
+from django.utils import timezone as django_timezone
+from django.conf import settings
+import mongoengine.fields as fields
+from mongoengine import Document, EmbeddedDocument
 from typing import List, Optional
 
 
@@ -95,7 +98,7 @@ class Commit(Document):
     committer_name = fields.StringField(required=True)
     committer_email = fields.StringField(required=True)
     
-    # Timestamps
+    # Timestamps (timezone-aware)
     authored_date = fields.DateTimeField(required=True)
     committed_date = fields.DateTimeField(required=True)
     
@@ -130,10 +133,35 @@ class Commit(Document):
         ]
     }
     
+    def get_authored_date_in_timezone(self):
+        """Get authored_date converted to the configured timezone"""
+        authored_date = getattr(self, 'authored_date', None)
+        if authored_date:
+            # If naive, assume UTC (since we store everything in UTC)
+            if authored_date.tzinfo is None:
+                authored_date = authored_date.replace(tzinfo=timezone.utc)
+            # Convert to configured timezone
+            return django_timezone.localtime(authored_date)
+        return authored_date
+    
+    def get_committed_date_in_timezone(self):
+        """Get committed_date converted to the configured timezone"""
+        committed_date = getattr(self, 'committed_date', None)
+        if committed_date:
+            # If naive, assume UTC (since we store everything in UTC)
+            if committed_date.tzinfo is None:
+                committed_date = committed_date.replace(tzinfo=timezone.utc)
+            # Convert to configured timezone
+            return django_timezone.localtime(committed_date)
+        return committed_date
+    
     def __str__(self):
-        sha_short = self.sha[:8] if self.sha else 'unknown'
-        message_short = self.message[:50] if self.message else 'No message'
-        return f"{self.repository_full_name}:{sha_short} - {message_short}"
+        sha = getattr(self, 'sha', None)
+        message = getattr(self, 'message', None)
+        repository_full_name = getattr(self, 'repository_full_name', 'unknown')
+        sha_short = sha[:8] if sha else 'unknown'
+        message_short = message[:50] if message else 'No message'
+        return f"{repository_full_name}:{sha_short} - {message_short}"
 
 
 class SyncLog(Document):
@@ -272,8 +300,10 @@ class RateLimitReset(Document):
     def is_ready_to_restart(self):
         """Check if enough time has passed to restart the task"""
         current_time = datetime.utcnow()
-        reset_time = self.rate_limit_reset_time
-        return current_time >= reset_time
+        reset_time = getattr(self, 'rate_limit_reset_time', None)
+        if reset_time:
+            return current_time >= reset_time
+        return False
     
     @property
     def time_until_reset(self):
@@ -281,5 +311,7 @@ class RateLimitReset(Document):
         if self.is_ready_to_restart:
             return 0
         current_time = datetime.utcnow()
-        reset_time = self.rate_limit_reset_time
-        return int((reset_time - current_time).total_seconds()) 
+        reset_time = getattr(self, 'rate_limit_reset_time', None)
+        if reset_time:
+            return int((reset_time - current_time).total_seconds())
+        return 0 

@@ -544,12 +544,6 @@ def developer_detail(request, developer_id):
     analytics = AnalyticsService(0)  # Pass 0 for global stats
     developer_stats = analytics.get_developer_detailed_stats(str(developer.id))
     
-    print(f"DEBUG: Developer ID: {developer.id}")
-    print(f"DEBUG: Developer name: {developer.primary_name}")
-    print(f"DEBUG: Developer email: {developer.primary_email}")
-    print(f"DEBUG: Developer stats success: {developer_stats.get('success', False)}")
-    print(f"DEBUG: Developer stats: {developer_stats}")
-    
     if developer_stats.get('success', False):
         # Create a developer object with the fields expected by the template
         developer_for_template = type('Developer', (), {
@@ -590,9 +584,6 @@ def developer_detail(request, developer_id):
             polar_chart_data = []
 
         # --- Correction: Activity Heatmap chart_data ---
-        from datetime import datetime, timedelta
-        import pytz
-        import random
         # Only keep commits from the last 365 days
         now = datetime.utcnow().replace(tzinfo=None)
         cutoff = now - timedelta(days=365)
@@ -601,7 +592,8 @@ def developer_detail(request, developer_id):
         repo_bubbles = {}
         for commit in commits_365d:
             repo = commit.repository_full_name or 'unknown'
-            commit_dt = commit.authored_date.replace(tzinfo=None)
+            # Use the robust timezone-aware method
+            commit_dt = commit.get_authored_date_in_timezone()
             days_ago = (now.date() - commit_dt.date()).days
             hour = commit_dt.hour
             key = (days_ago, hour)
@@ -658,14 +650,12 @@ def developer_detail(request, developer_id):
             'commit_type_values': commit_type_data['values'],
             'commit_type_legend': commit_type_data['legend']
         }
-        
         # Set first and last commit if available
         if developer_stats.get('first_commit_date'):
             from analytics.models import Commit
             first_commit = Commit.objects.filter(author_email__in=[alias.email for alias in aliases]).order_by('authored_date').first()
             if first_commit:
                 context['first_commit'] = first_commit
-        
         if developer_stats.get('last_commit_date'):
             from analytics.models import Commit
             last_commit = Commit.objects.filter(author_email__in=[alias.email for alias in aliases]).order_by('-authored_date').first()
@@ -681,7 +671,6 @@ def developer_detail(request, developer_id):
             'github_id': developer.github_id,
             'aliases': aliases
         })()
-        
         context = {
             'developer': developer_for_template,
             'developer_id': str(developer.id),
@@ -699,10 +688,5 @@ def developer_detail(request, developer_id):
             'commit_type_values': [],
             'commit_type_legend': []
         }
-    
-    print(f"DEBUG: Final polar_chart_data: {context.get('polar_chart_data', [])}")
-    print(f"DEBUG: Final chart_data: {context.get('chart_data', [])}")
-    print(f"DEBUG: Final quality_metrics_by_month: {context.get('quality_metrics_by_month', {})}")
-    
     return render(request, 'developers/detail.html', context)
 

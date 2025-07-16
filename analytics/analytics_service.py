@@ -29,7 +29,8 @@ class AnalyticsService:
         Returns:
             Dictionary with developer activity metrics
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        from django.utils import timezone
+        cutoff_date = timezone.now() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         # Get grouped developers for this application only
@@ -109,7 +110,8 @@ class AnalyticsService:
         Returns:
             Dictionary with heatmap data
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        from django.utils import timezone
+        cutoff_date = timezone.now() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         # Group commits by date
@@ -148,15 +150,19 @@ class AnalyticsService:
         Returns:
             Dictionary with bubble chart data organized by repository
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        from django.utils import timezone
+        cutoff_date = timezone.now() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         # Group commits by repository, date, and hour
         repo_bubble_data = defaultdict(lambda: defaultdict(lambda: {'commits': 0}))
         
         for commit in recent_commits:
-            date = commit.authored_date.date()
-            hour = commit.authored_date.hour
+            # Use the new timezone-aware method from the model
+            local_date = commit.get_authored_date_in_timezone()
+            
+            date = local_date.date()
+            hour = local_date.hour
             repo = commit.repository_full_name
             
             key = (date, hour)
@@ -187,7 +193,7 @@ class AnalyticsService:
             }
             
             for (date, hour), data in bubbles.items():
-                days_ago = (datetime.utcnow().date() - date).days
+                days_ago = (timezone.now().date() - date).days
                 dataset['data'].append({
                     'x': days_ago,
                     'y': hour,
