@@ -610,3 +610,294 @@ def fetch_all_pull_requests_task():
                 logger.error(f"[App {app.id}][Repo {repo_name}] Error: {e}")
                 results.append({'app': app.id, 'repo': repo_name, 'error': str(e)})
     return results 
+
+
+def group_developer_identities_task(application_id=None):
+    """
+    Tâche Django-Q pour regrouper automatiquement les identités de développeurs.
+    
+    Cette tâche :
+    1. Lit tous les commits de l'application (ou tous si application_id=None)
+    2. Extrait les identités uniques (author_name + author_email)
+    3. Crée/met à jour les DeveloperAlias
+    4. Applique les règles de regroupement pour créer/lier les Developer
+    
+    Args:
+        application_id: ID de l'application à traiter (None pour toutes)
+    
+    Returns:
+        dict: Résultats du regroupement
+    """
+    import re
+    import unicodedata
+    from difflib import SequenceMatcher
+    from analytics.models import Commit, Developer, DeveloperAlias
+    
+    logger.info(f"Starting developer identity grouping task for application {application_id}")
+    
+    def normalize_name(name):
+        """Normalise un nom : minuscules, sans accents, sans espaces/tirets/underscores"""
+        if not name:
+            return ""
+        # Supprimer les accents
+        name = unicodedata.normalize('NFD', name).encode('ascii', 'ignore').decode('ascii')
+        # Minuscules et supprimer caractères spéciaux
+        name = re.sub(r'[^a-zA-Z0-9]', '', name.lower())
+        return name
+    
+    def extract_email_local(email):
+        """Extrait la partie locale d'un email (avant @)"""
+        if not email or '@' not in email:
+            return ""
+        return email.split('@')[0].lower()
+    
+    def extract_initials_from_name(name):
+        """Extrait les initiales d'un nom complet"""
+        if not name:
+            return ""
+        parts = re.split(r'[^a-zA-Z]+', name.lower())
+        return ''.join([part[0] for part in parts if part])
+    
+    def name_initials_match(identity1, identity2):
+        """Vérifie si nom + initiales correspondent entre deux identités"""
+        # Cas 1: nom complet vs initiales dans email
+        name1_parts = [part for part in re.split(r'[^a-zA-Z]+', identity1['name'].lower()) if part]
+        name2_parts = [part for part in re.split(r'[^a-zA-Z]+', identity2['name'].lower()) if part]
+        email1_local = extract_email_local(identity1['email'])
+        email2_local = extract_email_local(identity2['email'])
+        
+        # Vérifier si l'email local contient les initiales du nom
+        if len(name1_parts) >= 2 and name1_parts[0] and name1_parts[-1]:
+            initials1 = name1_parts[0][0] + name1_parts[-1]  # première lettre prénom + nom
+            if initials1 in email2_local or email2_local in initials1:
+                return True
+        
+        if len(name2_parts) >= 2 and name2_parts[0] and name2_parts[-1]:
+            initials2 = name2_parts[0][0] + name2_parts[-1]  # première lettre prénom + nom
+            if initials2 in email1_local or email1_local in initials2:
+                return True
+        
+        # Cas 2: prénom.nom dans email vs nom complet
+        if '.' in email1_local:
+            email_parts = email1_local.split('.')
+            if len(email_parts) == 2 and len(name2_parts) >= 2 and name2_parts[0] and name2_parts[-1]:
+                if (email_parts[0] in name2_parts[0] or name2_parts[0] in email_parts[0]) and \
+                   (email_parts[1] in name2_parts[-1] or name2_parts[-1] in email_parts[1]):
+                    return True
+        
+        if '.' in email2_local:
+            email_parts = email2_local.split('.')
+            if len(email_parts) == 2 and len(name1_parts) >= 2 and name1_parts[0] and name1_parts[-1]:
+                if (email_parts[0] in name1_parts[0] or name1_parts[0] in email_parts[0]) and \
+                   (email_parts[1] in name1_parts[-1] or name1_parts[-1] in email_parts[1]):
+                    return True
+        
+        return False
+    
+    def fuzzy_match(str1, str2, threshold=0.85):
+        """Calcule la similarité entre deux chaînes"""
+        if not str1 or not str2:
+            return False
+        return SequenceMatcher(None, str1, str2).ratio() >= threshold
+    
+    def should_group_identities(identity1, identity2):
+        """Détermine si deux identités doivent être regroupées"""
+        email1_local = extract_email_local(identity1['email'])
+        email2_local = extract_email_local(identity2['email'])
+        name1_norm = normalize_name(identity1['name'])
+        name2_norm = normalize_name(identity2['name'])
+        
+        # 1. Email local exact match
+        if email1_local and email2_local and email1_local == email2_local:
+            return True, "email_local_match"
+        
+        # 2. Nom normalisé exact match
+        if name1_norm and name2_norm and name1_norm == name2_norm:
+            return True, "normalized_name_match"
+        
+        # 3. Email ↔ Name cross match
+        if (email1_local and name2_norm and email1_local == name2_norm) or \
+           (email2_local and name1_norm and email2_local == name1_norm):
+            return True, "email_name_cross_match"
+        
+        # 4. Initiales + nom match
+        if name_initials_match(identity1, identity2):
+            return True, "name_initials_match"
+        
+        # 5. Fuzzy match sur noms normalisés
+        if name1_norm and name2_norm and len(name1_norm) > 3 and len(name2_norm) > 3:
+            if fuzzy_match(name1_norm, name2_norm, 0.85):
+                return True, "fuzzy_name_match"
+        
+        # 6. Patterns spéciaux GitHub/GitLab
+        if 'noreply.github.com' in identity1['email'] or 'noreply.gitlab.com' in identity1['email']:
+            github_user = extract_email_local(identity1['email'])
+            if github_user and name2_norm and github_user in name2_norm:
+                return True, "github_pattern_match"
+        
+        if 'noreply.github.com' in identity2['email'] or 'noreply.gitlab.com' in identity2['email']:
+            github_user = extract_email_local(identity2['email'])
+            if github_user and name1_norm and github_user in name1_norm:
+                return True, "github_pattern_match"
+        
+        return False, None
+    
+    try:
+        # Construire la requête pour les commits
+        commit_filter = {}
+        if application_id:
+            commit_filter['application_id'] = application_id
+        
+        # Extraire toutes les identités uniques des commits
+        commits = Commit.objects(**commit_filter)
+        identities = {}  # key: (name, email), value: {name, email, commit_count, first_seen, last_seen}
+        
+        logger.info(f"Processing {commits.count()} commits to extract identities")
+        
+        for commit in commits:
+            # Traiter author
+            author_key = (commit.author_name, commit.author_email)
+            if author_key not in identities:
+                identities[author_key] = {
+                    'name': commit.author_name,
+                    'email': commit.author_email,
+                    'commit_count': 0,
+                    'first_seen': commit.authored_date,
+                    'last_seen': commit.authored_date
+                }
+            
+            identities[author_key]['commit_count'] += 1
+            if commit.authored_date < identities[author_key]['first_seen']:
+                identities[author_key]['first_seen'] = commit.authored_date
+            if commit.authored_date > identities[author_key]['last_seen']:
+                identities[author_key]['last_seen'] = commit.authored_date
+            
+            # Traiter committer s'il est différent de l'author
+            if commit.committer_name != commit.author_name or commit.committer_email != commit.author_email:
+                committer_key = (commit.committer_name, commit.committer_email)
+                if committer_key not in identities:
+                    identities[committer_key] = {
+                        'name': commit.committer_name,
+                        'email': commit.committer_email,
+                        'commit_count': 0,
+                        'first_seen': commit.committed_date,
+                        'last_seen': commit.committed_date
+                    }
+                
+                identities[committer_key]['commit_count'] += 1
+                if commit.committed_date < identities[committer_key]['first_seen']:
+                    identities[committer_key]['first_seen'] = commit.committed_date
+                if commit.committed_date > identities[committer_key]['last_seen']:
+                    identities[committer_key]['last_seen'] = commit.committed_date
+        
+        logger.info(f"Found {len(identities)} unique identities")
+        
+        # Créer/mettre à jour les DeveloperAlias
+        aliases_created = 0
+        aliases_updated = 0
+        
+        for identity_data in identities.values():
+            alias_filter = {
+                'name': identity_data['name'],
+                'email': identity_data['email']
+            }
+            
+            alias = DeveloperAlias.objects(**alias_filter).first()
+            if not alias:
+                alias = DeveloperAlias(**alias_filter)
+                aliases_created += 1
+            else:
+                aliases_updated += 1
+            
+            alias.commit_count = identity_data['commit_count']
+            alias.first_seen = identity_data['first_seen']
+            alias.last_seen = identity_data['last_seen']
+            alias.save()
+        
+        logger.info(f"Created {aliases_created} new aliases, updated {aliases_updated} existing aliases")
+        
+        # Regroupement automatique
+        # Récupérer tous les aliases non groupés pour cette application
+        ungrouped_aliases = list(DeveloperAlias.objects(developer=None))
+        
+        if application_id:
+            # Filtrer par application en regardant les commits
+            app_emails = set()
+            for commit in Commit.objects(application_id=application_id):
+                app_emails.add(commit.author_email)
+                app_emails.add(commit.committer_email)
+            
+            ungrouped_aliases = [alias for alias in ungrouped_aliases if alias.email in app_emails]
+        
+        logger.info(f"Processing {len(ungrouped_aliases)} ungrouped aliases for grouping")
+        
+        developers_created = 0
+        aliases_grouped = 0
+        grouping_details = []
+        
+        # Algorithme de regroupement
+        processed_aliases = set()
+        
+        for i, alias1 in enumerate(ungrouped_aliases):
+            if alias1.id in processed_aliases:
+                continue
+            
+            # Créer un nouveau groupe avec cette alias
+            group = [alias1]
+            identity1 = {'name': alias1.name, 'email': alias1.email}
+            
+            # Chercher d'autres aliases qui correspondent
+            for j, alias2 in enumerate(ungrouped_aliases[i+1:], i+1):
+                if alias2.id in processed_aliases:
+                    continue
+                
+                identity2 = {'name': alias2.name, 'email': alias2.email}
+                should_group, reason = should_group_identities(identity1, identity2)
+                
+                if should_group:
+                    group.append(alias2)
+                    grouping_details.append({
+                        'alias1': f"{alias1.name} ({alias1.email})",
+                        'alias2': f"{alias2.name} ({alias2.email})",
+                        'reason': reason
+                    })
+            
+            # Créer un Developer pour ce groupe
+            if len(group) > 0:
+                # Choisir l'alias avec le plus de commits comme identité principale
+                primary_alias = max(group, key=lambda a: a.commit_count)
+                
+                developer = Developer(
+                    primary_name=primary_alias.name,
+                    primary_email=primary_alias.email,
+                    application_id=application_id,
+                    is_auto_grouped=True,
+                    confidence_score=min(100, 50 + len(group) * 10)  # Score basé sur le nombre d'aliases
+                )
+                developer.save()
+                developers_created += 1
+                
+                # Lier toutes les aliases à ce developer
+                for alias in group:
+                    alias.developer = developer
+                    alias.save()
+                    processed_aliases.add(alias.id)
+                    aliases_grouped += 1
+        
+        results = {
+            'application_id': application_id,
+            'identities_found': len(identities),
+            'aliases_created': aliases_created,
+            'aliases_updated': aliases_updated,
+            'developers_created': developers_created,
+            'aliases_grouped': aliases_grouped,
+            'grouping_details': grouping_details[:10],  # Limiter pour éviter des logs trop longs
+            'total_grouping_details': len(grouping_details)
+        }
+        
+        logger.info(f"Developer identity grouping completed: {results}")
+        return results
+        
+    except Exception as e:
+        logger.error(f"Developer identity grouping task failed: {e}")
+        raise
