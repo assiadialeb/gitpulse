@@ -12,6 +12,7 @@ from .github_service import GitHubRateLimitError
 from applications.models import Application, ApplicationRepository
 from github.models import GitHubToken
 from .services import DeploymentIndexingService
+from .services import ReleaseIndexingService
 
 logger = logging.getLogger(__name__)
 
@@ -432,13 +433,13 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
 
 def daily_indexing_release():
     """
-    Django-Q task to index GitHub deployments for all repositories of all applications (daily)
+    Django-Q task to index GitHub releases for all repositories of all applications (daily)
     """
-    logger.info("Starting daily deployment indexing task")
+    logger.info("Starting daily release indexing task")
     results = {
         'applications_processed': 0,
         'repositories_processed': 0,
-        'deployments_indexed': 0,
+        'releases_indexed': 0,
         'errors': []
     }
     try:
@@ -448,15 +449,15 @@ def daily_indexing_release():
         for app in applications_with_repos:
             try:
                 user_id = app.owner_id
-                deployment_service = DeploymentIndexingService(user_id)
+                release_service = ReleaseIndexingService(user_id)
                 repos = app.repositories.all()
                 for repo in repos:
                     try:
-                        deployment_ids = deployment_service.index_deployments(app.id, repo.github_repo_name)
+                        release_ids = release_service.index_releases(app.id, repo.github_repo_name)
                         results['repositories_processed'] += 1
-                        results['deployments_indexed'] += len(deployment_ids)
+                        results['releases_indexed'] += len(release_ids)
                     except Exception as e:
-                        error_msg = f"Failed to index deployments for repo {repo.github_repo_name} (app {app.id}): {e}"
+                        error_msg = f"Failed to index releases for repo {repo.github_repo_name} (app {app.id}): {e}"
                         logger.error(error_msg)
                         results['errors'].append(error_msg)
                 results['applications_processed'] += 1
@@ -464,8 +465,8 @@ def daily_indexing_release():
                 error_msg = f"Failed to process application {app.id}: {e}"
                 logger.error(error_msg)
                 results['errors'].append(error_msg)
-        logger.info(f"Daily deployment indexing completed: {results}")
+        logger.info(f"Daily release indexing completed: {results}")
         return results
     except Exception as e:
-        logger.error(f"Daily deployment indexing task failed: {e}")
+        logger.error(f"Daily release indexing task failed: {e}")
         raise 

@@ -572,3 +572,70 @@ class DeploymentIndexingService:
             obj.save()
             indexed_ids.append(deployment_id)
         return indexed_ids 
+
+from .models import Release
+import dateutil.parser
+from datetime import timezone
+
+class ReleaseIndexingService:
+    """Service for indexing GitHub releases for a repository and application"""
+    def __init__(self, user_id: int):
+        self.user_id = user_id
+        self.github_service = self._init_github_service()
+
+    def _init_github_service(self):
+        try:
+            token = GitHubToken.objects.get(user_id=self.user_id)
+            return GitHubService(token.access_token)
+        except GitHubToken.DoesNotExist:
+            raise ValueError(f"No GitHub token found for user {self.user_id}")
+
+    def index_releases(self, application_id: int, repo_full_name: str) -> list:
+        """
+        Fetch and index releases for a given repo and application.
+        Returns a list of release IDs indexed.
+        """
+        url = f"{self.github_service.base_url}/repos/{repo_full_name}/releases"
+        releases, _ = self.github_service._make_request(url)
+        indexed_ids = []
+        for rel in releases:
+            release_id = str(rel.get('id'))
+            published_at_raw = rel.get('published_at')
+            published_at = None
+            if published_at_raw:
+                dt = dateutil.parser.parse(published_at_raw)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                published_at = dt
+            obj = Release.objects(release_id=release_id).first()
+            if not obj:
+                obj = Release(
+                    release_id=release_id,
+                    application_id=application_id,
+                    repository_full_name=repo_full_name,
+                    tag_name=rel.get('tag_name'),
+                    name=rel.get('name'),
+                    author=rel.get('author', {}).get('login'),
+                    published_at=published_at,
+                    draft=rel.get('draft', False),
+                    prerelease=rel.get('prerelease', False),
+                    body=rel.get('body'),
+                    html_url=rel.get('html_url'),
+                    assets=rel.get('assets', []),
+                    payload=rel,
+                )
+                obj.save()
+            else:
+                obj.tag_name = rel.get('tag_name')
+                obj.name = rel.get('name')
+                obj.author = rel.get('author', {}).get('login')
+                obj.published_at = published_at
+                obj.draft = rel.get('draft', False)
+                obj.prerelease = rel.get('prerelease', False)
+                obj.body = rel.get('body')
+                obj.html_url = rel.get('html_url')
+                obj.assets = rel.get('assets', [])
+                obj.payload = rel
+                obj.save()
+            indexed_ids.append(release_id)
+        return indexed_ids 

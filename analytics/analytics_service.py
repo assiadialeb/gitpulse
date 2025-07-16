@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 from collections import defaultdict, Counter
 import re
 
-from .models import Commit, RepositoryStats
+from .models import Commit, RepositoryStats, Release
 from .developer_grouping_service import DeveloperGroupingService
 from applications.models import Application
 
@@ -902,3 +902,30 @@ class AnalyticsService:
             })
         results = sorted(results, key=lambda x: x['cycle_time_hours'] if x['cycle_time_hours'] is not None else 1e9)
         return results 
+
+    def get_release_frequency(self, period_days: int = 90) -> dict:
+        """
+        Calcule la fréquence de release (par mois et par semaine) sur la période donnée.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        cutoff = timezone.now() - timedelta(days=period_days)
+        releases = Release.objects.filter(application_id=self.application_id, published_at__gte=cutoff).order_by('published_at')
+        total_releases = releases.count()
+        if total_releases == 0:
+            return {
+                'releases_per_month': 0,
+                'releases_per_week': 0,
+                'total_releases': 0,
+                'period_days': period_days,
+            }
+        # Correction : toujours utiliser la période demandée
+        days_span = period_days
+        months = days_span / 30.44
+        weeks = days_span / 7
+        return {
+            'releases_per_month': round(total_releases / months, 2),
+            'releases_per_week': round(total_releases / weeks, 2),
+            'total_releases': total_releases,
+            'period_days': days_span,
+        } 

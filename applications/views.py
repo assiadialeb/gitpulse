@@ -80,6 +80,18 @@ def application_detail(request, pk):
         active_developers_count_120d = len(developer_activity_120d.get('developers', []))
         # Suppression des variables de debug liées aux PRs
         
+        # Ajout : fréquence de release (30 jours)
+        try:
+            release_frequency = analytics.get_release_frequency(period_days=30)
+        except Exception as e:
+            print(f"Error getting release frequency: {e}")
+            release_frequency = {
+                'releases_per_month': 0,
+                'releases_per_week': 0,
+                'total_releases': 0,
+                'period_days': 30,
+            }
+        
         # Calcul PR Cycle Time (médiane, min, max, count)
         pr_cycle_times = analytics.get_pr_cycle_times()
         pr_times = [pr['cycle_time_hours'] for pr in pr_cycle_times if pr['cycle_time_hours'] is not None]
@@ -111,6 +123,7 @@ def application_detail(request, pk):
             'commit_quality': analytics.get_commit_quality_metrics(),
             'commit_types': analytics.get_commit_type_distribution(),
             'commit_frequency': commit_frequency,
+            'release_frequency': release_frequency,
             'application_quality_metrics': application_quality_metrics,
             'pr_cycle_times': pr_cycle_times,
             'pr_cycle_time_median': pr_cycle_time_median,

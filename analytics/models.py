@@ -348,3 +348,35 @@ class Deployment(Document):
 
     def __str__(self):
         return f"{self.repository_full_name} - {self.environment} - {self.deployment_id}" 
+
+
+class Release(Document):
+    """MongoDB document for storing GitHub releases"""
+    release_id = fields.StringField(required=True, unique=True)
+    application_id = fields.IntField(required=True)
+    repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
+    tag_name = fields.StringField()
+    name = fields.StringField()
+    author = fields.StringField()
+    published_at = fields.DateTimeField()
+    draft = fields.BooleanField(default=False)
+    prerelease = fields.BooleanField(default=False)
+    body = fields.StringField()
+    html_url = fields.StringField()
+    assets = fields.ListField(fields.DictField())
+    payload = fields.DictField()  # Raw release payload (optionnel)
+
+    meta = {
+        'collection': 'releases',
+        'indexes': [
+            'release_id',
+            'application_id',
+            'repository_full_name',
+            ('application_id', 'repository_full_name'),
+            'tag_name',
+            'published_at',
+        ]
+    }
+
+    def __str__(self):
+        return f"{self.repository_full_name} - {self.tag_name} - {self.release_id}" 

@@ -138,6 +138,29 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Release Frequency Block -->
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
+                            <div class="flex items-center">
+                                <div class="p-3 bg-yellow-500 bg-opacity-10 rounded-xl mr-4">
+                                    <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Release Frequency</p>
+                                    <p class="text-2xl font-bold text-dark-gray">
+                                        {% if release_frequency %}
+                                            {{ release_frequency.releases_per_month }}/month
+                                            <span class="text-sm text-medium-gray ml-2">({{ release_frequency.releases_per_week }}/week)</span>
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </p>
+                                    <p class="text-xs text-medium-gray">on last {{ release_frequency.period_days }} days</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
 
