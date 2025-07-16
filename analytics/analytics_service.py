@@ -929,3 +929,9 @@ class AnalyticsService:
             'total_releases': total_releases,
             'period_days': days_span,
         } 
+
+    def get_total_releases(self) -> int:
+        """
+        Retourne le nombre total de releases pour l'application (toutes périodes confondues).
+        """
+        return Release.objects(application_id=self.application_id).count() 

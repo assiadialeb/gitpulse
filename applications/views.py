@@ -91,6 +91,13 @@ def application_detail(request, pk):
                 'total_releases': 0,
                 'period_days': 30,
             }
+
+        # Ajout : total releases toutes périodes
+        try:
+            total_releases = analytics.get_total_releases()
+        except Exception as e:
+            print(f"Error getting total releases: {e}")
+            total_releases = 0
         
         # Calcul PR Cycle Time (médiane, min, max, count)
         pr_cycle_times = analytics.get_pr_cycle_times()
@@ -130,6 +137,7 @@ def application_detail(request, pk):
             'pr_cycle_time_min': pr_cycle_time_min,
             'pr_cycle_time_max': pr_cycle_time_max,
             'pr_cycle_time_count': pr_cycle_time_count,
+            'total_releases': total_releases,  # Ajout pour le template
         }
         doughnut_colors = {
             'fix': '#4caf50',
