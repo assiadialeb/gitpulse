@@ -9,6 +9,7 @@ import re
 from .models import Commit, RepositoryStats, Release
 from .developer_grouping_service import DeveloperGroupingService
 from applications.models import Application
+from .models import PullRequest
 
 
 class AnalyticsService:
@@ -880,25 +881,33 @@ class AnalyticsService:
 
     def get_pr_cycle_times(self) -> list:
         """
-        Retourne la liste des PRs avec leur cycle time (en heures) pour l'application.
+        Retourne la liste des PRs avec leur cycle time (en heures) pour l'application, basé sur la collection PullRequest.
         """
-        from collections import defaultdict
-        pr_commits = self.commits.filter(pull_request_number__ne=None, pull_request_merged_at__ne=None)
-        pr_map = defaultdict(list)
-        for c in pr_commits:
-            pr_map[(c.repository_full_name, c.pull_request_number)].append(c)
+        # Récupérer tous les repository_full_name associés à l'app
+        from applications.models import Application
+        app = Application.objects.get(id=self.application_id)
+        repo_names = [repo.github_repo_name for repo in app.repositories.all()]
+
+        # Filtrer les PRs de l'app avec created_at et closed_at non nuls
+        prs = PullRequest.objects(
+            application_id=self.application_id,
+            repository_full_name__in=repo_names,
+            created_at__ne=None,
+            closed_at__ne=None
+        )
         results = []
-        for (repo, pr_number), commits in pr_map.items():
-            merged_at = commits[0].pull_request_merged_at
-            created_at = min(c.authored_date for c in commits)
-            cycle_time = (merged_at - created_at).total_seconds() / 3600 if merged_at and created_at else None
+        for pr in prs:
+            cycle_time = (pr.closed_at - pr.created_at).total_seconds() / 3600 if pr.closed_at and pr.created_at else None
             results.append({
-                'repo': repo,
-                'pr_number': pr_number,
-                'created_at': created_at,
-                'merged_at': merged_at,
+                'repo': pr.repository_full_name,
+                'pr_number': pr.number,
+                'created_at': pr.created_at,
+                'closed_at': pr.closed_at,
                 'cycle_time_hours': cycle_time,
-                'commits': len(commits)
+                'title': pr.title,
+                'author': pr.author,
+                'state': pr.state,
+                'url': pr.url,
             })
         results = sorted(results, key=lambda x: x['cycle_time_hours'] if x['cycle_time_hours'] is not None else 1e9)
         return results 

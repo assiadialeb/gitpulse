@@ -103,7 +103,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <!-- Commit Frequency -->
                         <div class="bg-white p-6 rounded-xl shadow-lg">
-                            <div class="flex items-center">
+                            <div class="flex items-start">
                                 <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl mr-4">
                                     <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
@@ -123,7 +123,7 @@
                         </div>
                         <!-- Release Frequency -->
                         <div class="bg-white p-6 rounded-xl shadow-lg">
-                            <div class="flex items-center">
+                            <div class="flex items-start">
                                 <div class="p-3 bg-yellow-500 bg-opacity-10 rounded-xl mr-4">
                                     <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -145,7 +145,7 @@
                         </div>
                         <!-- PR Cycle Time Block -->
                         <div class="bg-white p-6 rounded-xl shadow-lg">
-                            <div class="flex items-center">
+                            <div class="flex items-start">
                                 <div class="p-3 bg-purple-500 bg-opacity-10 rounded-xl mr-4">
                                     <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
@@ -157,7 +157,6 @@
                                         <p class="text-2xl font-bold text-dark-gray">{{ pr_cycle_time_median|floatformat:1 }}</p>
                                         <p class="text-xs text-medium-gray">min: {{ pr_cycle_time_min|floatformat:1 }}h / max: {{ pr_cycle_time_max|floatformat:1 }}h</p>
                                         <p class="text-xs text-medium-gray">{{ pr_cycle_time_count }} PRs</p>
-                                        <a href="#pr-cycle-time-table" class="text-primary-blue underline text-xs">View details</a>
                                     {% else %}
                                         <p class="text-2xl font-bold text-gray-400">N/A</p>
                                     {% endif %}

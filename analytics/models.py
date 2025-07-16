@@ -380,3 +380,33 @@ class Release(Document):
 
     def __str__(self):
         return f"{self.repository_full_name} - {self.tag_name} - {self.release_id}" 
+
+
+class PullRequest(Document):
+    """MongoDB document for storing GitHub Pull Requests"""
+    application_id = fields.IntField(required=True)
+    repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
+    number = fields.IntField(required=True)
+    title = fields.StringField()
+    author = fields.StringField()
+    created_at = fields.DateTimeField()
+    updated_at = fields.DateTimeField()
+    closed_at = fields.DateTimeField()
+    merged_at = fields.DateTimeField()
+    state = fields.StringField()  # open/closed
+    url = fields.StringField()
+    labels = fields.ListField(fields.StringField())
+    payload = fields.DictField()  # Raw PR payload (optionnel)
+
+    meta = {
+        'collection': 'pull_requests',
+        'indexes': [
+            'application_id',
+            'repository_full_name',
+            'number',
+            ('application_id', 'repository_full_name', 'number'),
+        ]
+    }
+
+    def __str__(self):
+        return f"{self.repository_full_name}#{self.number} - {self.title}" 

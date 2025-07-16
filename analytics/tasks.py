@@ -510,3 +510,103 @@ def developer_grouping_all_apps_task():
     for app in Application.objects.all():
         results.append(DeveloperGroupingService(app.id).auto_group_developers())
     return results 
+
+
+def release_indexing_task(application_id):
+    """
+    Tâche Q pour indexer les releases de toutes les repositories d'une application.
+    """
+    from applications.models import Application
+    from analytics.services import ReleaseIndexingService
+    app = Application.objects.get(id=application_id)
+    user_id = app.owner_id
+    release_service = ReleaseIndexingService(user_id)
+    results = []
+    for repo in app.repositories.all():
+        results.append(release_service.index_releases(app.id, repo.github_repo_name))
+    return results
+
+
+def release_indexing_all_apps_task():
+    """
+    Tâche Q pour indexer les releases de toutes les applications et repositories.
+    """
+    from applications.models import Application
+    from analytics.services import ReleaseIndexingService
+    results = []
+    for app in Application.objects.all():
+        user_id = app.owner_id
+        release_service = ReleaseIndexingService(user_id)
+        for repo in app.repositories.all():
+            results.append(release_service.index_releases(app.id, repo.github_repo_name))
+    return results 
+
+
+def fetch_all_pull_requests_task():
+    """
+    Tâche Q de test : va chercher toutes les PRs FERMÉES pour tous les repos de toutes les applications via l'API GitHub,
+    et les stocke dans la collection PullRequest. Traverse toute la pagination jusqu'à ce qu'il n'y ait plus de résultats.
+    """
+    from applications.models import Application
+    from analytics.models import PullRequest
+    from analytics.github_service import GitHubService
+    from github.models import GitHubToken
+    import dateutil.parser
+    from datetime import timezone
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    results = []
+    for app in Application.objects.all():
+        user_id = app.owner_id
+        token_obj = GitHubToken.objects.filter(user_id=user_id).first()
+        if not token_obj:
+            logger.warning(f"[App {app.id}] No GitHub token found.")
+            results.append({'app': app.id, 'error': 'No GitHub token'})
+            continue
+        gh = GitHubService(token_obj.access_token)
+        for repo in app.repositories.all():
+            repo_name = repo.github_repo_name
+            try:
+                page = 1
+                total_saved = 0
+                while True:
+                    url = f"https://api.github.com/repos/{repo_name}/pulls"
+                    params = {'state': 'closed', 'per_page': 100, 'page': page}
+                    prs, _ = gh._make_request(url, params)
+                    logger.info(f"[App {app.id}][Repo {repo_name}] Page {page}: {len(prs)} PRs fetched.")
+                    if not prs or len(prs) == 0:
+                        break
+                    for pr in prs:
+                        pr_number = pr.get('number')
+                        try:
+                            obj = PullRequest.objects(application_id=app.id, repository_full_name=repo_name, number=pr_number).first()
+                            if not obj:
+                                obj = PullRequest(
+                                    application_id=app.id,
+                                    repository_full_name=repo_name,
+                                    number=pr_number
+                                )
+                            obj.title = pr.get('title')
+                            obj.author = pr.get('user', {}).get('login')
+                            obj.created_at = dateutil.parser.parse(pr.get('created_at')) if pr.get('created_at') else None
+                            obj.updated_at = dateutil.parser.parse(pr.get('updated_at')) if pr.get('updated_at') else None
+                            obj.closed_at = dateutil.parser.parse(pr.get('closed_at')) if pr.get('closed_at') else None
+                            obj.merged_at = dateutil.parser.parse(pr.get('merged_at')) if pr.get('merged_at') else None
+                            obj.state = pr.get('state')
+                            obj.url = pr.get('html_url')
+                            obj.labels = [l['name'] for l in pr.get('labels', [])]
+                            obj.payload = pr
+                            obj.save()
+                            logger.info(f"[App {app.id}][Repo {repo_name}] PR #{pr_number} saved.")
+                            total_saved += 1
+                        except Exception as e:
+                            logger.error(f"[App {app.id}][Repo {repo_name}] Error saving PR #{pr_number}: {e}")
+                    page += 1
+                logger.info(f"[App {app.id}][Repo {repo_name}] Total PRs saved: {total_saved}")
+                results.append({'app': app.id, 'repo': repo_name, 'status': 'ok', 'total_saved': total_saved})
+            except Exception as e:
+                logger.error(f"[App {app.id}][Repo {repo_name}] Error: {e}")
+                results.append({'app': app.id, 'repo': repo_name, 'error': str(e)})
+    return results 
