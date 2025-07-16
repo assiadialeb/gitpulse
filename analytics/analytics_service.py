@@ -91,8 +91,8 @@ class AnalyticsService:
                 commits_per_group[dev_key]['deletions'] += commit.deletions
                 commits_per_group[dev_key]['files_changed'] += len(commit.files_changed)
         
-        # Sort by name (case-insensitive), then by commits count
-        sorted_devs = sorted(commits_per_group.values(), key=lambda x: (x['name'].lower(), -x['commits']))
+        # Sort by commits count in descending order (most active developers first)
+        sorted_devs = sorted(commits_per_group.values(), key=lambda x: -x['commits'])
         
         return {
             'period_days': days,

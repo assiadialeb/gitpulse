@@ -246,14 +246,9 @@
                         datasets: [{
                             data: {{ commit_type_values|safe }},
                             backgroundColor: [
-                                '#4caf50', // fix
-                                '#2196f3', // feature
-                                '#ffeb3b', // docs
-                                '#ff9800', // refactor
-                                '#9c27b0', // test
-                                '#00bcd4', // style
-                                '#607d8b', // chore
-                                '#bdbdbd', // other
+                                {% for item in commit_type_legend %}
+                                    '{{ item.color }}'{% if not forloop.last %},{% endif %}
+                                {% endfor %}
                             ],
                             borderWidth: 1
                         }]
