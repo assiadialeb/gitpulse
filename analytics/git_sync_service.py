@@ -75,42 +75,6 @@ class GitSyncService:
             # Clean up all cloned repositories
             self.git_service.cleanup_all_repositories()
 
-        # Auto-group developers after successful sync
-        if results['repositories_synced'] > 0:
-            try:
-                # Create missing aliases first
-                logger.info("Creating missing aliases...")
-                aliases_created = create_missing_aliases_for_application(application_id)
-                logger.info(f"Created {aliases_created} missing aliases")
-                
-                logger.info("Starting automatic developer grouping...")
-                from .developer_grouping_service import DeveloperGroupingService
-                grouping_service = DeveloperGroupingService()
-                grouping_result = grouping_service.auto_group_developers()
-                if grouping_result['success']:
-                    logger.info(f"Developer grouping completed: {grouping_result['developers_created']} developers processed")
-                    results['developer_groups_processed'] = grouping_result['developers_created']
-                else:
-                    logger.warning(f"Developer grouping failed: {grouping_result.get('error', 'Unknown error')}")
-                    results['developer_groups_processed'] = 0
-            except Exception as e:
-                logger.error(f"Error during developer grouping: {e}")
-                results['developer_groups_processed'] = 0
-        else:
-            results['developer_groups_processed'] = 0
-
-        # Batch quality metrics analysis after developer grouping
-        try:
-            logger.info("Starting batch commit quality analysis...")
-            from .quality_service import QualityAnalysisService
-            quality_service = QualityAnalysisService()
-            processed = quality_service.analyze_commits_for_application(application_id)
-            logger.info(f"Batch quality analysis completed: {processed} commits processed")
-            results['quality_metrics_processed'] = processed
-        except Exception as e:
-            logger.error(f"Error during batch quality analysis: {e}")
-            results['quality_metrics_processed'] = 0
-
         return results
 
     def sync_application_repositories_with_progress(self, application_id: int, sync_type: str = 'incremental') -> Dict:
@@ -167,42 +131,6 @@ class GitSyncService:
         finally:
             # Clean up all cloned repositories
             self.git_service.cleanup_all_repositories()
-
-        # Auto-group developers after successful sync
-        if results['repositories_synced'] > 0:
-            try:
-                # Create missing aliases first
-                logger.info("Creating missing aliases...")
-                aliases_created = create_missing_aliases_for_application(application_id)
-                logger.info(f"Created {aliases_created} missing aliases")
-                
-                logger.info("Starting automatic developer grouping...")
-                from .developer_grouping_service import DeveloperGroupingService
-                grouping_service = DeveloperGroupingService()
-                grouping_result = grouping_service.auto_group_developers()
-                if grouping_result['success']:
-                    logger.info(f"Developer grouping completed: {grouping_result['developers_created']} developers processed")
-                    results['developer_groups_processed'] = grouping_result['developers_created']
-                else:
-                    logger.warning(f"Developer grouping failed: {grouping_result.get('error', 'Unknown error')}")
-                    results['developer_groups_processed'] = 0
-            except Exception as e:
-                logger.error(f"Error during developer grouping: {e}")
-                results['developer_groups_processed'] = 0
-        else:
-            results['developer_groups_processed'] = 0
-
-        # Batch quality metrics analysis after developer grouping
-        try:
-            logger.info("Starting batch commit quality analysis...")
-            from .quality_service import QualityAnalysisService
-            quality_service = QualityAnalysisService()
-            processed = quality_service.analyze_commits_for_application(application_id)
-            logger.info(f"Batch quality analysis completed: {processed} commits processed")
-            results['quality_metrics_processed'] = processed
-        except Exception as e:
-            logger.error(f"Error during batch quality analysis: {e}")
-            results['quality_metrics_processed'] = 0
 
         return results
     
