@@ -676,8 +676,15 @@ function sortTable(columnIndex) {
     
     // Determine sort direction
     let sortDirection = 'asc';
-    if (currentSortColumn === columnIndex) {
+    if (currentSortColumn === -1) {
+        // First time sorting, use the forced direction
+        sortDirection = currentSortDirection;
+    } else if (currentSortColumn === columnIndex) {
+        // Toggle direction only if we're clicking the same column again
         sortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        // For new column, use the forced direction if set, otherwise default to 'asc'
+        sortDirection = currentSortDirection;
     }
     
     // Update sort state
@@ -765,12 +772,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Auto-sort the code distribution table by Net Lines (column 5) in descending order
-    const codeDistributionTable = document.getElementById('code-distribution-table');
-    if (codeDistributionTable) {
-        // Sort by Net Lines column (index 5) in descending order
-        sortTable(5);
-    }
+    // The backend already sorts by net_lines in descending order
+    // No need to auto-sort the table on page load
 });
 
 function startIndexing(applicationId) {
