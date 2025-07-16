@@ -514,3 +514,61 @@ def cleanup_old_rate_limit_resets():
             'success': False,
             'error': str(e)
         } 
+
+from .models import Deployment
+from github.models import GitHubToken
+from applications.models import ApplicationRepository
+from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
+from typing import List
+
+class DeploymentIndexingService:
+    """Service for indexing GitHub deployments for a repository and application"""
+    def __init__(self, user_id: int):
+        self.user_id = user_id
+        self.github_service = self._init_github_service()
+
+    def _init_github_service(self):
+        try:
+            token = GitHubToken.objects.get(user_id=self.user_id)
+            return GitHubService(token.access_token)
+        except GitHubToken.DoesNotExist:
+            raise ValueError(f"No GitHub token found for user {self.user_id}")
+
+    def index_deployments(self, application_id: int, repo_full_name: str) -> List[str]:
+        """
+        Fetch and index deployments for a given repo and application.
+        Returns a list of deployment IDs indexed.
+        """
+        url = f"{self.github_service.base_url}/repos/{repo_full_name}/deployments"
+        deployments, _ = self.github_service._make_request(url)
+        indexed_ids = []
+        for dep in deployments:
+            deployment_id = str(dep.get('id'))
+            # Upsert by deployment_id
+            obj, created = Deployment.objects.get_or_create(
+                deployment_id=deployment_id,
+                defaults={
+                    'application_id': application_id,
+                    'repository_full_name': repo_full_name,
+                    'environment': dep.get('environment'),
+                    'creator': dep.get('creator', {}).get('login'),
+                    'created_at': dep.get('created_at'),
+                    'updated_at': dep.get('updated_at'),
+                    'payload': dep,
+                }
+            )
+            if not created:
+                # Update fields if already exists
+                obj.environment = dep.get('environment')
+                obj.creator = dep.get('creator', {}).get('login')
+                obj.created_at = dep.get('created_at')
+                obj.updated_at = dep.get('updated_at')
+                obj.payload = dep
+                obj.save()
+            # Fetch deployment statuses
+            statuses_url = f"{self.github_service.base_url}/repos/{repo_full_name}/deployments/{deployment_id}/statuses"
+            statuses, _ = self.github_service._make_request(statuses_url)
+            obj.statuses = statuses
+            obj.save()
+            indexed_ids.append(deployment_id)
+        return indexed_ids 

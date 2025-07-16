@@ -320,3 +320,31 @@ class RateLimitReset(Document):
         if reset_time:
             return int((reset_time - current_time).total_seconds())
         return 0 
+
+
+class Deployment(Document):
+    """MongoDB document for storing GitHub deployments"""
+    deployment_id = fields.StringField(required=True, unique=True)
+    application_id = fields.IntField(required=True)
+    repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
+    environment = fields.StringField()
+    creator = fields.StringField()
+    created_at = fields.DateTimeField()
+    updated_at = fields.DateTimeField()
+    statuses = fields.ListField(fields.DictField())  # List of deployment statuses
+    payload = fields.DictField()  # Raw deployment payload (optional)
+
+    meta = {
+        'collection': 'deployments',
+        'indexes': [
+            'deployment_id',
+            'application_id',
+            'repository_full_name',
+            ('application_id', 'repository_full_name'),
+            'environment',
+            'created_at',
+        ]
+    }
+
+    def __str__(self):
+        return f"{self.repository_full_name} - {self.environment} - {self.deployment_id}" 
