@@ -470,3 +470,43 @@ def daily_indexing_release():
     except Exception as e:
         logger.error(f"Daily release indexing task failed: {e}")
         raise 
+
+
+def quality_analysis_task(application_id):
+    """
+    Tâche Q indépendante pour lancer l'analyse de qualité sur tous les commits d'une application.
+    """
+    from analytics.quality_service import QualityAnalysisService
+    return QualityAnalysisService().analyze_commits_for_application(application_id)
+
+
+def developer_grouping_task(application_id):
+    """
+    Tâche Q indépendante pour lancer le groupement automatique des développeurs d'une application.
+    """
+    from analytics.developer_grouping_service import DeveloperGroupingService
+    return DeveloperGroupingService(application_id).auto_group_developers() 
+
+
+def quality_analysis_all_apps_task():
+    """
+    Tâche Q pour lancer l'analyse de qualité sur toutes les applications.
+    """
+    from applications.models import Application
+    from analytics.quality_service import QualityAnalysisService
+    processed = 0
+    for app in Application.objects.all():
+        processed += QualityAnalysisService().analyze_commits_for_application(app.id)
+    return processed
+
+
+def developer_grouping_all_apps_task():
+    """
+    Tâche Q pour lancer le groupement automatique des développeurs sur toutes les applications.
+    """
+    from applications.models import Application
+    from analytics.developer_grouping_service import DeveloperGroupingService
+    results = []
+    for app in Application.objects.all():
+        results.append(DeveloperGroupingService(app.id).auto_group_developers())
+    return results 
