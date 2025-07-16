@@ -877,3 +877,28 @@ class AnalyticsService:
             'avg_gap_between_commits': round(avg_gap, 1),
             'gap_consistency': round(gap_std, 1)
         } 
+
+    def get_pr_cycle_times(self) -> list:
+        """
+        Retourne la liste des PRs avec leur cycle time (en heures) pour l'application.
+        """
+        from collections import defaultdict
+        pr_commits = self.commits.filter(pull_request_number__ne=None, pull_request_merged_at__ne=None)
+        pr_map = defaultdict(list)
+        for c in pr_commits:
+            pr_map[(c.repository_full_name, c.pull_request_number)].append(c)
+        results = []
+        for (repo, pr_number), commits in pr_map.items():
+            merged_at = commits[0].pull_request_merged_at
+            created_at = min(c.authored_date for c in commits)
+            cycle_time = (merged_at - created_at).total_seconds() / 3600 if merged_at and created_at else None
+            results.append({
+                'repo': repo,
+                'pr_number': pr_number,
+                'created_at': created_at,
+                'merged_at': merged_at,
+                'cycle_time_hours': cycle_time,
+                'commits': len(commits)
+            })
+        results = sorted(results, key=lambda x: x['cycle_time_hours'] if x['cycle_time_hours'] is not None else 1e9)
+        return results 

@@ -110,6 +110,11 @@ class Commit(Document):
     
     # Commit classification
     commit_type = fields.StringField(choices=['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other'], default='other')
+
+    # PR metadata (nouveaux champs)
+    pull_request_number = fields.IntField(null=True)
+    pull_request_url = fields.StringField(null=True)
+    pull_request_merged_at = fields.DateTimeField(null=True)
     
     # Metadata
     parent_shas = fields.ListField(fields.StringField(max_length=40))

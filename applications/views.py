@@ -75,7 +75,27 @@ def application_detail(request, pk):
         # Get analytics data
         overall_stats = analytics.get_overall_stats()
         developer_activity = analytics.get_developer_activity(days=30)
+        # Ajout pour active developers sur 120 jours
+        developer_activity_120d = analytics.get_developer_activity(days=120)
+        active_developers_count_120d = len(developer_activity_120d.get('developers', []))
+        # Suppression des variables de debug liées aux PRs
         
+        # Calcul PR Cycle Time (médiane, min, max, count)
+        pr_cycle_times = analytics.get_pr_cycle_times()
+        pr_times = [pr['cycle_time_hours'] for pr in pr_cycle_times if pr['cycle_time_hours'] is not None]
+        pr_cycle_time_median = None
+        pr_cycle_time_min = None
+        pr_cycle_time_max = None
+        if pr_times:
+            pr_times_sorted = sorted(pr_times)
+            n = len(pr_times_sorted)
+            pr_cycle_time_min = pr_times_sorted[0]
+            pr_cycle_time_max = pr_times_sorted[-1]
+            if n % 2 == 1:
+                pr_cycle_time_median = pr_times_sorted[n // 2]
+            else:
+                pr_cycle_time_median = (pr_times_sorted[n // 2 - 1] + pr_times_sorted[n // 2]) / 2
+        pr_cycle_time_count = len(pr_times)
 
         
         context = {
@@ -83,6 +103,8 @@ def application_detail(request, pk):
             'repositories': repositories,
             'overall_stats': overall_stats,
             'developer_activity': developer_activity,
+            # Ajout du nombre d'active developers sur 120 jours
+            'active_developers_count_120d': active_developers_count_120d,
             'activity_heatmap': analytics.get_activity_heatmap(days=90),
             'bubble_chart': analytics.get_bubble_chart_data(days=30),
             'code_distribution': analytics.get_code_distribution(),
@@ -90,6 +112,11 @@ def application_detail(request, pk):
             'commit_types': analytics.get_commit_type_distribution(),
             'commit_frequency': commit_frequency,
             'application_quality_metrics': application_quality_metrics,
+            'pr_cycle_times': pr_cycle_times,
+            'pr_cycle_time_median': pr_cycle_time_median,
+            'pr_cycle_time_min': pr_cycle_time_min,
+            'pr_cycle_time_max': pr_cycle_time_max,
+            'pr_cycle_time_count': pr_cycle_time_count,
         }
         doughnut_colors = {
             'fix': '#4caf50',
