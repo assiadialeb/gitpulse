@@ -408,15 +408,15 @@ def background_indexing_task(application_id: int, user_id: int, task_id: str = N
                 logger.error(error_msg)
                 results['errors'].append(error_msg)
         
-        # Run developer grouping after indexing
-        try:
-            from .developer_grouping_service import DeveloperGroupingService
-            grouping_service = DeveloperGroupingService()
-            grouping_result = grouping_service.auto_group_developers()
-            logger.info(f"Developer grouping completed: {grouping_result}")
-        except Exception as e:
-            logger.error(f"Developer grouping failed: {e}")
-            results['errors'].append(f"Developer grouping failed: {str(e)}")
+        # Run developer grouping after indexing - DISABLED (using new group_developer_identities_task instead)
+        # try:
+        #     from .developer_grouping_service import DeveloperGroupingService
+        #     grouping_service = DeveloperGroupingService()
+        #     grouping_result = grouping_service.auto_group_developers()
+        #     logger.info(f"Developer grouping completed: {grouping_result}")
+        # except Exception as e:
+        #     logger.error(f"Developer grouping failed: {e}")
+        #     results['errors'].append(f"Developer grouping failed: {str(e)}")
         
         results['completed_at'] = datetime.utcnow().isoformat()
         logger.info(f"Background indexing completed for application {application_id}: {results}")
@@ -483,9 +483,11 @@ def quality_analysis_task(application_id):
 def developer_grouping_task(application_id):
     """
     Tâche Q indépendante pour lancer le groupement automatique des développeurs d'une application.
+    DISABLED - Use group_developer_identities_task instead
     """
-    from analytics.developer_grouping_service import DeveloperGroupingService
-    return DeveloperGroupingService(application_id).auto_group_developers() 
+    # from analytics.developer_grouping_service import DeveloperGroupingService
+    # return DeveloperGroupingService(application_id).auto_group_developers()
+    return {"disabled": True, "message": "Use group_developer_identities_task instead"} 
 
 
 def quality_analysis_all_apps_task():
@@ -503,13 +505,15 @@ def quality_analysis_all_apps_task():
 def developer_grouping_all_apps_task():
     """
     Tâche Q pour lancer le groupement automatique des développeurs sur toutes les applications.
+    DISABLED - Use group_developer_identities_task instead
     """
-    from applications.models import Application
-    from analytics.developer_grouping_service import DeveloperGroupingService
-    results = []
-    for app in Application.objects.all():
-        results.append(DeveloperGroupingService(app.id).auto_group_developers())
-    return results 
+    # from applications.models import Application
+    # from analytics.developer_grouping_service import DeveloperGroupingService
+    # results = []
+    # for app in Application.objects.all():
+    #     results.append(DeveloperGroupingService(app.id).auto_group_developers())
+    # return results
+    return {"disabled": True, "message": "Use group_developer_identities_task instead"} 
 
 
 def release_indexing_task(application_id):
@@ -542,74 +546,150 @@ def release_indexing_all_apps_task():
     return results 
 
 
-def fetch_all_pull_requests_task():
+def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=10):
     """
-    Tâche Q de test : va chercher toutes les PRs FERMÉES pour tous les repos de toutes les applications via l'API GitHub,
-    et les stocke dans la collection PullRequest. Traverse toute la pagination jusqu'à ce qu'il n'y ait plus de résultats.
+    Tâche Q optimisée : va chercher les PRs FERMÉES pour les repos via l'API GitHub,
+    avec des limites pour éviter les timeouts.
+    
+    Args:
+        max_pages_per_repo: Nombre maximum de pages à traiter par repo (défaut: 50)
+        max_repos_per_run: Nombre maximum de repos à traiter par exécution (défaut: 10)
     """
     from applications.models import Application
     from analytics.models import PullRequest
     from analytics.github_service import GitHubService
     from github.models import GitHubToken
     import dateutil.parser
-    from datetime import timezone
+    from datetime import timezone, datetime
     import logging
+    import time
 
     logger = logging.getLogger(__name__)
+    start_time = time.time()
+    max_execution_time = 300  # 5 minutes max
 
     results = []
+    repos_processed = 0
+    
     for app in Application.objects.all():
+        if repos_processed >= max_repos_per_run:
+            logger.info(f"Reached max repos limit ({max_repos_per_run}), stopping")
+            break
+            
+        if time.time() - start_time > max_execution_time:
+            logger.info(f"Reached max execution time ({max_execution_time}s), stopping")
+            break
+            
         user_id = app.owner_id
         token_obj = GitHubToken.objects.filter(user_id=user_id).first()
         if not token_obj:
             logger.warning(f"[App {app.id}] No GitHub token found.")
             results.append({'app': app.id, 'error': 'No GitHub token'})
             continue
+            
         gh = GitHubService(token_obj.access_token)
+        
         for repo in app.repositories.all():
+            if repos_processed >= max_repos_per_run:
+                break
+                
+            if time.time() - start_time > max_execution_time:
+                break
+                
             repo_name = repo.github_repo_name
+            repos_processed += 1
+            
             try:
                 page = 1
                 total_saved = 0
-                while True:
+                pages_processed = 0
+                
+                while page <= max_pages_per_repo and pages_processed < max_pages_per_repo:
+                    if time.time() - start_time > max_execution_time:
+                        logger.info(f"[App {app.id}][Repo {repo_name}] Timeout reached, stopping at page {page}")
+                        break
+                        
                     url = f"https://api.github.com/repos/{repo_name}/pulls"
                     params = {'state': 'closed', 'per_page': 100, 'page': page}
-                    prs, _ = gh._make_request(url, params)
-                    logger.info(f"[App {app.id}][Repo {repo_name}] Page {page}: {len(prs)} PRs fetched.")
-                    if not prs or len(prs) == 0:
-                        break
-                    for pr in prs:
-                        pr_number = pr.get('number')
-                        try:
-                            obj = PullRequest.objects(application_id=app.id, repository_full_name=repo_name, number=pr_number).first()
-                            if not obj:
-                                obj = PullRequest(
-                                    application_id=app.id,
-                                    repository_full_name=repo_name,
+                    
+                    try:
+                        prs, _ = gh._make_request(url, params)
+                        pages_processed += 1
+                        
+                        logger.info(f"[App {app.id}][Repo {repo_name}] Page {page}: {len(prs)} PRs fetched.")
+                        
+                        if not prs or len(prs) == 0:
+                            logger.info(f"[App {app.id}][Repo {repo_name}] No more PRs, stopping pagination")
+                            break
+                            
+                        for pr in prs:
+                            pr_number = pr.get('number')
+                            try:
+                                obj = PullRequest.objects(
+                                    application_id=app.id, 
+                                    repository_full_name=repo_name, 
                                     number=pr_number
-                                )
-                            obj.title = pr.get('title')
-                            obj.author = pr.get('user', {}).get('login')
-                            obj.created_at = dateutil.parser.parse(pr.get('created_at')) if pr.get('created_at') else None
-                            obj.updated_at = dateutil.parser.parse(pr.get('updated_at')) if pr.get('updated_at') else None
-                            obj.closed_at = dateutil.parser.parse(pr.get('closed_at')) if pr.get('closed_at') else None
-                            obj.merged_at = dateutil.parser.parse(pr.get('merged_at')) if pr.get('merged_at') else None
-                            obj.state = pr.get('state')
-                            obj.url = pr.get('html_url')
-                            obj.labels = [l['name'] for l in pr.get('labels', [])]
-                            obj.payload = pr
-                            obj.save()
-                            logger.info(f"[App {app.id}][Repo {repo_name}] PR #{pr_number} saved.")
-                            total_saved += 1
-                        except Exception as e:
-                            logger.error(f"[App {app.id}][Repo {repo_name}] Error saving PR #{pr_number}: {e}")
-                    page += 1
-                logger.info(f"[App {app.id}][Repo {repo_name}] Total PRs saved: {total_saved}")
-                results.append({'app': app.id, 'repo': repo_name, 'status': 'ok', 'total_saved': total_saved})
+                                ).first()
+                                
+                                if not obj:
+                                    obj = PullRequest(
+                                        application_id=app.id,
+                                        repository_full_name=repo_name,
+                                        number=pr_number
+                                    )
+                                    
+                                obj.title = pr.get('title')
+                                obj.author = pr.get('user', {}).get('login')
+                                obj.created_at = dateutil.parser.parse(pr.get('created_at')) if pr.get('created_at') else None
+                                obj.updated_at = dateutil.parser.parse(pr.get('updated_at')) if pr.get('updated_at') else None
+                                obj.closed_at = dateutil.parser.parse(pr.get('closed_at')) if pr.get('closed_at') else None
+                                obj.merged_at = dateutil.parser.parse(pr.get('merged_at')) if pr.get('merged_at') else None
+                                obj.state = pr.get('state')
+                                obj.url = pr.get('html_url')
+                                obj.labels = [l['name'] for l in pr.get('labels', [])]
+                                obj.payload = pr
+                                obj.save()
+                                
+                                total_saved += 1
+                                
+                            except Exception as e:
+                                logger.error(f"[App {app.id}][Repo {repo_name}] Error saving PR #{pr_number}: {e}")
+                                
+                        page += 1
+                        
+                        # Petit délai pour éviter de surcharger l'API
+                        time.sleep(0.1)
+                        
+                    except Exception as e:
+                        logger.error(f"[App {app.id}][Repo {repo_name}] Error fetching page {page}: {e}")
+                        break
+                
+                execution_time = time.time() - start_time
+                logger.info(f"[App {app.id}][Repo {repo_name}] Completed: {total_saved} PRs saved, {pages_processed} pages processed in {execution_time:.1f}s")
+                
+                results.append({
+                    'app': app.id, 
+                    'repo': repo_name, 
+                    'status': 'ok', 
+                    'total_saved': total_saved,
+                    'pages_processed': pages_processed,
+                    'execution_time': execution_time
+                })
+                
             except Exception as e:
                 logger.error(f"[App {app.id}][Repo {repo_name}] Error: {e}")
                 results.append({'app': app.id, 'repo': repo_name, 'error': str(e)})
-    return results 
+    
+    total_execution_time = time.time() - start_time
+    logger.info(f"Task completed: {repos_processed} repos processed in {total_execution_time:.1f}s")
+    
+    return {
+        'results': results,
+        'repos_processed': repos_processed,
+        'total_execution_time': total_execution_time,
+        'max_pages_per_repo': max_pages_per_repo,
+        'max_repos_per_run': max_repos_per_run
+    } 
 
 
 def group_developer_identities_task(application_id=None):
