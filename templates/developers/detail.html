@@ -264,6 +264,54 @@
                         }
                     });
                 </script>
+                <!-- Feature-to-Fix Ratio Block -->
+                <div class="mt-6 p-4 rounded-xl shadow-sm bg-light-gray">
+                    <div class="flex items-center mb-2">
+                        <span class="text-lg font-semibold text-dark-gray mr-2">Feature-to-Fix Ratio</span>
+                        <span class="text-sm text-medium-gray">(Feature / Fix &gt; 1)</span>
+                    </div>
+                    <div class="flex items-center mb-1">
+                        <span class="text-2xl font-bold mr-3 {% if commit_type_distribution.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {{ commit_type_distribution.feature_fix_ratio }}
+                        </span>
+                        <span class="ml-2 text-lg font-semibold {% if commit_type_distribution.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {% if commit_type_distribution.feature_fix_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                        </span>
+                    </div>
+                    <div class="text-sm text-dark-gray mt-1">{{ commit_type_distribution.feature_fix_message }}</div>
+                </div>
+                <!-- Test Coverage Ratio Block -->
+                <div class="mt-4 p-4 rounded-xl shadow-sm bg-light-gray">
+                    <div class="flex items-center mb-2">
+                        <span class="text-lg font-semibold text-dark-gray mr-2">Test Coverage Ratio</span>
+                        <span class="text-sm text-medium-gray">(Test / Feature ≥ 0.3)</span>
+                    </div>
+                    <div class="flex items-center mb-1">
+                        <span class="text-2xl font-bold mr-3 {% if commit_type_distribution.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {{ commit_type_distribution.test_feature_ratio }}
+                        </span>
+                        <span class="ml-2 text-lg font-semibold {% if commit_type_distribution.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {% if commit_type_distribution.test_feature_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                        </span>
+                    </div>
+                    <div class="text-sm text-dark-gray mt-1">{{ commit_type_distribution.test_feature_message }}</div>
+                </div>
+                <!-- Focus Ratio Block -->
+                <div class="mt-4 p-4 rounded-xl shadow-sm bg-light-gray">
+                    <div class="flex items-center mb-2">
+                        <span class="text-lg font-semibold text-dark-gray mr-2">Focus Ratio</span>
+                        <span class="text-sm text-medium-gray">(Chore + Docs &lt; 30%)</span>
+                    </div>
+                    <div class="flex items-center mb-1">
+                        <span class="text-2xl font-bold mr-3 {% if commit_type_distribution.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {{ commit_type_distribution.chore_docs_ratio|floatformat:2 }}
+                        </span>
+                        <span class="ml-2 text-lg font-semibold {% if commit_type_distribution.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {% if commit_type_distribution.chore_docs_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                        </span>
+                    </div>
+                    <div class="text-sm text-dark-gray mt-1">{{ commit_type_distribution.chore_docs_message }}</div>
+                </div>
                 {% else %}
                 <div class="text-center py-8">
                     <p class="text-gray-500">No commit type data available</p>

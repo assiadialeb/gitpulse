@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 
 from analytics.models import Developer, DeveloperAlias
 from applications.models import Application
+from analytics.commit_classifier import get_commit_type_stats
 
 
 @login_required
@@ -378,58 +379,8 @@ def _calculate_detailed_quality_metrics(commits):
 
 
 def _calculate_commit_type_distribution(commits):
-    """Calculate commit type distribution for a developer"""
-    if not commits:
-        return {
-            'total': 0,
-            'types': {},
-            'labels': [],
-            'values': [],
-            'legend': []
-        }
-    
-    # Count commit types
-    type_counts = Counter()
-    for commit in commits:
-        type_counts[commit.commit_type] += 1
-    
-    total_commits = sum(type_counts.values())
-    
-    # Define colors for each type
-    colors = {
-        'fix': '#4caf50',
-        'feature': '#2196f3',
-        'docs': '#ffeb3b',
-        'refactor': '#ff9800',
-        'test': '#9c27b0',
-        'style': '#00bcd4',
-        'chore': '#607d8b',
-        'other': '#bdbdbd'
-    }
-    
-    # Create data for Chart.js
-    labels = []
-    values = []
-    legend = []
-    
-    for commit_type in ['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other']:
-        count = type_counts.get(commit_type, 0)
-        if count > 0:
-            labels.append(commit_type.title())
-            values.append(count)
-            legend.append({
-                'label': commit_type.title(),
-                'count': count,
-                'color': colors.get(commit_type, '#bdbdbd')
-            })
-    
-    return {
-        'total': total_commits,
-        'types': dict(type_counts),
-        'labels': labels,
-        'values': values,
-        'legend': legend
-    }
+    """Calculate commit type distribution for a developer, with ratios and status fields"""
+    return get_commit_type_stats(commits)
 
 
 def _calculate_quality_metrics_by_month(commits):
@@ -646,9 +597,12 @@ def developer_detail(request, developer_id):
             'quality_metrics_by_month': quality_metrics_by_month,
             'chart_data': chart_data,
             'commit_type_distribution': commit_type_data,
-            'commit_type_labels': commit_type_data['labels'],
-            'commit_type_values': commit_type_data['values'],
-            'commit_type_legend': commit_type_data['legend']
+            'commit_type_labels': list(commit_type_data['counts'].keys()),
+            'commit_type_values': list(commit_type_data['counts'].values()),
+            'commit_type_legend': [
+                {'label': k, 'count': v, 'color': _get_commit_type_color(k)}
+                for k, v in commit_type_data['counts'].items()
+            ]
         }
         # Set first and last commit if available
         if developer_stats.get('first_commit_date'):
@@ -689,4 +643,19 @@ def developer_detail(request, developer_id):
             'commit_type_legend': []
         }
     return render(request, 'developers/detail.html', context)
+
+
+# Helper for legend colors
+def _get_commit_type_color(commit_type):
+    colors = {
+        'fix': '#4caf50',
+        'feature': '#2196f3',
+        'docs': '#ffeb3b',
+        'refactor': '#ff9800',
+        'test': '#9c27b0',
+        'style': '#00bcd4',
+        'chore': '#607d8b',
+        'other': '#bdbdbd'
+    }
+    return colors.get(commit_type, '#bdbdbd')
 
