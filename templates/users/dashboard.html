@@ -86,12 +86,20 @@
     <div class="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8">
         <!-- Top 5 Developers (This Month) -->
         <div>
-            <h2 class="text-2xl font-bold text-dark-gray mb-4">🏆 Commit Champions (This Month)</h2>
+            <h2 class="text-2xl font-bold text-dark-gray mb-4 flex items-center">
+                <svg class="w-6 h-6 text-primary-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Commit Champions (This Month)
+            </h2>
             <div class="bg-white rounded-xl shadow p-6">
                 <ol class="list-decimal ml-6 space-y-2">
                     {% for dev in top_developers %}
                     <li class="flex justify-between items-center">
-                        <span class="font-medium">{{ dev.name }}</span>
+                        <span class="font-medium flex items-center">
+                            {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}<span style="display:inline-block;width:1.2em;"></span>{% endif %}
+                            <span class="ml-1">{{ dev.name }}</span>
+                        </span>
                         <span class="text-primary-green font-bold">{{ dev.commits }} commits</span>
                     </li>
                     {% empty %}
@@ -102,7 +110,14 @@
         </div>
         <!-- Top 5 Active Repositories (This Month) -->
         <div>
-            <h2 class="text-2xl font-bold text-dark-gray mb-4">📦 Top 5 Active Repositories (This Month)</h2>
+            <h2 class="text-2xl font-bold text-dark-gray mb-4 flex items-center">
+                <svg class="w-6 h-6 text-primary-blue mr-2" viewBox="0 600 512 448" xmlns="http://www.w3.org/2000/svg">
+                    <title>repository-submodule</title>
+                    <path fill="currentColor" d="M 98.937501,604.36297 C 79.597548,604.36297 64,619.96052 64,639.30047 l 0,29.0625 0,103.1875 72.8125,-72.81249 c 9.37524,-9.37525 24.43726,-9.37525 33.8125,0 l 184.06249,184.06249 c 9.37526,9.37524 9.37526,24.43725 0,33.81248 l -71.74999,71.75002 229.0625,0 0,-320 -224,0 0,-29.0625 c 0,-19.33995 -15.59755,-34.9375 -34.9375,-34.9375 l -154.124999,0 z"/>
+                    <path fill="currentColor" d="m 152.00061,748.3622 c -4.09587,0 -8.19133,1.56872 -11.32979,4.70719 l -24.63778,24.63778 27.59654,27.59512 a 26.307708,26.307708 0 0 1 8.37103,-1.40159 26.307708,26.307708 0 0 1 26.3077,26.30771 26.307708,26.307708 0 0 1 -1.39445,8.37816 l 36.86961,36.86962 a 26.307708,26.307708 0 0 1 8.37103,-1.4016 26.307708,26.307708 0 0 1 26.30771,26.30771 26.307708,26.307708 0 0 1 -26.30771,26.30771 26.307708,26.307708 0 0 1 -26.30771,-26.30771 26.307708,26.307708 0 0 1 1.39445,-8.37673 l -33.54832,-33.54832 0,88.5473 a 26.307708,26.307708 0 0 1 14.61539,23.53164 26.307708,26.307708 0 0 1 -26.3077,26.30771 26.307708,26.307708 0 0 1 -26.30771,-26.30771 26.307708,26.307708 0 0 1 14.61539,-23.55447 l 0,-93.22167 a 26.307708,26.307708 0 0 1 -14.61539,-23.53164 26.307708,26.307708 0 0 1 1.39446,-8.37674 L 99.497944,794.24226 4.7076932,889.03251 c -6.2769243,6.27693 -6.2769243,16.38264 0,22.65958 L 140.67082,1047.6553 c 6.27693,6.2768 16.38264,6.2768 22.65957,0 L 299.29352,911.69209 c 6.27693,-6.27694 6.27693,-16.38265 0,-22.65958 L 163.33039,753.06939 c -3.13846,-3.13847 -7.23392,-4.70719 -11.32978,-4.70719 z"/>
+                </svg>
+                Top 5 Active Repositories (This Month)
+            </h2>
             <div class="bg-white rounded-xl shadow p-6">
                 <ol class="list-decimal ml-6 space-y-2">
                     {% for repo in top_repositories %}
