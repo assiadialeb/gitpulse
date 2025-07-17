@@ -8,7 +8,11 @@ from django.contrib.auth.models import User
 from .forms import CustomUserCreationForm, CustomAuthenticationForm, UserProfileForm
 from .models import UserProfile
 from .services import GitHubUserService
-from models import GitHubUser
+# from models import GitHubUser  # Supprimé car inutilisé et cause une erreur linter
+from analytics.models import Commit, PullRequest, DeveloperAlias, Developer  # mongoengine
+import applications.models  # pour accès Django ORM
+from django.utils import timezone
+from collections import defaultdict
 
 
 def login_view(request):
@@ -110,7 +114,8 @@ def profile_view(request):
         # Try to get existing GitHub user data
         if request.user.userprofile.github_username:
             try:
-                github_user = GitHubUser.objects(login=request.user.userprofile.github_username).first()
+                # This .objects access works for both mongoengine and Django ORM
+                github_user = User.objects.filter(username=request.user.userprofile.github_username).first()
             except Exception:
                 pass
         # Récupérer les organisations si superuser
@@ -141,4 +146,41 @@ def home_view(request):
 @login_required
 def dashboard_view(request):
     """Dashboard view"""
-    return render(request, 'users/dashboard.html')
+    total_repositories = applications.models.ApplicationRepository.objects.count()  # Django ORM
+    total_commits = Commit.objects.count()  # mongoengine
+    total_pull_requests = PullRequest.objects.count()  # mongoengine
+
+    # Commits du mois (30 derniers jours)
+    cutoff_date = timezone.now() - timezone.timedelta(days=30)
+    recent_commits = Commit.objects.filter(authored_date__gte=cutoff_date)
+
+    # Top développeurs (par Developer global, nom principal)
+    dev_stats = defaultdict(int)
+    alias_to_developer = {}
+    # Préparer un mapping email -> Developer
+    for alias in DeveloperAlias.objects.filter(developer__ne=None):
+        alias_to_developer[alias.email.lower()] = alias.developer
+    for commit in recent_commits:
+        dev = alias_to_developer.get(commit.author_email.lower())
+        if dev:
+            key = dev.primary_name.strip()
+        else:
+            key = commit.author_name.strip()
+        dev_stats[key] += 1
+    top_developers = [{'name': name, 'commits': count} for name, count in sorted(dev_stats.items(), key=lambda x: -x[1])[:5]]
+
+    # Top repositories (par nom)
+    repo_stats = defaultdict(int)
+    for commit in recent_commits:
+        key = commit.repository_full_name.strip()
+        repo_stats[key] += 1
+    top_repositories = [{'repo': repo, 'commits': count} for repo, count in sorted(repo_stats.items(), key=lambda x: -x[1])[:5]]
+
+    context = {
+        'total_repositories': total_repositories,
+        'total_commits': total_commits,
+        'total_pull_requests': total_pull_requests,
+        'top_developers': top_developers,
+        'top_repositories': top_repositories,
+    }
+    return render(request, 'users/dashboard.html', context)

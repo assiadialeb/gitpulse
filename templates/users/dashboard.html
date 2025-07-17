@@ -1,4 +1,4 @@
-{% extends 'base/base.html' %}
+{% extends "base/base.html" %}
 
 {% block title %}Dashboard - GitPulse{% endblock %}
 
@@ -29,7 +29,7 @@
                     <p class="text-medium-gray text-sm">Total analyzed</p>
                 </div>
             </div>
-            <div class="text-3xl font-bold text-primary-green">0</div>
+            <div class="text-3xl font-bold text-primary-green">{{ total_repositories }}</div>
         </div>
 
         <div class="card-modern p-6">
@@ -44,7 +44,7 @@
                     <p class="text-medium-gray text-sm">Total analyzed</p>
                 </div>
             </div>
-            <div class="text-3xl font-bold text-primary-blue">0</div>
+            <div class="text-3xl font-bold text-primary-blue">{{ total_commits }}</div>
         </div>
 
         <div class="card-modern p-6">
@@ -59,24 +59,45 @@
                     <p class="text-medium-gray text-sm">Total analyzed</p>
                 </div>
             </div>
-            <div class="text-3xl font-bold text-medium-gray">0</div>
+            <div class="text-3xl font-bold text-medium-gray">{{ total_pull_requests }}</div>
         </div>
     </div>
 
-    <!-- Welcome Message -->
-    <div class="card-modern p-8">
-        <div class="text-center">
-            <div class="w-16 h-16 bg-gradient-to-r from-primary-green/20 to-primary-blue/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <svg class="w-8 h-8 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
+    <!-- Top 5 Developers & Top 5 Active Repositories (This Month) -->
+    <div class="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Top 5 Developers (This Month) -->
+        <div>
+            <h2 class="text-2xl font-bold text-dark-gray mb-4">🏆 Commit Champions (This Month)</h2>
+            <div class="bg-white rounded-xl shadow p-6">
+                <ol class="list-decimal ml-6 space-y-2">
+                    {% for dev in top_developers %}
+                    <li class="flex justify-between items-center">
+                        <span class="font-medium">{{ dev.name }}</span>
+                        <span class="text-primary-green font-bold">{{ dev.commits }} commits</span>
+                    </li>
+                    {% empty %}
+                    <li class="text-medium-gray">No data for this period.</li>
+                    {% endfor %}
+                </ol>
             </div>
-            <h2 class="text-2xl font-bold text-dark-gray mb-4">Welcome to GitPulse</h2>
-            <p class="text-medium-gray text-lg mb-6 max-w-2xl mx-auto">
-                Your GitHub analytics dashboard is under development. 
-                Repository, commit, and pull request analysis features will be available soon.
-            </p>
+        </div>
+        <!-- Top 5 Active Repositories (This Month) -->
+        <div>
+            <h2 class="text-2xl font-bold text-dark-gray mb-4">📦 Top 5 Active Repositories (This Month)</h2>
+            <div class="bg-white rounded-xl shadow p-6">
+                <ol class="list-decimal ml-6 space-y-2">
+                    {% for repo in top_repositories %}
+                    <li class="flex justify-between items-center">
+                        <span class="font-medium">{{ repo.repo }}</span>
+                        <span class="text-primary-blue font-bold">{{ repo.commits }} commits</span>
+                    </li>
+                    {% empty %}
+                    <li class="text-medium-gray">No data for this period.</li>
+                    {% endfor %}
+                </ol>
+            </div>
         </div>
     </div>
+
 </div>
-{% endblock %} 
+{% endblock content %} 
