@@ -240,12 +240,66 @@ def get_commit_type_stats(commits) -> dict:
         percentages = {k: (v / total) * 100 for k, v in stats.items()}
     else:
         percentages = {k: 0 for k in stats.keys()}
-    
+
+    # --- Custom ratios and status logic ---
+    # Test Coverage Ratio: test/feature >= 0.3 is good
+    test_count = stats['test']
+    feature_count = stats['feature']
+    fix_count = stats['fix']
+    if feature_count > 0:
+        test_feature_ratio = test_count / feature_count
+    else:
+        test_feature_ratio = 0
+    test_feature_good = test_feature_ratio >= 0.3
+    test_feature_status = 'good' if test_feature_good else 'poor'
+    test_feature_message = (
+        'The ratio of test to feature commits reflects a strong commitment to test coverage. This improves code reliability, eases refactoring, and supports long-term maintainability.'
+        if test_feature_good else
+        'A low test-to-feature ratio can be a sign of insufficient test coverage. This increases the risk of regressions and may reduce confidence in the stability of new features.'
+    )
+
+    # Feature-to-Fix Ratio: feature/fix > 1 is good
+    if fix_count > 0:
+        feature_fix_ratio = feature_count / fix_count
+    else:
+        feature_fix_ratio = feature_count
+    feature_fix_good = feature_fix_ratio > 1
+    feature_fix_status = 'good' if feature_fix_good else 'poor'
+    feature_fix_message = (
+        'The current feature-to-fix ratio indicates a healthy focus on building new capabilities, with fewer bug fixes. This suggests the codebase is relatively stable and development is moving forward.'
+        if feature_fix_good else
+        'A low feature-to-fix ratio may indicate a high maintenance burden or recurring issues. It can suggest technical debt or instability slowing down the delivery of new value.'
+    )
+
+    # Focus Ratio: (chore + docs) / total < 0.3 is good
+    chore_docs_count = stats['chore'] + stats['docs']
+    if total > 0:
+        chore_docs_ratio = chore_docs_count / total
+    else:
+        chore_docs_ratio = 0
+    chore_docs_good = chore_docs_ratio < 0.3
+    chore_docs_status = 'good' if chore_docs_good else 'poor'
+    chore_docs_message = (
+        'The project shows a clear focus on product-driven development, with a balanced investment in documentation and infrastructure work.'
+        if chore_docs_good else
+        'A high percentage of chore and documentation commits may indicate overhead or fragmented focus. This can reduce direct impact on feature delivery and product value.'
+    )
+
     return {
         'counts': stats,
         'percentages': percentages,
-        'total': total
-    } 
+        'total': total,
+        # New ratios and status
+        'test_feature_ratio': round(test_feature_ratio, 2),
+        'test_feature_status': test_feature_status,
+        'test_feature_message': test_feature_message,
+        'feature_fix_ratio': round(feature_fix_ratio, 2),
+        'feature_fix_status': feature_fix_status,
+        'feature_fix_message': feature_fix_message,
+        'chore_docs_ratio': round(chore_docs_ratio, 2),
+        'chore_docs_status': chore_docs_status,
+        'chore_docs_message': chore_docs_message,
+    }
 
 
 def classify_commit_with_files(message: str, files: list) -> str:

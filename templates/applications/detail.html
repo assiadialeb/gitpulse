@@ -218,9 +218,7 @@
                                         <div class="bg-red-500 h-2 rounded-full" style="width: {{ commit_quality.generic_ratio }}%"></div>
                                     </div>
                                     
-                                    <div class="mt-4 p-4 bg-light-gray rounded-xl">
-                                        <p class="text-sm text-medium-gray">Total commits analyzed: {{ commit_quality.total_commits }}</p>
-                                    </div>
+                                    <!-- Bloc gris pour 'Total commits analyzed' supprimé pour éviter la redondance -->
                                 </div>
                                 {% else %}
                                 <div class="text-center py-8">
@@ -230,8 +228,9 @@
                             </div>
                             
                             <!-- Commit Type Distribution Doughnut Chart -->
-                            <div class="bg-white p-6 rounded-xl shadow-lg">
-                                <h3 class="text-xl font-semibold text-dark-gray mb-4">🍩 Commit Type Distribution</h3>
+                            <div class="bg-white p-6 rounded-xl shadow-lg relative">
+                                <h3 class="text-xl font-semibold text-dark-gray mb-4">🍩 Commit Type Distribution
+                                </h3>
                                 {% if commit_types.total > 0 %}
                                 <div class="flex items-start space-x-6">
                                     <div class="relative" style="width: 280px; height: 280px;">
@@ -246,6 +245,18 @@
                                         {% endfor %}
                                     </div>
                                 </div>
+                                {% with feature=0 fix=0 %}
+                                    {% for item in commit_type_legend %}
+                                        {% if item.label == 'feature' %}{% with feature=item.count %}{% endwith %}{% endif %}
+                                        {% if item.label == 'fix' %}{% with fix=item.count %}{% endwith %}{% endif %}
+                                    {% endfor %}
+                                    {% if fix > 0 %}
+                                        {% with ratio=feature|divisibleby:fix %}{% endwith %}
+                                    {% else %}
+                                        {% with ratio=feature %}{% endwith %}
+                                    {% endif %}
+                                    <!-- Remove old feature/fix ratio comment and status block -->
+                                {% endwith %}
                                 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
                                 <script>
                                     const commitTypeData = {
@@ -276,6 +287,54 @@
                                         }
                                     });
                                 </script>
+                                <!-- Feature-to-Fix Ratio Block -->
+                                <div class="mt-6 p-4 rounded-xl shadow-sm bg-light-gray">
+                                    <div class="flex items-center mb-2">
+                                        <span class="text-lg font-semibold text-dark-gray mr-2">Feature-to-Fix Ratio</span>
+                                        <span class="text-sm text-medium-gray">(Feature / Fix &gt; 1)</span>
+                                    </div>
+                                    <div class="flex items-center mb-1">
+                                        <span class="text-2xl font-bold mr-3 {% if commit_types.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                            {{ commit_types.feature_fix_ratio }}
+                                        </span>
+                                        <span class="ml-2 text-lg font-semibold {% if commit_types.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                            {% if commit_types.feature_fix_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="text-sm text-dark-gray mt-1">{{ commit_types.feature_fix_message }}</div>
+                                </div>
+                                <!-- Test Coverage Ratio Block -->
+                                <div class="mt-6 p-4 rounded-xl shadow-sm bg-light-gray">
+                                    <div class="flex items-center mb-2">
+                                        <span class="text-lg font-semibold text-dark-gray mr-2">Test Coverage Ratio</span>
+                                        <span class="text-sm text-medium-gray">(Test / Feature ≥ 0.3)</span>
+                                    </div>
+                                    <div class="flex items-center mb-1">
+                                        <span class="text-2xl font-bold mr-3 {% if commit_types.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                            {{ commit_types.test_feature_ratio }}
+                                        </span>
+                                        <span class="ml-2 text-lg font-semibold {% if commit_types.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                            {% if commit_types.test_feature_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="text-sm text-dark-gray mt-1">{{ commit_types.test_feature_message }}</div>
+                                </div>
+                                <!-- Focus Ratio Block -->
+                                <div class="mt-4 p-4 rounded-xl shadow-sm bg-light-gray">
+                                    <div class="flex items-center mb-2">
+                                        <span class="text-lg font-semibold text-dark-gray mr-2">Focus Ratio</span>
+                                        <span class="text-sm text-medium-gray">(Chore + Docs &lt; 30%)</span>
+                                    </div>
+                                    <div class="flex items-center mb-1">
+                                        <span class="text-2xl font-bold mr-3 {% if commit_types.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                            {{ commit_types.chore_docs_ratio|floatformat:2 }}
+                                        </span>
+                                        <span class="ml-2 text-lg font-semibold {% if commit_types.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                            {% if commit_types.chore_docs_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="text-sm text-dark-gray mt-1">{{ commit_types.chore_docs_message }}</div>
+                                </div>
                                 {% else %}
                                 <div class="text-center py-8">
                                     <p class="text-medium-gray">No commit type data available</p>
