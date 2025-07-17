@@ -9,7 +9,7 @@ from .forms import CustomUserCreationForm, CustomAuthenticationForm, UserProfile
 from .models import UserProfile
 from .services import GitHubUserService
 # from models import GitHubUser  # Supprimé car inutilisé et cause une erreur linter
-from analytics.models import Commit, PullRequest, DeveloperAlias, Developer  # mongoengine
+from analytics.models import Commit, PullRequest, DeveloperAlias, Developer, Release  # mongoengine
 import applications.models  # pour accès Django ORM
 from django.utils import timezone
 from collections import defaultdict
@@ -147,8 +147,9 @@ def home_view(request):
 def dashboard_view(request):
     """Dashboard view"""
     total_repositories = applications.models.ApplicationRepository.objects.count()  # Django ORM
-    total_commits = Commit.objects.count()  # mongoengine
-    total_pull_requests = PullRequest.objects.count()  # mongoengine
+    total_commits = Commit.objects().count()  # mongoengine
+    total_pull_requests = PullRequest.objects().count()  # mongoengine
+    total_releases = Release.objects().count()  # mongoengine
 
     # Commits du mois (30 derniers jours)
     cutoff_date = timezone.now() - timezone.timedelta(days=30)
@@ -180,6 +181,7 @@ def dashboard_view(request):
         'total_repositories': total_repositories,
         'total_commits': total_commits,
         'total_pull_requests': total_pull_requests,
+        'total_releases': total_releases,
         'top_developers': top_developers,
         'top_repositories': top_repositories,
     }
