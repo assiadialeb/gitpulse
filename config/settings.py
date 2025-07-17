@@ -41,10 +41,15 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_q',
     'users',
-    'github',
+    'github.apps.GithubConfig',
     'applications',
     'analytics',
     'developers',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.github',
 ]
 
 MIDDLEWARE = [
@@ -53,6 +58,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -145,7 +151,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Authentication settings
 LOGIN_URL = '/users/login/'
-LOGIN_REDIRECT_URL = '/dashboard/'
+LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 # Django-Q Configuration
@@ -173,3 +179,22 @@ INDEXING_SERVICE = config('INDEXING_SERVICE', default='git_local')
 # GitHub API Configuration (only used if INDEXING_SERVICE = 'github_api')
 GITHUB_API_RATE_LIMIT_WARNING = int(config('GITHUB_API_RATE_LIMIT_WARNING', default=10))
 GITHUB_API_TIMEOUT = int(config('GITHUB_API_TIMEOUT', default=30))
+
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # Auth locale
+    'allauth.account.auth_backends.AuthenticationBackend',  # Auth sociale
+]
+
+# allauth settings de base
+ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+
+SOCIALACCOUNT_PROVIDERS = {
+    'github': {}
+}
+
+SOCIALACCOUNT_LOGIN_ON_GET = True

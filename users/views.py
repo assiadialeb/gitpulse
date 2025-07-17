@@ -13,6 +13,10 @@ from analytics.models import Commit, PullRequest, DeveloperAlias, Developer, Rel
 import applications.models  # pour accès Django ORM
 from django.utils import timezone
 from collections import defaultdict
+from allauth.socialaccount.models import SocialAccount, SocialToken
+from analytics.analytics_service import AnalyticsService
+from analytics.models import Developer as MongoDeveloper, DeveloperAlias as MongoDeveloperAlias
+import requests
 
 
 def login_view(request):
@@ -69,70 +73,196 @@ def logout_view(request):
 
 @login_required
 def profile_view(request):
-    """User profile view with GitHub data sync"""
+    """User profile view with GitHub SSO data and developer stats (robuste sur les emails)"""
     github_user = None
-    sync_error = None
     github_organizations = None
-    
-    if request.method == 'POST':
-        form = UserProfileForm(request.POST, instance=request.user.userprofile)
-        if form.is_valid():
-            profile = form.save()
-            
-            # If GitHub username was provided, sync data
-            if profile.github_username:
-                try:
-                    # Check if user has GitHub token
-                    github_service = GitHubUserService(request.user.id)
-                    
-                    # Sync user data from GitHub
-                    github_user = github_service.sync_user_data(profile.github_username)
-                    
-                    # Récupérer les organisations si superuser
-                    if request.user.is_superuser:
-                        try:
-                            github_organizations = github_service.get_authenticated_user_organizations()
-                        except Exception:
-                            github_organizations = None
-                    messages.success(request, f'Profile updated and GitHub data synced for {profile.github_username}!')
-                    
-                except ValueError as e:
-                    sync_error = str(e)
-                    messages.warning(request, f'Profile updated but GitHub sync failed: {sync_error}')
-                    
-                except Exception as e:
-                    sync_error = str(e)
-                    messages.error(request, f'Error syncing GitHub data: {sync_error}')
-            
-            else:
-                messages.success(request, 'Profile updated successfully!')
-            
-            return redirect('users:profile')
+    sync_error = None
+    form = UserProfileForm(instance=request.user.userprofile)
+    github_emails_list = []
+    github_emails_api_status = None
+    github_emails_api_raw = None
+
+    # Récupérer le SocialAccount GitHub
+    social_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+    github_emails = set()
+    # Correction : récupérer le token de façon robuste
+    token = SocialToken.objects.filter(account__user=request.user, account__provider='github').first()
+    if social_account:
+        github_user = social_account.extra_data
+        # Ajout des emails du SocialAccount
+        if 'email' in github_user and github_user['email']:
+            github_emails.add(github_user['email'].lower())
+        if 'emails' in github_user and isinstance(github_user['emails'], list):
+            for email_obj in github_user['emails']:
+                if isinstance(email_obj, dict) and 'email' in email_obj:
+                    github_emails.add(email_obj['email'].lower())
+    # Récupérer la vraie liste d'emails via l'API GitHub même si social_account absent
+    github_emails_api_status = None
+    github_emails_api_raw = None
+    github_emails_list = []
+    if token:
+        headers = {
+            'Authorization': f'Bearer {token.token}',
+            'Accept': 'application/vnd.github+json'
+        }
+        try:
+            resp = requests.get('https://api.github.com/user/emails', headers=headers, timeout=10)
+            github_emails_api_status = resp.status_code
+            try:
+                github_emails_api_raw = resp.json()
+            except Exception:
+                github_emails_api_raw = resp.text
+            if resp.status_code == 200:
+                github_emails_list = github_emails_api_raw
+        except Exception as e:
+            github_emails_api_status = str(e)
+            github_emails_api_raw = None
+
+    # Emails à tester : email Django + emails GitHub
+    user_emails = set()
+    if request.user.email:
+        user_emails.add(request.user.email.lower())
+    user_emails |= github_emails
+
+    # Trouver un alias correspondant à un de ces emails
+    alias = MongoDeveloperAlias.objects(email__in=list(user_emails)).first()
+    developer = alias.developer if alias and alias.developer else None
+    developer_stats = None
+    aliases = []
+    if developer:
+        analytics = AnalyticsService(0)
+        developer_stats = analytics.get_developer_detailed_stats(str(developer.id))
+        aliases = MongoDeveloperAlias.objects(developer=developer)
+        developer_for_template = type('Developer', (), {
+            'name': developer.primary_name,
+            'email': developer.primary_email,
+            'commit_count': developer_stats.get('total_commits', 0),
+            'is_developer': True,
+            'github_id': developer.github_id,
+            'aliases': aliases
+        })()
+        from analytics.models import Commit
+        alias_emails = [alias.email for alias in aliases]
+        all_commits = Commit.objects.filter(author_email__in=alias_emails)
+        from developers.views import _calculate_detailed_quality_metrics, _calculate_commit_type_distribution, _calculate_quality_metrics_by_month
+        detailed_quality_metrics = _calculate_detailed_quality_metrics(all_commits)
+        commit_type_data = _calculate_commit_type_distribution(all_commits)
+        quality_metrics_by_month = _calculate_quality_metrics_by_month(all_commits)
+        polar_chart_data = []
+        for repo in developer_stats.get('top_repositories', []):
+            net_lines = repo.get('additions', 0) - repo.get('deletions', 0)
+            polar_chart_data.append({
+                'label': repo['name'],
+                'data': [net_lines],
+                'backgroundColor': f'rgba({hash(repo["name"]) % 256}, {(hash(repo["name"]) >> 8) % 256}, {(hash(repo["name"]) >> 16) % 256}, 0.6)',
+                'borderColor': f'rgba({hash(repo["name"]) % 256}, {(hash(repo["name"]) >> 8) % 256}, {(hash(repo["name"]) >> 16) % 256}, 1)',
+                'borderWidth': 2
+            })
+        if not polar_chart_data:
+            polar_chart_data = []
+        from datetime import datetime, timedelta
+        now = datetime.utcnow().replace(tzinfo=None)
+        cutoff = now - timedelta(days=365)
+        commits_365d = [c for c in all_commits if c.authored_date and c.authored_date.replace(tzinfo=None) >= cutoff]
+        repo_bubbles = {}
+        for commit in commits_365d:
+            repo = commit.repository_full_name or 'unknown'
+            commit_dt = commit.get_authored_date_in_timezone()
+            days_ago = (now.date() - commit_dt.date()).days
+            hour = commit_dt.hour
+            key = (days_ago, hour)
+            if repo not in repo_bubbles:
+                repo_bubbles[repo] = {}
+            if key not in repo_bubbles[repo]:
+                repo_bubbles[repo][key] = {'commits': 0, 'changes': 0}
+            repo_bubbles[repo][key]['commits'] += 1
+            repo_bubbles[repo][key]['changes'] += (commit.additions or 0) + (commit.deletions or 0)
+        palette = [
+            {'bg': 'rgba(16, 185, 129, 0.6)', 'border': 'rgba(16, 185, 129, 1)'},
+            {'bg': 'rgba(59, 130, 246, 0.6)', 'border': 'rgba(59, 130, 246, 1)'},
+            {'bg': 'rgba(245, 158, 11, 0.6)', 'border': 'rgba(245, 158, 11, 1)'},
+            {'bg': 'rgba(139, 92, 246, 0.6)', 'border': 'rgba(139, 92, 246, 1)'},
+            {'bg': 'rgba(236, 72, 153, 0.6)', 'border': 'rgba(236, 72, 153, 1)'},
+            {'bg': 'rgba(34, 197, 94, 0.6)', 'border': 'rgba(34, 197, 94, 1)'},
+        ]
+        chart_data = []
+        for i, (repo, bubbles) in enumerate(repo_bubbles.items()):
+            color = palette[i % len(palette)]
+            dataset = {
+                'label': repo,
+                'data': [],
+                'backgroundColor': color['bg'],
+                'borderColor': color['border'],
+                'borderWidth': 1
+            }
+            for (days_ago, hour), data in bubbles.items():
+                dataset['data'].append({
+                    'x': days_ago,
+                    'y': hour,
+                    'r': min(5 + data['commits'] * 2, 20),
+                    'commit_count': data['commits'],
+                    'changes': data['changes']
+                })
+            chart_data.append(dataset)
+        def _get_commit_type_color(commit_type):
+            colors = {
+                'fix': '#4caf50',
+                'feature': '#2196f3',
+                'docs': '#ffeb3b',
+                'refactor': '#ff9800',
+                'test': '#9c27b0',
+                'style': '#00bcd4',
+                'chore': '#607d8b',
+                'other': '#bdbdbd'
+            }
+            return colors.get(commit_type, '#bdbdbd')
+        commit_type_legend = [
+            {'label': k, 'count': v, 'color': _get_commit_type_color(k)}
+            for k, v in commit_type_data['counts'].items()
+        ] if 'counts' in commit_type_data else []
+        first_commit = None
+        last_commit = None
+        if developer_stats.get('first_commit_date'):
+            from analytics.models import Commit
+            first_commit = Commit.objects.filter(author_email__in=alias_emails).order_by('authored_date').first()
+        if developer_stats.get('last_commit_date'):
+            from analytics.models import Commit
+            last_commit = Commit.objects.filter(author_email__in=alias_emails).order_by('-authored_date').first()
+        commit_frequency = analytics.get_developer_commit_frequency(all_commits)
+        context = {
+            'form': form,
+            'github_user': github_user,
+            'github_organizations': github_organizations,
+            'sync_error': sync_error,
+            'developer': developer_for_template,
+            'developer_id': str(developer.id),
+            'aliases': aliases,
+            'commit_frequency': commit_frequency,
+            'commit_quality': developer_stats.get('commit_quality', {}),
+            'quality_metrics': detailed_quality_metrics,
+            'first_commit': first_commit,
+            'last_commit': last_commit,
+            'polar_chart_data': polar_chart_data,
+            'quality_metrics_by_month': quality_metrics_by_month,
+            'chart_data': chart_data,
+            'commit_type_distribution': commit_type_data,
+            'commit_type_labels': list(commit_type_data['counts'].keys()) if 'counts' in commit_type_data else [],
+            'commit_type_values': list(commit_type_data['counts'].values()) if 'counts' in commit_type_data else [],
+            'commit_type_legend': commit_type_legend,
+            'github_emails_list': github_emails_list,
+            'github_emails_api_status': github_emails_api_status,
+            'github_emails_api_raw': github_emails_api_raw,
+        }
     else:
-        form = UserProfileForm(instance=request.user.userprofile)
-        
-        # Try to get existing GitHub user data
-        if request.user.userprofile.github_username:
-            try:
-                # This .objects access works for both mongoengine and Django ORM
-                github_user = User.objects.filter(username=request.user.userprofile.github_username).first()
-            except Exception:
-                pass
-        # Récupérer les organisations si superuser
-        if request.user.is_superuser:
-            try:
-                github_service = GitHubUserService(request.user.id)
-                github_organizations = github_service.get_authenticated_user_organizations()
-            except Exception:
-                github_organizations = None
-    
-    context = {
-        'form': form,
-        'github_user': github_user,
-        'sync_error': sync_error,
-        'github_organizations': github_organizations
-    }
-    
+        context = {
+            'form': form,
+            'github_user': github_user,
+            'github_organizations': github_organizations,
+            'sync_error': sync_error,
+            'github_emails_list': github_emails_list,
+            'github_emails_api_status': github_emails_api_status,
+            'github_emails_api_raw': github_emails_api_raw,
+        }
     return render(request, 'users/profile.html', context)
 
 

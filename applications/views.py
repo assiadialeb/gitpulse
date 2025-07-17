@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from datetime import datetime, timedelta
+from django.core.exceptions import PermissionDenied
 
 from .models import Application, ApplicationRepository
 from .forms import ApplicationForm, RepositorySelectionForm
@@ -15,8 +16,8 @@ from github.models import GitHubToken
 
 @login_required
 def application_list(request):
-    """List all applications for the current user"""
-    applications = Application.objects.filter(owner=request.user)
+    """List all applications for all users"""
+    applications = Application.objects.all()
     return render(request, 'applications/list.html', {
         'applications': applications
     })
@@ -25,6 +26,8 @@ def application_list(request):
 @login_required
 def application_create(request):
     """Create a new application"""
+    if not request.user.is_superuser:
+        return redirect('applications:list')
     if request.method == 'POST':
         form = ApplicationForm(request.POST)
         if form.is_valid():
@@ -44,7 +47,7 @@ def application_create(request):
 @login_required
 def application_detail(request, pk):
     """Display application details and repositories with analytics dashboard"""
-    application = get_object_or_404(Application, pk=pk, owner=request.user)
+    application = get_object_or_404(Application, pk=pk)
     repositories = application.repositories.all()
     
     # Get analytics data
@@ -223,7 +226,9 @@ def application_detail(request, pk):
 @login_required
 def application_edit(request, pk):
     """Edit an existing application"""
-    application = get_object_or_404(Application, pk=pk, owner=request.user)
+    if not (request.user.is_superuser or request.user.is_staff):
+        raise PermissionDenied
+    application = get_object_or_404(Application, pk=pk)
     
     if request.method == 'POST':
         form = ApplicationForm(request.POST, instance=application)
@@ -243,7 +248,9 @@ def application_edit(request, pk):
 @login_required
 def application_delete(request, pk):
     """Delete an application"""
-    application = get_object_or_404(Application, pk=pk, owner=request.user)
+    if not (request.user.is_superuser or request.user.is_staff):
+        raise PermissionDenied
+    application = get_object_or_404(Application, pk=pk)
     
     if request.method == 'POST':
         application_name = application.name

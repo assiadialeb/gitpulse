@@ -1,5 +1,6 @@
 from django import forms
 from .models import GitHubApp
+from allauth.socialaccount.models import SocialApp
 
 
 class GitHubAppForm(forms.ModelForm):
@@ -50,3 +51,9 @@ class GitHubAppForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance 
+
+
+class SocialAppForm(forms.ModelForm):
+    class Meta:
+        model = SocialApp
+        fields = ['client_id', 'secret'] 

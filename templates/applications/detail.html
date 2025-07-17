@@ -26,6 +26,7 @@
                         </div>
                     </div>
                     
+                    {% if request.user.is_superuser %}
                     <!-- Toggle Button for Slide-over -->
                     <button id="slideover-toggle" class="btn btn-outline border-gray-300 text-dark-gray hover:bg-gray-50 rounded-xl">
                         <svg id="chevron-icon" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,6 +34,7 @@
                         </svg>
                         <span class="ml-2">Settings</span>
                     </button>
+                    {% endif %}
                 </div>
             </div>
 
@@ -597,12 +599,14 @@
                         </button>
                         
                         <div class="flex space-x-3">
+                            {% if request.user.is_superuser %}
                             <a href="{% url 'applications:edit' application.pk %}" class="btn btn-outline border-gray-300 text-dark-gray hover:bg-gray-50 rounded-xl flex-1">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                 </svg>
                                 Edit
                             </a>
+                            {% endif %}
                             <a href="{% url 'applications:delete' application.pk %}" class="btn btn-outline border-red-300 text-red-500 hover:bg-red-50 rounded-xl flex-1">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -819,7 +823,9 @@ document.addEventListener('DOMContentLoaded', function() {
         chevronIcon.style.transform = 'rotate(0deg)';
     }
     
-    toggle.addEventListener('click', openSlideover);
+    if (toggle) {
+        toggle.addEventListener('click', openSlideover);
+    }
     closeBtn.addEventListener('click', closeSlideover);
     backdrop.addEventListener('click', closeSlideover);
     
