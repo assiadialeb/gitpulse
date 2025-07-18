@@ -4,20 +4,15 @@ from allauth.socialaccount.models import SocialApp
 
 
 class GitHubAppForm(forms.ModelForm):
-    """Form for GitHub App configuration"""
+    """Form for GitHub OAuth App configuration"""
     
     class Meta:
         model = GitHubApp
-        fields = ['client_id', 'client_secret']
+        fields = ['client_id']  # Only client_id, client_secret is handled separately
         widgets = {
             'client_id': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',
-                'placeholder': 'GitHub OAuth App Client ID'
-            }),
-            'client_secret': forms.TextInput(attrs={
-                'class': 'input input-bordered w-full',
-                'placeholder': 'Personal Access Token (ghp_...)',
-                'type': 'password'
+                'placeholder': 'GitHub OAuth App Client ID (e.g., Ov23li...)'
             }),
         }
     

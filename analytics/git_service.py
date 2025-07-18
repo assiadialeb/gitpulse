@@ -57,12 +57,34 @@ class GitService:
             # Clone repository
             logger.info(f"Cloning repository {repo_full_name} to {repo_dir}")
             
+            # Clone without LFS to avoid large file issues
+            env = os.environ.copy()
+            env['GIT_LFS_SKIP_SMUDGE'] = '1'  # Skip LFS file download
+            env['GIT_LFS_SKIP_PUSH'] = '1'    # Skip LFS push
+            
+            # First try: clone normally with LFS disabled
             result = subprocess.run(
                 ['git', 'clone', '--quiet', repo_url, repo_dir],
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minutes timeout
+                timeout=600,  # 10 minutes timeout (increased)
+                env=env
             )
+            
+            # If clone succeeded but checkout failed due to LFS, try to fix it
+            if result.returncode != 0 and 'git-lfs' in result.stderr:
+                logger.warning(f"LFS issue detected for {repo_full_name}, attempting workaround...")
+                
+                # Remove the failed clone
+                if os.path.exists(repo_dir):
+                    shutil.rmtree(repo_dir)
+                
+                # Clone with LFS completely disabled
+                result = subprocess.run([
+                    'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
+                    '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
+                    'clone', '--quiet', repo_url, repo_dir
+                ], capture_output=True, text=True, timeout=300, env=env)
             
             if result.returncode != 0:
                 raise GitServiceError(f"Failed to clone repository: {result.stderr}")

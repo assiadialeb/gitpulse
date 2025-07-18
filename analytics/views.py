@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 from .analytics_service import AnalyticsService
 from analytics.sync_service import SyncService
 from analytics.models import Developer, DeveloperAlias
-from github.models import GitHubToken
+# from github.models import GitHubToken  # Deprecated - using PAT now
 
 
 @login_required
@@ -126,25 +126,24 @@ def start_indexing(request, application_id):
     application = get_object_or_404(Application, id=application_id, owner=request.user)
     
     try:
-        # Start background indexing task
+        # Start manual indexing task (one-shot)
         from django_q.tasks import async_task
-        from .tasks import background_indexing_task
+        from .tasks import manual_indexing_task
         
         task_id = async_task(
-            'analytics.tasks.background_indexing_task',
+            'analytics.tasks.manual_indexing_task',
             application_id,
             request.user.id,
-            None,  # task_id will be generated
-            group=f'indexing_{application_id}_{request.user.id}',
+            group=f'manual_indexing_{application_id}_{request.user.id}',
             timeout=7200  # 2 hour timeout
         )
         
-        logger.info(f"Started background indexing task {task_id} for application {application_id}")
+        logger.info(f"Started manual indexing task {task_id} for application {application_id}")
         
         return JsonResponse({
             'success': True,
             'task_id': task_id,
-            'message': 'Indexing started successfully'
+            'message': 'Manual indexing started successfully'
         })
         
     except Exception as e:

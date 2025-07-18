@@ -324,6 +324,28 @@ def manual_sync_application(application_id: int, sync_type: str = 'incremental')
         raise
 
 
+def manual_indexing_task(application_id: int, user_id: int):
+    """
+    Tâche d'indexation manuelle pour une application spécifique (one-shot)
+    
+    Args:
+        application_id: ID de l'application à indexer
+        user_id: ID de l'utilisateur qui lance l'indexation
+        
+    Returns:
+        Résultats de l'indexation
+    """
+    logger.info(f"Starting manual indexing for application {application_id}, user {user_id}")
+    
+    try:
+        # Utiliser la même logique que background_indexing_task mais en mode one-shot
+        return background_indexing_task(application_id, user_id, task_id=f"manual_{application_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        
+    except Exception as e:
+        logger.error(f"Manual indexing failed for application {application_id}: {e}")
+        raise
+
+
 def background_indexing_task(application_id: int, user_id: int, task_id: str = None):
     """
     Background task for indexing with progress tracking
@@ -671,8 +693,21 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=10):
                         time.sleep(0.1)
                         
                     except Exception as e:
-                        logger.error(f"[App {app.id}][Repo {repo_name}] Error fetching page {page}: {e}")
-                        break
+                        error_msg = str(e)
+                        if "Repository not found or not accessible" in error_msg:
+                            logger.warning(f"[App {app.id}][Repo {repo_name}] Repository not accessible with current token - skipping")
+                            results.append({
+                                'app': app.id, 
+                                'repo': repo_name, 
+                                'status': 'skipped',
+                                'reason': 'Repository not accessible with current token',
+                                'pages_processed': 0,
+                                'total_saved': 0
+                            })
+                            break
+                        else:
+                            logger.error(f"[App {app.id}][Repo {repo_name}] Error fetching page {page}: {e}")
+                            break
                 
                 execution_time = time.time() - start_time
                 logger.info(f"[App {app.id}][Repo {repo_name}] Completed: {total_saved} PRs saved, {pages_processed} pages processed in {execution_time:.1f}s")
@@ -991,3 +1026,17 @@ def group_developer_identities_task(application_id=None):
     except Exception as e:
         logger.error(f"Developer identity grouping task failed: {e}")
         raise
+
+
+def daily_indexing_all_apps_task():
+    """
+    Tâche planifiée unique : lance l'indexation pour toutes les applications.
+    """
+    from applications.models import Application
+    from django.utils import timezone
+    results = []
+    for app in Application.objects.all():
+        # Lancer l'indexation en asynchrone pour chaque application
+        task_id = async_task('analytics.tasks.background_indexing_task', app.id, app.owner_id, None)
+        results.append({'app_id': app.id, 'task_id': task_id})
+    return results

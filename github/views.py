@@ -47,56 +47,223 @@ def admin_view(request):
             else:
                 messages.warning(request, 'GitHub configuration saved but no OAuth secret provided')
             
-            # Debug info
-            messages.info(request, f'GitHubApp: ID={github_app.client_id[:10]}..., PAT={github_app.client_secret[:10]}...')
-            messages.info(request, f'SocialApp: ID={social_app.client_id[:10]}..., Secret={social_app.secret[:10] if social_app.secret else "None"}...')
+            # Sync GitHubApp with SocialApp (keep them in sync)
+            github_app.client_secret = oauth_secret or github_app.client_secret
+            github_app.save()
             
             return redirect('github:admin')
     else:
         form = GitHubAppForm(instance=github_app)
 
-    # Check if app has valid token for API access
-    app_token_valid = False
-    app_username = None
-    if github_app.client_secret:
-        try:
-            # Test if it's a Personal Access Token
-            if github_app.client_secret.startswith(('ghp_', 'gho_', 'github_pat_')):
-                test_headers = {
-                    'Authorization': f'token {github_app.client_secret}',
-                    'Accept': 'application/vnd.github.v3+json',
-                    'User-Agent': 'GitPulse/1.0'
-                }
-                test_response = requests.get('https://api.github.com/user', headers=test_headers, timeout=10)
-                if test_response.status_code == 200:
-                    user_data = test_response.json()
-                    app_token_valid = True
-                    app_username = user_data.get('login')
-            else:
-                # For OAuth App client_secret, we can't test /user endpoint directly
-                # But we can test rate limit endpoint which works with any valid credentials
-                test_headers = {
-                    'Accept': 'application/vnd.github.v3+json',
-                    'User-Agent': 'GitPulse/1.0'
-                }
-                # Test basic API access (rate limit endpoint doesn't need auth)
-                test_response = requests.get('https://api.github.com/rate_limit', headers=test_headers, timeout=10)
-                if test_response.status_code == 200:
-                    # OAuth App configured (we can't test user endpoint without OAuth flow)
-                    app_token_valid = True
-                    app_username = "OAuth App configured"
-        except Exception as e:
-            print(f"API test error: {e}")  # Debug
-
-    github_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+    # Check OAuth App configuration status
+    oauth_configured = bool(social_app.client_id and social_app.secret)
     
+    # Check if current user has GitHub connection with valid token
+    user_github_connected = False
+    user_github_username = None
+    user_has_valid_token = False
+    
+    try:
+        from analytics.github_utils import get_github_token_for_user, get_user_github_scopes
+        
+        # Check if user has GitHub account connected
+        github_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+        if github_account:
+            user_github_connected = True
+            user_github_username = github_account.extra_data.get('login')
+            
+            # Check if user has valid OAuth token
+            token = get_github_token_for_user(request.user.id)
+            if token and not token.startswith(('ghp_', 'gho_', 'github_pat_')):  # Exclude fallback PAT
+                user_has_valid_token = True
+                
+    except Exception as e:
+        print(f"User token check error: {e}")  # Debug
+
     context = {
         'form': form,
         'oauth_secret': social_app.secret if social_app.secret else '',
         'user_redirect_url': request.build_absolute_uri('/accounts/github/login/callback/'),
-        'github_connected': github_account is not None,
-        'github_username': github_account.extra_data.get('login') if github_account else None,
-        'app_token_valid': app_token_valid,
-        'app_username': app_username,
+        'oauth_configured': oauth_configured,
+        'github_connected': user_github_connected,
+        'github_username': user_github_username,
+        'user_has_valid_token': user_has_valid_token,
     }
     return render(request, 'github/admin_simple.html', context)
+
+
+def admin_simple(request):
+    """
+    Simple GitHub configuration interface (alias for admin_view)
+    """
+    return admin_view(request)
+
+
+def token_help(request):
+    """
+    GitHub token configuration help page
+    """
+    return render(request, 'github/token_help.html')
+
+
+from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
+
+@require_http_methods(["POST"])
+def test_github_access(request):
+    """
+    Test GitHub token access via AJAX
+    """
+    try:
+        from analytics.github_utils import get_github_token_for_user
+        from applications.models import Application
+        import requests
+        
+        token = get_github_token_for_user(request.user.id)
+        if not token:
+            return JsonResponse({
+                'success': False,
+                'error': 'Aucun token GitHub configuré'
+            })
+        
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+        
+        # Test user info
+        response = requests.get('https://api.github.com/user', headers=headers)
+        if response.status_code != 200:
+            return JsonResponse({
+                'success': False,
+                'error': f'Token invalide (code {response.status_code})'
+            })
+        
+        user_info = response.json()
+        scopes = response.headers.get('X-OAuth-Scopes', '')
+        
+        # Test repository access
+        total_repos = 0
+        accessible_repos = 0
+        
+        for app in Application.objects.filter(owner=request.user)[:3]:
+            for repo in app.repositories.all()[:5]:
+                total_repos += 1
+                repo_name = repo.github_repo_name
+                
+                try:
+                    url = f"https://api.github.com/repos/{repo_name}"
+                    repo_response = requests.get(url, headers=headers)
+                    if repo_response.status_code == 200:
+                        accessible_repos += 1
+                except:
+                    pass
+        
+        if total_repos == 0:
+            return JsonResponse({
+                'success': True,
+                'message': 'Token configuré correctement (aucun repository à tester)',
+                'user': user_info.get('login'),
+                'scopes': scopes,
+                'total_repos': 0,
+                'accessible_repos': 0
+            })
+        
+        success = accessible_repos > 0
+        return JsonResponse({
+            'success': success,
+            'user': user_info.get('login'),
+            'scopes': scopes,
+            'total_repos': total_repos,
+            'accessible_repos': accessible_repos,
+            'error': f'Aucun repository accessible sur {total_repos} testés' if not success else None
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@login_required
+def force_github_reauth(request):
+    """
+    Force GitHub re-authentication to get new scopes
+    """
+    try:
+        from allauth.socialaccount.models import SocialAccount, SocialToken
+        
+        # Delete existing GitHub connection to force re-auth
+        social_accounts = SocialAccount.objects.filter(user=request.user, provider='github')
+        tokens_deleted = 0
+        accounts_deleted = 0
+        
+        for account in social_accounts:
+            # Delete associated tokens
+            tokens = SocialToken.objects.filter(account=account)
+            tokens_deleted += tokens.count()
+            tokens.delete()
+            
+            # Delete account
+            account.delete()
+            accounts_deleted += 1
+        
+        messages.success(
+            request, 
+            f'GitHub connection reset ({accounts_deleted} accounts, {tokens_deleted} tokens deleted). '
+            'Please reconnect to grant new permissions.'
+        )
+        
+        # Redirect to GitHub OAuth with new scopes
+        from django.urls import reverse
+        from allauth.socialaccount.providers.github.urls import urlpatterns
+        return redirect('github_login')  # This will use the new scopes from settings
+        
+    except Exception as e:
+        messages.error(request, f'Error resetting GitHub connection: {e}')
+        return redirect('github:admin')
+
+
+def github_connection_status(request):
+    """
+    Check GitHub connection status and scopes for current user
+    """
+    try:
+        from analytics.github_utils import get_user_github_scopes
+        from allauth.socialaccount.models import SocialAccount
+        
+        # Check if user has GitHub account connected
+        github_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+        
+        if not github_account:
+            return JsonResponse({
+                'connected': False,
+                'message': 'No GitHub account connected'
+            })
+        
+        # Get user's current scopes
+        scopes = get_user_github_scopes(request.user.id)
+        required_scopes = ['user:email', 'repo', 'read:org']
+        missing_scopes = [scope for scope in required_scopes if scope not in scopes]
+        
+        return JsonResponse({
+            'connected': True,
+            'username': github_account.extra_data.get('login'),
+            'scopes': scopes,
+            'required_scopes': required_scopes,
+            'missing_scopes': missing_scopes,
+            'has_all_scopes': len(missing_scopes) == 0
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        })
+
+
+def unified_setup(request):
+    """
+    Unified GitHub setup page
+    """
+    return render(request, 'github/unified_setup.html')

@@ -13,7 +13,7 @@ from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
 from .github_utils import get_github_token_for_user
 from .services import RateLimitService
 from applications.models import Application, ApplicationRepository
-from github.models import GitHubToken
+# from github.models import GitHubToken  # Deprecated - using PAT now
 
 logger = logging.getLogger(__name__)
 
@@ -220,9 +220,15 @@ class SyncService:
             
             # Get user's GitHub username for rate limit service
             try:
-                github_token = GitHubToken.objects.filter(user_id=self.user_id).first()
-                github_username = github_token.github_username
-            except GitHubToken.DoesNotExist:
+                # Try to get username from GitHub API using our PAT
+                access_token = get_github_token_for_user(self.user_id)
+                if access_token:
+                    github_service = GitHubService(access_token)
+                    user_info, _ = github_service._make_request("https://api.github.com/user")
+                    github_username = user_info.get('login', f"user_{self.user_id}")
+                else:
+                    github_username = f"user_{self.user_id}"
+            except Exception:
                 github_username = f"user_{self.user_id}"
             
             # Handle rate limit with automatic restart

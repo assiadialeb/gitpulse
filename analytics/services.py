@@ -151,7 +151,7 @@ from django_q.tasks import async_task, Schedule
 from django_q.models import Schedule as ScheduleModel
 
 from .github_service import GitHubRateLimitError
-from github.models import GitHubToken
+# from github.models import GitHubToken  # Deprecated - using PAT now
 
 logger = logging.getLogger(__name__)
 
@@ -516,7 +516,7 @@ def cleanup_old_rate_limit_resets():
         } 
 
 from .models import Deployment
-from github.models import GitHubToken
+# from github.models import GitHubToken  # Deprecated - using PAT now
 from applications.models import ApplicationRepository
 from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
 from .github_utils import get_github_token_for_user

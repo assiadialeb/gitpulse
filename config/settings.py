@@ -158,8 +158,9 @@ LOGOUT_REDIRECT_URL = '/'
 Q_CLUSTER = {
     'name': 'GitPulse',
     'workers': 4,
+    'workers': 5,
     'recycle': 500,
-    'timeout': 60,
+    'timeout': 1800,  # 30 minutes for indexing tasks
     'compress': True,
     'save_limit': 250,
     'queue_limit': 500,
@@ -198,3 +199,15 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
+
+# GitHub OAuth configuration with required scopes
+SOCIALACCOUNT_PROVIDERS = {
+    'github': {
+        'SCOPE': [
+            'user:email',  # Access to user email addresses
+            'repo',        # Full access to repositories (public and private)
+            'read:org',    # Read organization membership and teams
+        ],
+        'VERIFIED_EMAIL': True,  # Require verified email
+    }
+}
