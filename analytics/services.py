@@ -519,6 +519,7 @@ from .models import Deployment
 from github.models import GitHubToken
 from applications.models import ApplicationRepository
 from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
+from .github_utils import get_github_token_for_user
 from typing import List
 
 class DeploymentIndexingService:
@@ -528,11 +529,10 @@ class DeploymentIndexingService:
         self.github_service = self._init_github_service()
 
     def _init_github_service(self):
-        try:
-            token = GitHubToken.objects.get(user_id=self.user_id)
-            return GitHubService(token.access_token)
-        except GitHubToken.DoesNotExist:
+        access_token = get_github_token_for_user(self.user_id)
+        if not access_token:
             raise ValueError(f"No GitHub token found for user {self.user_id}")
+        return GitHubService(access_token)
 
     def index_deployments(self, application_id: int, repo_full_name: str) -> List[str]:
         """
@@ -584,11 +584,10 @@ class ReleaseIndexingService:
         self.github_service = self._init_github_service()
 
     def _init_github_service(self):
-        try:
-            token = GitHubToken.objects.get(user_id=self.user_id)
-            return GitHubService(token.access_token)
-        except GitHubToken.DoesNotExist:
+        access_token = get_github_token_for_user(self.user_id)
+        if not access_token:
             raise ValueError(f"No GitHub token found for user {self.user_id}")
+        return GitHubService(access_token)
 
     def index_releases(self, application_id: int, repo_full_name: str) -> list:
         """
@@ -607,7 +606,7 @@ class ReleaseIndexingService:
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
                 published_at = dt
-            obj = Release.objects(release_id=release_id).first()
+            obj = Release.objects.filter(release_id=release_id).first()
             if not obj:
                 obj = Release(
                     release_id=release_id,

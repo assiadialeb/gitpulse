@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 from typing import List, Dict, Optional, Tuple
 from django.conf import settings
 import logging
+from allauth.socialaccount.models import SocialToken
+from django.contrib.auth import get_user_model
+
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +22,9 @@ class GitHubAPIError(Exception):
 class GitHubRateLimitError(GitHubAPIError):
     """Exception raised when GitHub API rate limit is exceeded"""
     pass
+
+
+# Fonction supprimée - utiliser get_github_token_for_user depuis github_utils.py
 
 
 class GitHubService:
@@ -60,7 +66,11 @@ class GitHubService:
                 raise GitHubRateLimitError("Rate limit exceeded")
             
             if response.status_code == 404:
-                raise GitHubAPIError(f"Repository not found or not accessible: {url}")
+                # For releases endpoint, 404 might just mean no releases exist
+                if '/releases' in url:
+                    return [], dict(response.headers)
+                else:
+                    raise GitHubAPIError(f"Repository not found or not accessible: {url}")
             
             if not response.ok:
                 raise GitHubAPIError(f"GitHub API error {response.status_code}: {response.text}")

@@ -10,7 +10,7 @@ from .git_sync_service import GitSyncService
 from .services import RateLimitService
 from .github_service import GitHubRateLimitError
 from applications.models import Application, ApplicationRepository
-from github.models import GitHubToken
+# from github.models import GitHubToken  # Deprecated - using django-allauth now
 from .services import DeploymentIndexingService
 from .services import ReleaseIndexingService
 
@@ -82,8 +82,17 @@ def retry_failed_syncs_task():
     logger.info("Starting retry failed syncs task")
     
     try:
-        # Get all users with GitHub tokens
-        github_tokens = GitHubToken.objects.all()
+        # Get all users with GitHub tokens from django-allauth
+        from allauth.socialaccount.models import SocialApp, SocialToken
+        from django.contrib.auth.models import User
+        
+        github_app = SocialApp.objects.filter(provider='github').first()
+        if not github_app:
+            logger.error("No GitHub SocialApp found")
+            return {'error': 'No GitHub SocialApp configured'}
+        
+        # Get all users who have GitHub tokens
+        social_tokens = SocialToken.objects.filter(app=github_app)
         
         total_results = {
             'users_processed': 0,
@@ -92,9 +101,10 @@ def retry_failed_syncs_task():
             'total_retries_failed': 0
         }
         
-        for token in github_tokens:
+        for social_token in social_tokens:
             try:
-                sync_service = GitSyncService(token.user_id)
+                user_id = social_token.account.user.id
+                sync_service = GitSyncService(user_id)
                 results = sync_service.retry_failed_syncs()
                 
                 total_results['users_processed'] += 1
@@ -103,7 +113,7 @@ def retry_failed_syncs_task():
                 total_results['total_retries_failed'] += results['retries_failed']
                 
             except Exception as e:
-                logger.error(f"Failed to retry syncs for user {token.user_id}: {e}")
+                logger.error(f"Failed to retry syncs for user {social_token.account.user.id}: {e}")
                 continue
         
         logger.info(f"Retry failed syncs completed: {total_results}")
@@ -558,7 +568,7 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=10):
     from applications.models import Application
     from analytics.models import PullRequest
     from analytics.github_service import GitHubService
-    from github.models import GitHubToken
+    from analytics.github_utils import get_github_token_for_user
     import dateutil.parser
     from datetime import timezone, datetime
     import logging
@@ -581,13 +591,13 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=10):
             break
             
         user_id = app.owner_id
-        token_obj = GitHubToken.objects.filter(user_id=user_id).first()
-        if not token_obj:
-            logger.warning(f"[App {app.id}] No GitHub token found.")
+        access_token = get_github_token_for_user(user_id)
+        if not access_token:
+            logger.warning(f"[App {app.id}] No GitHub token found for user {user_id}.")
             results.append({'app': app.id, 'error': 'No GitHub token'})
             continue
             
-        gh = GitHubService(token_obj.access_token)
+        gh = GitHubService(access_token)
         
         for repo in app.repositories.all():
             if repos_processed >= max_repos_per_run:

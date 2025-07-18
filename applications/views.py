@@ -12,6 +12,7 @@ from django.core.exceptions import PermissionDenied
 from .models import Application, ApplicationRepository
 from .forms import ApplicationForm, RepositorySelectionForm
 from github.models import GitHubToken
+from analytics.github_utils import get_github_token_for_user
 
 
 @login_required
@@ -289,9 +290,8 @@ def add_repositories(request, pk):
     application = get_object_or_404(Application, pk=pk, owner=request.user)
     
     # Get user's GitHub token
-    try:
-        github_token = GitHubToken.objects.get(user=request.user)
-    except GitHubToken.DoesNotExist:
+    github_token = get_github_token_for_user(request.user.id)
+    if not github_token:
         messages.error(request, 'Please connect your GitHub account first.')
         return redirect('github:admin')
     
@@ -302,7 +302,7 @@ def add_repositories(request, pk):
     
     try:
         headers = {
-            'Authorization': f'token {github_token.access_token}',
+            'Authorization': f'token {github_token}',
             'Accept': 'application/vnd.github.v3+json'
         }
         
@@ -432,9 +432,8 @@ def api_get_repositories(request, pk):
     application = get_object_or_404(Application, pk=pk, owner=request.user)
     
     # Get user's GitHub token
-    try:
-        github_token = GitHubToken.objects.get(user=request.user)
-    except GitHubToken.DoesNotExist:
+    github_token = get_github_token_for_user(request.user.id)
+    if not github_token:
         return JsonResponse({'error': 'GitHub token not found'}, status=401)
     
     # Get search query
@@ -445,7 +444,7 @@ def api_get_repositories(request, pk):
     
     try:
         headers = {
-            'Authorization': f'token {github_token.access_token}',
+            'Authorization': f'token {github_token}',
             'Accept': 'application/vnd.github.v3+json'
         }
         
@@ -543,13 +542,16 @@ def remove_repository(request, pk, repo_id):
 @login_required
 def debug_github(request):
     """Debug GitHub connection and repositories"""
+    github_token = get_github_token_for_user(request.user.id)
+    if not github_token:
+        messages.error(request, 'No GitHub token found. Please connect your GitHub account.')
+        return redirect('github:admin')
     try:
-        github_token = GitHubToken.objects.get(user=request.user)
         print(f"Found GitHub token for user {request.user.username}")
-        print(f"Token: {github_token.access_token[:10]}...")
+        print(f"Token: {github_token[:10]}...")
         
         headers = {
-            'Authorization': f'token {github_token.access_token}',
+            'Authorization': f'token {github_token}',
             'Accept': 'application/vnd.github.v3+json'
         }
         
@@ -578,9 +580,6 @@ def debug_github(request):
             'repos_response': repos_response
         })
         
-    except GitHubToken.DoesNotExist:
-        messages.error(request, 'No GitHub token found. Please connect your GitHub account.')
-        return redirect('github:admin')
     except Exception as e:
         messages.error(request, f'Error: {str(e)}')
         return redirect('applications:list')

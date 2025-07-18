@@ -1,0 +1,139 @@
+{% extends "base/base.html" %}
+{% load socialaccount %}
+
+{% block title %}GitHub Admin - GitPulse{% endblock title %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+    <!-- Header -->
+    <div class="text-center py-8">
+        <h1 class="text-3xl font-bold gradient-text mb-4">GitHub Configuration</h1>
+        <p class="text-lg text-medium-gray">Configure your GitHub OAuth App and API access</p>
+    </div>
+
+    <!-- Single Configuration Form -->
+    <div class="card-modern p-8">
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Left Column: Configuration -->
+                <div class="space-y-6">
+                    <h2 class="text-xl font-bold text-dark-gray">OAuth App Configuration</h2>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold">Client ID</span>
+                        </label>
+                        {{ form.client_id }}
+                        {% if form.client_id.errors %}
+                        <div class="text-error text-sm mt-1">{{ form.client_id.errors.0 }}</div>
+                        {% endif %}
+                        <div class="text-sm text-medium-gray mt-1">
+                            From your GitHub OAuth App
+                        </div>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold">Client Secret</span>
+                        </label>
+                        <input type="password" name="oauth_secret" class="input input-bordered w-full" 
+                               value="{{ oauth_secret }}"
+                               placeholder="OAuth App Client Secret (for user login)">
+                        <div class="text-sm text-medium-gray mt-1">
+                            Your OAuth App's client secret (for user authentication)
+                        </div>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold">Personal Access Token</span>
+                        </label>
+                        {{ form.client_secret }}
+                        {% if form.client_secret.errors %}
+                        <div class="text-error text-sm mt-1">{{ form.client_secret.errors.0 }}</div>
+                        {% endif %}
+                        <div class="text-sm text-medium-gray mt-1">
+                            Create at <a href="https://github.com/settings/tokens" target="_blank" class="link">GitHub Settings</a> with scopes: repo, user, admin:org
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-full">
+                        Save Configuration
+                    </button>
+                </div>
+
+                <!-- Right Column: Status & Info -->
+                <div class="space-y-6">
+                    <h2 class="text-xl font-bold text-dark-gray">Status & Setup</h2>
+                    
+                    <!-- Callback URL -->
+                    <div>
+                        <h3 class="font-semibold text-dark-gray mb-2">Callback URL:</h3>
+                        <code class="text-xs bg-gray-100 p-3 rounded block break-all">{{ user_redirect_url }}</code>
+                        <div class="text-sm text-medium-gray mt-1">Add this to your GitHub OAuth App</div>
+                    </div>
+                    
+                    <!-- User SSO Status -->
+                    <div>
+                        <h3 class="font-semibold text-dark-gray mb-2">User Authentication:</h3>
+                        {% if github_connected %}
+                            <div class="alert alert-success">
+                                ✅ Connected as {{ github_username }}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                ⚠️ Not connected
+                            </div>
+                        {% endif %}
+                        <a href="{% provider_login_url 'github' %}" class="btn btn-outline btn-sm mt-2">
+                            {% if github_connected %}Reconnect{% else %}Test Login{% endif %}
+                        </a>
+                    </div>
+                    
+                    <!-- API Status -->
+                    <div>
+                        <h3 class="font-semibold text-dark-gray mb-2">API Access:</h3>
+                        {% if app_token_valid %}
+                            <div class="alert alert-success">
+                                ✅ API Ready ({{ app_username }})
+                            </div>
+                        {% else %}
+                            <div class="alert alert-error">
+                                ❌ No API Access
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Quick Setup Guide -->
+    <div class="card-modern p-6">
+        <h2 class="text-lg font-bold text-dark-gray mb-4">Quick Setup</h2>
+        <div class="grid md:grid-cols-2 gap-6 text-sm">
+            <div>
+                <h3 class="font-semibold mb-2">1. Create GitHub OAuth App</h3>
+                <ul class="space-y-1 text-medium-gray">
+                    <li>• Go to <a href="https://github.com/settings/applications/oauth" target="_blank" class="link">GitHub OAuth Apps</a></li>
+                    <li>• Create new OAuth App</li>
+                    <li>• Set callback URL (shown above)</li>
+                    <li>• Copy Client ID and Secret</li>
+                </ul>
+            </div>
+            <div>
+                <h3 class="font-semibold mb-2">2. Create Personal Access Token</h3>
+                <ul class="space-y-1 text-medium-gray">
+                    <li>• Go to <a href="https://github.com/settings/tokens" target="_blank" class="link">GitHub Tokens</a></li>
+                    <li>• Create "Fine-grained" token</li>
+                    <li>• Select scopes: repo, user, admin:org</li>
+                    <li>• Copy token</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

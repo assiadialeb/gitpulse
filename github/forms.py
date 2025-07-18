@@ -12,11 +12,12 @@ class GitHubAppForm(forms.ModelForm):
         widgets = {
             'client_id': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',
-                'placeholder': 'GitHub App Client ID'
+                'placeholder': 'GitHub OAuth App Client ID'
             }),
-            'client_secret': forms.PasswordInput(attrs={
+            'client_secret': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',
-                'placeholder': 'GitHub App Client Secret'
+                'placeholder': 'Personal Access Token (ghp_...)',
+                'type': 'password'
             }),
         }
     

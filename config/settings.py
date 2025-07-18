@@ -165,11 +165,11 @@ Q_CLUSTER = {
     'queue_limit': 500,
     'cpu_affinity': 1,
     'label': 'Django Q',
-    'redis': {
-        'host': config('REDIS_HOST', default='127.0.0.1'),
-        'port': int(config('REDIS_PORT', default=6379)),
-        'db': 0,
-    }
+    'mongo': {
+        'host': MONGODB_HOST,
+        'port': MONGODB_PORT,
+    },
+    'mongo_db': MONGODB_NAME,
 }
 
 # GitPulse Configuration

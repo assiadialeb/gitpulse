@@ -10,6 +10,7 @@ from mongoengine import Q
 
 from .models import Commit, SyncLog, RepositoryStats
 from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
+from .github_utils import get_github_token_for_user
 from .services import RateLimitService
 from applications.models import Application, ApplicationRepository
 from github.models import GitHubToken
@@ -28,11 +29,10 @@ class SyncService:
     
     def _init_github_service(self):
         """Initialize GitHub service with user's token"""
-        try:
-            github_token = GitHubToken.objects.get(user_id=self.user_id)
-            self.github_service = GitHubService(github_token.access_token)
-        except GitHubToken.DoesNotExist:
+        access_token = get_github_token_for_user(self.user_id)
+        if not access_token:
             raise ValueError(f"No GitHub token found for user {self.user_id}")
+        self.github_service = GitHubService(access_token)
     
     def sync_application_repositories(self, application_id: int, sync_type: str = 'incremental') -> Dict:
         """
@@ -220,7 +220,7 @@ class SyncService:
             
             # Get user's GitHub username for rate limit service
             try:
-                github_token = GitHubToken.objects.get(user_id=self.user_id)
+                github_token = GitHubToken.objects.filter(user_id=self.user_id).first()
                 github_username = github_token.github_username
             except GitHubToken.DoesNotExist:
                 github_username = f"user_{self.user_id}"
