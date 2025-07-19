@@ -198,6 +198,23 @@ SOCIALACCOUNT_PROVIDERS = {
     'github': {}
 }
 
+# Django Cache Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+        'TIMEOUT': 3600,  # 1 hour default timeout
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,  # Maximum number of entries in cache
+        }
+    }
+}
+
+# Cache settings for analytics
+ANALYTICS_CACHE_TIMEOUT = 1  # 1 hour for analytics data
+PR_METRICS_CACHE_TIMEOUT = 1  # 30 minutes for PR metrics
+COMMIT_METRICS_CACHE_TIMEOUT = 1  # 2 hours for commit metrics
+
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
 # Custom adapter to capture GitHub tokens

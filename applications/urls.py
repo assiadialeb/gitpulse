@@ -11,6 +11,7 @@ urlpatterns = [
     path('<int:pk>/delete/', views.application_delete, name='delete'),
     path('<int:pk>/add-repositories/', views.add_repositories, name='add_repositories'),
     path('<int:pk>/api/repositories/', views.api_get_repositories, name='api_get_repositories'),
+    path('<int:pk>/api/pr-metrics/', views.api_pr_health_metrics, name='api_pr_health_metrics'),
     path('<int:pk>/remove-repository/<int:repo_id>/', views.remove_repository, name='remove_repository'),
     path('debug/github/', views.debug_github, name='debug_github'),
 ] 

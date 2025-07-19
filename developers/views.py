@@ -326,7 +326,7 @@ def _calculate_detailed_quality_metrics(commits):
         quality_scores.append(min(100, code_quality))
         
         # Calculate impact score
-        impact_score = 40  # Base score
+        impact_score = 50  # Base score
         if commit.total_changes > 20:
             impact_score += 40
         elif commit.total_changes > 10:

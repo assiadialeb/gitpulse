@@ -348,6 +348,17 @@
                         </div>
                     </div>
 
+                    <!-- Pull Request Health -->
+                    <div id="pr-health-metrics" class="bg-white p-6 mb-8 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-semibold text-dark-gray mb-6">🔍 Pull Request Health</h3>
+                        <div id="pr-metrics-loading">
+                            <div class="flex items-center justify-center py-8">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-green"></div>
+                                <span class="ml-3 text-medium-gray">Loading PR metrics...</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Application Quality Metrics -->
                     <div class="bg-white p-6 mb-8 rounded-xl shadow-lg">
                         <h3 class="text-xl font-semibold text-dark-gray mb-6">📊 Application Quality Metrics</h3>
@@ -422,6 +433,7 @@
                                 </div>
                             </div>
                         </div>
+                        
                         {% else %}
                         <div class="text-center py-8">
                             <p class="text-gray-500">No quality metrics available. Run the quality analysis first.</p>
@@ -964,7 +976,128 @@ document.addEventListener('DOMContentLoaded', function() {
     {% if bubble_chart.datasets %}
     initializeBubbleChart();
     {% endif %}
+    
+    // Load PR metrics asynchronously if the block exists
+    const prMetricsBlock = document.getElementById('pr-health-metrics');
+    if (prMetricsBlock) {
+        loadPRMetrics({{ application.id }});
+    }
 });
+
+// Lazy loading for PR metrics
+function loadPRMetrics(applicationId) {
+    const metricsBlock = document.getElementById('pr-health-metrics');
+    const loadingElement = document.getElementById('pr-metrics-loading');
+    
+    if (!metricsBlock || !loadingElement) return;
+    
+    // Show loading state
+    loadingElement.innerHTML = `
+        <div class="flex items-center justify-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-green"></div>
+            <span class="ml-3 text-medium-gray">Loading PR metrics...</span>
+        </div>
+    `;
+    
+    // Fetch metrics from API
+    fetch(`/applications/${applicationId}/api/pr-metrics/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updatePRMetricsDisplay(data.metrics);
+                loadingElement.style.display = 'none';
+            } else {
+                loadingElement.innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <p>Error loading PR metrics: ${data.error || 'Unknown error'}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading PR metrics:', error);
+            loadingElement.innerHTML = `
+                <div class="text-center py-8 text-red-500">
+                    <p>Error loading PR metrics. Please refresh the page.</p>
+                </div>
+            `;
+        });
+}
+
+function updatePRMetricsDisplay(metrics) {
+    const metricsBlock = document.getElementById('pr-health-metrics');
+    if (!metricsBlock) return;
+    
+    // Update the metrics display with the fetched data
+    metricsBlock.innerHTML = `
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h3 class="text-xl font-semibold text-dark-gray mb-4">🔍 Pull Request Health</h3>
+            
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="text-center p-4 bg-light-gray rounded-xl">
+                    <p class="text-2xl font-bold text-primary-green">${metrics.total_prs}</p>
+                    <p class="text-sm text-medium-gray">Total PRs</p>
+                </div>
+                <div class="text-center p-4 bg-light-gray rounded-xl">
+                    <p class="text-2xl font-bold text-blue-500">${metrics.merged_prs}</p>
+                    <p class="text-sm text-medium-gray">Merged (${metrics.merged_prs_percentage}%)</p>
+                </div>
+                <div class="text-center p-4 bg-light-gray rounded-xl">
+                    <p class="text-2xl font-bold text-yellow-500">${metrics.self_merged_prs}</p>
+                    <p class="text-sm text-medium-gray">Self-merged (${metrics.self_merged_rate}%)</p>
+                </div>
+                <div class="text-center p-4 bg-light-gray rounded-xl">
+                    <p class="text-2xl font-bold text-purple-500">${metrics.avg_merge_time_hours}h</p>
+                    <p class="text-sm text-medium-gray">Avg Merge Time</p>
+                </div>
+            </div>
+            
+            <!-- Detailed Metrics Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="text-left py-2 font-medium text-dark-gray">Metric</th>
+                            <th class="text-right py-2 font-medium text-dark-gray">Value</th>
+                            <th class="text-right py-2 font-medium text-dark-gray">Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-gray-100">
+                            <td class="py-2 text-medium-gray">Open PRs</td>
+                            <td class="text-right font-medium">${metrics.open_prs}</td>
+                            <td class="text-right text-medium-gray">${metrics.open_prs_percentage || 0}%</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="py-2 text-medium-gray">PRs Without Review*</td>
+                            <td class="text-right font-medium">${metrics.prs_without_review}</td>
+                            <td class="text-right text-medium-gray">${metrics.prs_without_review_rate || 0}%</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="py-2 text-medium-gray">PRs Open > 7 Days</td>
+                            <td class="text-right font-medium">${metrics.old_open_prs}</td>
+                            <td class="text-right text-medium-gray">${metrics.old_open_prs_rate || 0}%</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 text-medium-gray">Median Merge Time</td>
+                            <td class="text-right font-medium">${metrics.median_merge_time_hours}h</td>
+                            <td class="text-right text-medium-gray">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Note explicative -->
+            <div class="mt-4 p-3 bg-blue-50 rounded-lg">
+                <p class="text-sm text-blue-700">
+                    <strong>* PRs Without Review:</strong> Includes self-merged PRs and those with ≤1 comment, 
+                    considered as potentially unreviewed.
+                </p>
+            </div>
+        </div>
+    `;
+}
 
 // Bubble chart initialization
 function initializeBubbleChart() {

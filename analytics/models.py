@@ -396,6 +396,18 @@ class PullRequest(Document):
     state = fields.StringField()  # open/closed
     url = fields.StringField()
     labels = fields.ListField(fields.StringField())
+    
+    # Nouveaux champs pour les métriques détaillées
+    merged_by = fields.StringField()  # Qui a fait le merge
+    requested_reviewers = fields.ListField(fields.StringField())  # Reviewers demandés
+    assignees = fields.ListField(fields.StringField())  # Assignés
+    review_comments_count = fields.IntField(default=0)  # Nombre de commentaires de review
+    comments_count = fields.IntField(default=0)  # Nombre total de commentaires
+    commits_count = fields.IntField(default=0)  # Nombre de commits
+    additions_count = fields.IntField(default=0)  # Lignes ajoutées
+    deletions_count = fields.IntField(default=0)  # Lignes supprimées
+    changed_files_count = fields.IntField(default=0)  # Nombre de fichiers modifiés
+    
     payload = fields.DictField()  # Raw PR payload (optionnel)
 
     meta = {
@@ -404,7 +416,13 @@ class PullRequest(Document):
             'application_id',
             'repository_full_name',
             'number',
-            ('application_id', 'repository_full_name', 'number'),
+            'author',
+            'state',
+            'merged_at',
+            'merged_by',
+            ('application_id', 'repository_full_name'),
+            ('application_id', 'number'),
+            ('repository_full_name', 'number'),
         ]
     }
 
