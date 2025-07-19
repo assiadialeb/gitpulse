@@ -74,7 +74,7 @@ def admin_view(request):
             
             # Check if user has valid OAuth token
             token = get_github_token_for_user(request.user.id)
-            if token and not token.startswith(('ghp_', 'gho_', 'github_pat_')):  # Exclude fallback PAT
+            if token:  # OAuth App token is always valid if present
                 user_has_valid_token = True
                 
     except Exception as e:

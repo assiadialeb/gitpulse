@@ -8,11 +8,14 @@ from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.core.exceptions import PermissionDenied
+import re
 
 from .models import Application, ApplicationRepository
 from .forms import ApplicationForm, RepositorySelectionForm
-from github.models import GitHubToken
-from analytics.github_utils import get_github_token_for_user
+from analytics.github_token_service import GitHubTokenService
+
+
+
 
 
 @login_required
@@ -27,8 +30,6 @@ def application_list(request):
 @login_required
 def application_create(request):
     """Create a new application"""
-    if not request.user.is_superuser:
-        return redirect('applications:list')
     if request.method == 'POST':
         form = ApplicationForm(request.POST)
         if form.is_valid():
@@ -48,7 +49,9 @@ def application_create(request):
 @login_required
 def application_detail(request, pk):
     """Display application details and repositories with analytics dashboard"""
-    application = get_object_or_404(Application, pk=pk)
+    application = get_object_or_404(Application, pk=pk, owner=request.user)
+    
+    # Get repositories for this application
     repositories = application.repositories.all()
     
     # Get analytics data
@@ -72,6 +75,8 @@ def application_detail(request, pk):
                 'active_days': 0,
                 'total_days': 0
             }
+        
+
         
         # Get application quality metrics
         application_quality_metrics = _generate_application_quality_metrics(application)
@@ -226,10 +231,8 @@ def application_detail(request, pk):
 
 @login_required
 def application_edit(request, pk):
-    """Edit an existing application"""
-    if not (request.user.is_superuser or request.user.is_staff):
-        raise PermissionDenied
-    application = get_object_or_404(Application, pk=pk)
+    """Edit an application"""
+    application = get_object_or_404(Application, pk=pk, owner=request.user)
     
     if request.method == 'POST':
         form = ApplicationForm(request.POST, instance=application)
@@ -249,34 +252,12 @@ def application_edit(request, pk):
 @login_required
 def application_delete(request, pk):
     """Delete an application"""
-    if not (request.user.is_superuser or request.user.is_staff):
-        raise PermissionDenied
-    application = get_object_or_404(Application, pk=pk)
+    application = get_object_or_404(Application, pk=pk, owner=request.user)
     
     if request.method == 'POST':
-        application_name = application.name
-        application_id = application.id
-        
-        # Clean up MongoDB data before deleting the application
-        try:
-            from analytics.services import cleanup_application_data
-            cleanup_results = cleanup_application_data(application_id)
-            
-            if 'error' in cleanup_results:
-                messages.warning(request, f'Application deleted but some data cleanup failed: {cleanup_results["error"]}')
-            else:
-                messages.success(request, f'Application "{application_name}" and all related data deleted successfully!')
-                if cleanup_results['total_deleted'] > 0:
-                    messages.info(request, f'Cleaned up {cleanup_results["total_deleted"]} MongoDB records.')
-        except ImportError:
-            # If analytics app is not available, just delete the application
-            messages.success(request, f'Application "{application_name}" deleted successfully!')
-        except Exception as e:
-            # If cleanup fails, still delete the application but warn the user
-            messages.warning(request, f'Application deleted but data cleanup failed: {str(e)}')
-        
-        # Delete the application
+        name = application.name
         application.delete()
+        messages.success(request, f'Application "{name}" deleted successfully!')
         return redirect('applications:list')
     
     return render(request, 'applications/delete.html', {
@@ -285,144 +266,136 @@ def application_delete(request, pk):
 
 
 @login_required
+def remove_repository(request, pk, repo_id):
+    """Remove a repository from an application"""
+    application = get_object_or_404(Application, pk=pk, owner=request.user)
+    repository = get_object_or_404(ApplicationRepository, pk=repo_id, application=application)
+    
+    if request.method == 'POST':
+        repo_name = repository.github_repo_name
+        repository.delete()
+        messages.success(request, f'Repository "{repo_name}" removed from "{application.name}"')
+        return redirect('applications:detail', pk=application.pk)
+    
+    return render(request, 'applications/remove_repository.html', {
+        'application': application,
+        'repository': repository
+    })
+
+
+@login_required
 def add_repositories(request, pk):
     """Add GitHub repositories to an application"""
     application = get_object_or_404(Application, pk=pk, owner=request.user)
     
-    # Get user's GitHub token
-    github_token = get_github_token_for_user(request.user.id)
-    if not github_token:
-        messages.error(request, 'Please connect your GitHub account first.')
-        return redirect('github:admin')
+    # Get user's GitHub token for repository access
+    github_token = GitHubTokenService.get_token_for_operation('private_repos', request.user.id)
+    print(f"DEBUG: Token found via service: {bool(github_token)}")
     
-    # Fetch user's repositories from GitHub
-    github_repos = []
+    # If no token via service, try to get it from session or other sources
+    if not github_token:
+        # Try to get token from session (for GitHub SSO)
+        github_token = request.session.get('github_token')
+        print(f"DEBUG: Token from session: {bool(github_token)}")
+        
+        # If still no token, try to get it from the user's social account
+        if not github_token:
+            try:
+                from allauth.socialaccount.models import SocialAccount, SocialToken, SocialApp
+                social_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+                if social_account:
+                    app = SocialApp.objects.filter(provider='github').first()
+                    if app:
+                        social_token = SocialToken.objects.filter(account=social_account, app=app).first()
+                        if social_token:
+                            github_token = social_token.token
+                            print(f"DEBUG: Token from SocialToken: {bool(github_token)}")
+            except Exception as e:
+                print(f"DEBUG: Error getting token from SocialToken: {e}")
+        
+        # If still no token, try to get it from the social account's extra data
+        if not github_token:
+            try:
+                from allauth.socialaccount.models import SocialAccount
+                social_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+                if social_account and social_account.extra_data:
+                    # Try to get access_token from extra_data
+                    github_token = social_account.extra_data.get('access_token')
+                    print(f"DEBUG: Token from extra_data: {bool(github_token)}")
+            except Exception as e:
+                print(f"DEBUG: Error getting token from extra_data: {e}")
+        
+        # If still no token, try to use the OAuth App token for basic operations
+        if not github_token:
+            try:
+                from allauth.socialaccount.models import SocialApp
+                app = SocialApp.objects.filter(provider='github').first()
+                if app and app.secret:
+                    github_token = app.secret
+                    print(f"DEBUG: Using OAuth App token as fallback: {bool(github_token)}")
+            except Exception as e:
+                print(f"DEBUG: Error getting OAuth App token: {e}")
+        
+        # If still no token, redirect to GitHub connection
+        if not github_token:
+            messages.error(request, 'Please connect your GitHub account first.')
+            return redirect('socialaccount_connections')
+        
+        # If we have a token but it's a test token, redirect to GitHub to get a real one
+        if github_token and github_token.startswith('ghp_test_'):
+            messages.warning(request, 'Please reconnect via GitHub to get a valid token.')
+            return redirect('socialaccount_connections')
+    
+    # Get existing repos for this application
     existing_repos = list(application.repositories.values_list('github_repo_name', flat=True))
     print(f"Debug: Found {len(existing_repos)} existing repos: {existing_repos}")
     
-    try:
-        headers = {
-            'Authorization': f'token {github_token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
-        
-        # Get user's repositories (both owned and collaborated) - get more pages
-        all_repos = []
-        page = 1
-        while True:
-            response = requests.get('https://api.github.com/user/repos', headers=headers, params={
-                'sort': 'updated',
-                'per_page': 100,
-                'type': 'all',  # Include all repos (owned, collaborated, etc.)
-                'page': page
-            })
-            
-            print(f"GitHub API Response Status: {response.status_code}")
-            print(f"GitHub API Response Headers: {dict(response.headers)}")
-            
-            if response.status_code == 200:
-                repos_page = response.json()
-                if not repos_page:  # No more repos
-                    break
-                all_repos.extend(repos_page)
-                print(f"Page {page}: Found {len(repos_page)} repositories")
-                page += 1
-                if page > 10:  # Limit to 1000 repos max
-                    break
-            else:
-                print(f"GitHub API Error: {response.status_code} - {response.text}")
-                messages.error(request, f'Failed to fetch repositories from GitHub. Status: {response.status_code}')
-                return redirect('applications:detail', pk=pk)
-        
-        github_repos = all_repos
-        print(f"Total repositories found: {len(github_repos)}")
-        for repo in github_repos[:3]:  # Show first 3 repos for debug
-            print(f"  - {repo.get('full_name', 'N/A')}: {repo.get('description', 'No description')}")
-            
-    except Exception as e:
-        messages.error(request, f'Error connecting to GitHub: {str(e)}')
-        return redirect('applications:detail', pk=pk)
+    # For GET requests, just render the template - JavaScript will handle the API calls
+    if request.method == 'GET':
+        return render(request, 'applications/add_repositories.html', {
+            'application': application,
+            'existing_repos': existing_repos,
+        })
     
+    # For POST requests, handle repository addition
     if request.method == 'POST':
-        # Check if this is a search request
-        if 'search' in request.POST:
-            # Just re-render with search results
-            form = RepositorySelectionForm(
-                request.POST,
-                github_repos=github_repos,
-                existing_repos=existing_repos,
-                search_query=request.POST.get('search_query', '')
-            )
-            choices = form.fields['repositories'].choices
-            return render(request, 'applications/add_repositories.html', {
-                'form': form,
-                'application': application,
-                'github_repos': github_repos,
-                'existing_repos': existing_repos,
-                'choices_count': len(choices),
-                'choices': choices  # Passer les choix directement
-            })
+        selected_repos = request.POST.getlist('repositories')
+        added_count = 0
         
-        # This is a form submission to add repositories
-        form = RepositorySelectionForm(
-            request.POST,
-            github_repos=github_repos,
-            existing_repos=existing_repos,
-            search_query=request.POST.get('search_query', '')
-        )
-        
-        if form.is_valid():
-            selected_repos = form.cleaned_data['repositories']
-            added_count = 0
-            
-            for repo_name in selected_repos:
-                # Find the repo data in github_repos
-                repo_data = next((repo for repo in github_repos if repo['full_name'] == repo_name), None)
+        if selected_repos:
+            try:
+                from analytics.github_service import GitHubService
+                github_service = GitHubService(github_token)
                 
-                if repo_data:
-                    ApplicationRepository.objects.create(
-                        application=application,
-                        github_repo_name=repo_data['full_name'],
-                        github_repo_id=repo_data['id'],
-                        github_repo_url=repo_data.get('clone_url', ''),
-                        description=repo_data.get('description', ''),
-                        default_branch=repo_data.get('default_branch', 'main'),
-                        is_private=repo_data.get('private', False),
-                        language=repo_data.get('language', ''),
-                        stars_count=repo_data.get('stargazers_count', 0),
-                        forks_count=repo_data.get('forks_count', 0),
-                        last_updated=repo_data.get('pushed_at')
-                    )
-                    added_count += 1
-            
-            if added_count > 0:
-                messages.success(request, f'Added {added_count} repositories to "{application.name}".')
-            else:
-                messages.info(request, 'No repositories were added.')
-            
-            return redirect('applications:detail', pk=pk)
-    else:
-        form = RepositorySelectionForm(
-            github_repos=github_repos,
-            existing_repos=existing_repos,
-            search_query=''  # Toujours vide en GET pour afficher tous les repos
-        )
-    
-    # Debug: vérifier que le formulaire a bien les choix
-    print(f"DEBUG VIEW: Form choices count: {len(form.fields['repositories'].choices)}")
-    print(f"DEBUG VIEW: First 3 choices: {form.fields['repositories'].choices[:3]}")
-    
-    # Passer les choix directement au template
-    choices = form.fields['repositories'].choices
-    
-    return render(request, 'applications/add_repositories.html', {
-        'form': form,
-        'application': application,
-        'github_repos': github_repos,
-        'existing_repos': existing_repos,
-        'choices_count': len(choices),
-        'choices': choices  # Passer les choix directement
-    })
+                for repo_name in selected_repos:
+                    # Get repo details from GitHub API
+                    repo_data, _ = github_service._make_request(f'https://api.github.com/repos/{repo_name}')
+                    
+                    if repo_data:
+                        ApplicationRepository.objects.create(
+                            application=application,
+                            github_repo_name=repo_data['full_name'],
+                            github_repo_id=repo_data['id'],
+                            github_repo_url=repo_data.get('clone_url', ''),
+                            description=repo_data.get('description', ''),
+                            default_branch=repo_data.get('default_branch', 'main'),
+                            is_private=repo_data.get('private', False),
+                            language=repo_data.get('language', ''),
+                            stars_count=repo_data.get('stargazers_count', 0),
+                            forks_count=repo_data.get('forks_count', 0),
+                            last_updated=repo_data.get('pushed_at')
+                        )
+                        added_count += 1
+                
+                if added_count > 0:
+                    messages.success(request, f'Added {added_count} repositories to "{application.name}".')
+                else:
+                    messages.info(request, 'No repositories were added.')
+                    
+            except Exception as e:
+                messages.error(request, f'Error adding repositories: {str(e)}')
+        
+        return redirect('applications:detail', pk=pk)
 
 
 @login_required
@@ -431,8 +404,8 @@ def api_get_repositories(request, pk):
     """API endpoint to get GitHub repositories with caching and real-time search"""
     application = get_object_or_404(Application, pk=pk, owner=request.user)
     
-    # Get user's GitHub token
-    github_token = get_github_token_for_user(request.user.id)
+    # Get user's GitHub token for repository access
+    github_token = GitHubTokenService.get_token_for_operation('private_repos', request.user.id)
     if not github_token:
         return JsonResponse({'error': 'GitHub token not found'}, status=401)
     
@@ -443,32 +416,32 @@ def api_get_repositories(request, pk):
     existing_repos = list(application.repositories.values_list('github_repo_name', flat=True))
     
     try:
-        headers = {
-            'Authorization': f'token {github_token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
+        from analytics.github_service import GitHubService
+        github_service = GitHubService(github_token)
         
         # Get user's repositories
         all_repos = []
         page = 1
         while True:
-            response = requests.get('https://api.github.com/user/repos', headers=headers, params={
+            url = 'https://api.github.com/user/repos'
+            params = {
                 'sort': 'updated',
                 'per_page': 100,
                 'type': 'all',
                 'page': page
-            })
+            }
             
-            if response.status_code == 200:
-                repos_page = response.json()
-                if not repos_page:
+            repos_data, _ = github_service._make_request(url, params)
+            
+            if repos_data is not None:
+                if not repos_data:
                     break
-                all_repos.extend(repos_page)
+                all_repos.extend(repos_data)
                 page += 1
                 if page > 10:
                     break
             else:
-                return JsonResponse({'error': f'GitHub API error: {response.status_code}'}, status=500)
+                return JsonResponse({'error': 'GitHub API error'}, status=500)
         
         # Filter repositories
         filtered_repos = []
@@ -507,81 +480,28 @@ def api_get_repositories(request, pk):
 
 
 @login_required
-def remove_repository(request, pk, repo_id):
-    """Remove a repository from an application"""
-    application = get_object_or_404(Application, pk=pk, owner=request.user)
-    repository = get_object_or_404(ApplicationRepository, pk=repo_id, application=application)
-    
-    if request.method == 'POST':
-        repo_name = repository.github_repo_name
-        
-        # Clean up MongoDB data before deleting the repository
-        try:
-            from analytics.services import cleanup_repository_data
-            cleanup_results = cleanup_repository_data(repo_name)
-            
-            if 'error' in cleanup_results:
-                messages.warning(request, f'Repository removed but some data cleanup failed: {cleanup_results["error"]}')
-            else:
-                if cleanup_results['total_deleted'] > 0:
-                    messages.info(request, f'Cleaned up {cleanup_results["total_deleted"]} MongoDB records.')
-        except ImportError:
-            # If analytics app is not available, just delete the repository
-            pass
-        except Exception as e:
-            # If cleanup fails, still delete the repository but warn the user
-            messages.warning(request, f'Repository removed but data cleanup failed: {str(e)}')
-        
-        # Delete the repository
-        repository.delete()
-        messages.success(request, f'Repository "{repo_name}" removed from "{application.name}".')
-    
-    return redirect('applications:detail', pk=pk)
-
-
-@login_required
 def debug_github(request):
-    """Debug GitHub connection and repositories"""
-    github_token = get_github_token_for_user(request.user.id)
-    if not github_token:
-        messages.error(request, 'No GitHub token found. Please connect your GitHub account.')
-        return redirect('github:admin')
+    """Debug GitHub connection and token access"""
     try:
-        print(f"Found GitHub token for user {request.user.username}")
-        print(f"Token: {github_token[:10]}...")
+        # Test different token types
+        basic_token = GitHubTokenService.get_token_for_operation('basic')
+        user_token = GitHubTokenService.get_token_for_operation('private_repos', request.user.id)
         
-        headers = {
-            'Authorization': f'token {github_token}',
-            'Accept': 'application/vnd.github.v3+json'
+        # Validate tokens
+        basic_validation = GitHubTokenService.validate_token_access(basic_token) if basic_token else None
+        user_validation = GitHubTokenService.validate_token_access(user_token) if user_token else None
+        
+        context = {
+            'basic_token': basic_token,
+            'user_token': user_token,
+            'basic_validation': basic_validation,
+            'user_validation': user_validation,
         }
         
-        # Test user info
-        user_response = requests.get('https://api.github.com/user', headers=headers)
-        print(f"User API Status: {user_response.status_code}")
-        if user_response.status_code == 200:
-            user_data = user_response.json()
-            print(f"GitHub User: {user_data.get('login', 'N/A')}")
-        
-        # Test repositories
-        repos_response = requests.get('https://api.github.com/user/repos', headers=headers, params={
-            'sort': 'updated',
-            'per_page': 10
-        })
-        print(f"Repos API Status: {repos_response.status_code}")
-        if repos_response.status_code == 200:
-            repos_data = repos_response.json()
-            print(f"Found {len(repos_data)} repositories")
-            for repo in repos_data:
-                print(f"  - {repo.get('full_name', 'N/A')}")
-        
-        return render(request, 'applications/debug_github.html', {
-            'github_token': github_token,
-            'user_response': user_response,
-            'repos_response': repos_response
-        })
+        return render(request, 'applications/debug_github.html', context)
         
     except Exception as e:
-        messages.error(request, f'Error: {str(e)}')
+        messages.error(request, f'Error debugging GitHub: {str(e)}')
         return redirect('applications:list')
 
 

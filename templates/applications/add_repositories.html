@@ -182,9 +182,23 @@ let selectedRepositories = new Set();
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    cleanupOldCache();
     loadRepositories();
     setupSearchListener();
 });
+
+// Clean up old cache on page load
+function cleanupOldCache() {
+    try {
+        Object.keys(localStorage).forEach(key => {
+            if (key.includes('github_repositories') && key !== CACHE_KEY) {
+                localStorage.removeItem(key);
+            }
+        });
+    } catch (error) {
+        console.error('Error cleaning up cache:', error);
+    }
+}
 
 function setupSearchListener() {
     const searchInput = document.getElementById('search-input');
@@ -256,13 +270,48 @@ function getCachedRepositories() {
 
 function cacheRepositories(repositories) {
     try {
+        // Limit the data to essential fields to reduce size
+        const limitedRepositories = repositories.map(repo => ({
+            full_name: repo.full_name,
+            description: repo.description || '',
+            is_private: repo.is_private,
+            language: repo.language || '',
+            stars_count: repo.stars_count || 0,
+            forks_count: repo.forks_count || 0
+        }));
+        
         const data = {
-            repositories: repositories,
+            repositories: limitedRepositories,
             timestamp: Date.now()
         };
-        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        
+        const jsonData = JSON.stringify(data);
+        
+        // Check if data is too large (localStorage limit is usually 5-10MB)
+        if (jsonData.length > 4 * 1024 * 1024) { // 4MB limit
+            console.warn('Repository data too large for cache, skipping cache');
+            return;
+        }
+        
+        localStorage.setItem(CACHE_KEY, jsonData);
     } catch (error) {
         console.error('Error caching repositories:', error);
+        // If quota exceeded, try to clear old cache and retry
+        if (error.name === 'QuotaExceededError') {
+            try {
+                // Clear all cache keys that might be related
+                Object.keys(localStorage).forEach(key => {
+                    if (key.includes('repositories') || key.includes('cache')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                // Try again with limited data
+                const limitedRepositories = repositories.slice(0, 100); // Limit to 100 repos
+                cacheRepositories(limitedRepositories);
+            } catch (retryError) {
+                console.error('Failed to cache repositories after cleanup:', retryError);
+            }
+        }
     }
 }
 
@@ -272,8 +321,7 @@ function filterRepositories(searchQuery) {
     } else {
         const query = searchQuery.toLowerCase();
         filteredRepositories = allRepositories.filter(repo => 
-            repo.full_name.toLowerCase().includes(query) ||
-            repo.description.toLowerCase().includes(query)
+            repo.full_name.toLowerCase().includes(query)
         );
     }
     

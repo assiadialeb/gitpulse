@@ -11,71 +11,39 @@ logger = logging.getLogger(__name__)
 
 def get_github_token_for_user(user_id: int) -> Optional[str]:
     """
-    Get GitHub token for API access - unified OAuth App approach
-    
-    This function implements a unified approach where:
-    1. Users authenticate via OAuth App (allauth)
-    2. We use their OAuth tokens for API access
-    3. Fallback to admin PAT if no user token available
+    Get GitHub token for API access - tries user token first, then app token
     
     Args:
         user_id: Django user ID
         
     Returns:
-        GitHub access token string or None if not found
+        GitHub token or None if not found
     """
     try:
         from allauth.socialaccount.models import SocialToken, SocialApp, SocialAccount
         from django.contrib.auth.models import User
         
-        # Strategy 1: User's OAuth token from allauth (PREFERRED)
+        # Try to get user's OAuth token first (for /user/repos access)
         try:
             user = User.objects.get(id=user_id)
-            
-            # Get the GitHub SocialApp (OAuth App configuration)
             github_app = SocialApp.objects.filter(provider='github').first()
-            if not github_app:
-                logger.warning("No GitHub SocialApp configured for allauth")
-            else:
-                # Get user's GitHub account
-                social_account = SocialAccount.objects.filter(
-                    user=user,
-                    provider='github'
-                ).first()
-                
+            
+            if github_app:
+                social_account = SocialAccount.objects.filter(user=user, provider='github').first()
                 if social_account:
-                    # Get the OAuth token for this user
-                    social_token = SocialToken.objects.filter(
-                        account=social_account,
-                        app=github_app
-                    ).first()
-                    
+                    social_token = SocialToken.objects.filter(account=social_account, app=github_app).first()
                     if social_token:
-                        # Check if token is still valid
                         if not social_token.expires_at or social_token.expires_at > timezone.now():
-                            logger.info(f"Using user OAuth token for user {user_id} ({user.username})")
+                            logger.info(f"Using user OAuth token for user {user_id}")
                             return social_token.token
                         else:
                             logger.warning(f"User OAuth token expired for user {user_id}")
-                    else:
-                        logger.info(f"No OAuth token found for user {user_id}")
-                else:
-                    logger.info(f"User {user_id} has not connected their GitHub account")
-                    
-        except User.DoesNotExist:
-            logger.error(f"User {user_id} does not exist")
         except Exception as e:
-            logger.error(f"Error getting user OAuth token for user {user_id}: {e}")
+            logger.info(f"No user OAuth token for user {user_id}: {e}")
         
-        # Strategy 2: Fallback to admin PAT (for background tasks or when user not connected)
-        logger.info(f"Falling back to admin PAT for user {user_id}")
-        admin_token = get_github_oauth_app_token()
-        if admin_token:
-            logger.info(f"Using admin PAT as fallback for user {user_id}")
-            return admin_token
-        
-        logger.error(f"No GitHub token available for user {user_id}")
-        return None
+        # Fallback to app token
+        logger.info(f"Using app token for user {user_id}")
+        return get_github_oauth_app_token()
         
     except Exception as e:
         logger.error(f"Error getting GitHub token for user {user_id}: {e}")
@@ -210,47 +178,69 @@ def sync_github_app_with_oauth():
         return False
 
 
+def get_github_oauth_app_credentials() -> tuple[Optional[str], Optional[str]]:
+    """
+    Get GitHub OAuth App credentials (client_id, client_secret)
+    
+    Returns:
+        Tuple of (client_id, client_secret) or (None, None) if not found
+    """
+    try:
+        from allauth.socialaccount.models import SocialApp
+        
+        github_app = SocialApp.objects.filter(provider='github').first()
+        if not github_app:
+            logger.error("No GitHub SocialApp found")
+            return None, None
+        
+        if not github_app.client_id or not github_app.secret:
+            logger.error("OAuth App client_id or client_secret missing")
+            return None, None
+        
+        logger.info("Using OAuth App client credentials")
+        return github_app.client_id, github_app.secret
+        
+    except Exception as e:
+        logger.error(f"Error getting OAuth App credentials: {e}")
+        return None, None
+
+
 def get_github_oauth_app_token() -> Optional[str]:
     """
     Get GitHub token using OAuth App configuration
     
     Returns:
-        GitHub access token or None if failed
+        GitHub client_secret (used as token) or None if failed
     """
     try:
-        # Get GitHub OAuth App configuration
-        github_app = GitHubApp.objects.first()
+        from allauth.socialaccount.models import SocialApp
+        
+        github_app = SocialApp.objects.filter(provider='github').first()
         if not github_app:
-            logger.error("No GitHub OAuth App configuration found")
-            logger.error("Please configure your OAuth App in /admin/github/githubapp/")
+            logger.error("No GitHub SocialApp found")
             return None
         
-        client_id = github_app.client_id
-        client_secret = github_app.client_secret
-        
-        if not client_id or not client_secret:
-            logger.error("GitHub client_id or client_secret missing")
+        if not github_app.secret:
+            logger.error("No OAuth App secret configured")
             return None
         
-        # Check if client_secret is actually a Personal Access Token (hack/fallback)
-        if client_secret.startswith(('ghp_', 'gho_', 'github_pat_')):
-            logger.info("Using Personal Access Token stored in client_secret (fallback mode)")
-            return client_secret
-        
-        # If it's a real OAuth App client_secret, we can't use it directly for API calls
-        # OAuth Apps need the OAuth flow to get access tokens
-        logger.warning("OAuth App client_secret detected but no user tokens available")
-        logger.warning("OAuth Apps require user authorization flow for API access")
-        logger.warning("Consider one of these solutions:")
-        logger.warning("1. Use GitHub App (not OAuth App) for organization-wide access")
-        logger.warning("2. Store a Personal Access Token in client_secret field (current fallback)")
-        logger.warning("3. Implement proper OAuth flow for user tokens")
-        
-        return None
+        logger.info("Using OAuth App client_secret as token")
+        return github_app.secret
         
     except Exception as e:
         logger.error(f"Error getting OAuth App token: {e}")
         return None
+
+
+def get_github_token() -> Optional[str]:
+    """
+    Get GitHub token for API access (simplified version without user_id)
+    
+    Returns:
+        GitHub OAuth App token or None if not found
+    """
+    logger.info("Getting OAuth App token")
+    return get_github_oauth_app_token()
 
 
 def get_github_app_installation_token(installation_id: int) -> Optional[str]:

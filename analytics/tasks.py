@@ -3,6 +3,7 @@ Django-Q tasks for automated synchronization
 """
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
 from django_q.tasks import async_task, schedule
 from django_q.models import Schedule
 
@@ -13,6 +14,7 @@ from applications.models import Application, ApplicationRepository
 # from github.models import GitHubToken  # Deprecated - using django-allauth now
 from .services import DeploymentIndexingService
 from .services import ReleaseIndexingService
+from .github_token_service import GitHubTokenService
 
 logger = logging.getLogger(__name__)
 
@@ -346,7 +348,7 @@ def manual_indexing_task(application_id: int, user_id: int):
         raise
 
 
-def background_indexing_task(application_id: int, user_id: int, task_id: str = None):
+def background_indexing_task(application_id: int, user_id: int, task_id: Optional[str] = None):
     """
     Background task for indexing with progress tracking
     
@@ -590,7 +592,7 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=10):
     from applications.models import Application
     from analytics.models import PullRequest
     from analytics.github_service import GitHubService
-    from analytics.github_utils import get_github_token_for_user
+    from analytics.github_token_service import GitHubTokenService
     import dateutil.parser
     from datetime import timezone, datetime
     import logging
@@ -613,7 +615,7 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=10):
             break
             
         user_id = app.owner_id
-        access_token = get_github_token_for_user(user_id)
+        access_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
         if not access_token:
             logger.warning(f"[App {app.id}] No GitHub token found for user {user_id}.")
             results.append({'app': app.id, 'error': 'No GitHub token'})

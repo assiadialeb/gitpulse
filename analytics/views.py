@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 from .analytics_service import AnalyticsService
 from analytics.sync_service import SyncService
 from analytics.models import Developer, DeveloperAlias
-# from github.models import GitHubToken  # Deprecated - using PAT now
+# from github.models import GitHubToken  # Deprecated - using OAuth App now
 
 
 @login_required

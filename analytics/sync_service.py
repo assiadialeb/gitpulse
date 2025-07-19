@@ -10,10 +10,10 @@ from mongoengine import Q
 
 from .models import Commit, SyncLog, RepositoryStats
 from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
-from .github_utils import get_github_token_for_user
+from .github_token_service import GitHubTokenService
 from .services import RateLimitService
 from applications.models import Application, ApplicationRepository
-# from github.models import GitHubToken  # Deprecated - using PAT now
+# from github.models import GitHubToken  # Deprecated - using OAuth App now
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,8 @@ class SyncService:
     
     def _init_github_service(self):
         """Initialize GitHub service with user's token"""
-        access_token = get_github_token_for_user(self.user_id)
+        # Use the new token service for repository access
+        access_token = GitHubTokenService.get_token_for_operation('private_repos', self.user_id)
         if not access_token:
             raise ValueError(f"No GitHub token found for user {self.user_id}")
         self.github_service = GitHubService(access_token)
@@ -197,12 +198,8 @@ class SyncService:
             sync_log.github_api_calls = results['api_calls']
             
             if commits_data:
-                sync_log.last_commit_date = datetime.fromisoformat(
-                    commits_data[0]['commit']['author']['date'].replace('Z', '+00:00')
-                )
-                sync_log.oldest_commit_date = datetime.fromisoformat(
-                    commits_data[-1]['commit']['author']['date'].replace('Z', '+00:00')
-                )
+                sync_log.last_commit_date = commits_data[0]['authored_date']
+                sync_log.oldest_commit_date = commits_data[-1]['authored_date']
             
             sync_log.save()
             
@@ -220,8 +217,8 @@ class SyncService:
             
             # Get user's GitHub username for rate limit service
             try:
-                # Try to get username from GitHub API using our PAT
-                access_token = get_github_token_for_user(self.user_id)
+                # Try to get username from GitHub API using OAuth App
+                access_token = GitHubTokenService.get_token_for_operation('basic')
                 if access_token:
                     github_service = GitHubService(access_token)
                     user_info, _ = github_service._make_request("https://api.github.com/user")
@@ -361,47 +358,24 @@ class SyncService:
         return results
     
     def _update_repository_stats(self, repo_stats: RepositoryStats, commits_data: List[Dict]):
-        """Update repository statistics after sync"""
+        """Update repository statistics with latest commit data"""
         if not commits_data:
             return
         
-        # Update last sync info
-        repo_stats.last_sync_at = datetime.utcnow()
+        # Update last commit date
         latest_commit = commits_data[0]
-        repo_stats.last_commit_sha = latest_commit.get('sha')
-        repo_stats.last_commit_date = datetime.fromisoformat(
-            latest_commit['commit']['author']['date'].replace('Z', '+00:00')
-        )
+        repo_stats.last_commit_date = latest_commit['authored_date']
         
-        # Update cached statistics
-        total_commits = Commit.objects(repository_full_name=repo_stats.repository_full_name).count()
-        repo_stats.total_commits = total_commits
+        # Update oldest commit date if this is the first sync or if we found older commits
+        oldest_commit = commits_data[-1]
+        if not repo_stats.oldest_commit_date or oldest_commit['authored_date'] < repo_stats.oldest_commit_date:
+            repo_stats.oldest_commit_date = oldest_commit['authored_date']
         
-        # Get unique authors count
-        authors = Commit.objects(repository_full_name=repo_stats.repository_full_name).distinct('author_email')
-        repo_stats.total_authors = len(authors)
+        # Update commit count
+        repo_stats.total_commits = Commit.objects(repository_full_name=repo_stats.repository_full_name).count()
         
-        # Get total additions/deletions
-        pipeline = [
-            {'$match': {'repository_full_name': repo_stats.repository_full_name}},
-            {'$group': {
-                '_id': None,
-                'total_additions': {'$sum': '$additions'},
-                'total_deletions': {'$sum': '$deletions'}
-            }}
-        ]
-        
-        aggregation_result = list(Commit.objects.aggregate(pipeline))
-        if aggregation_result:
-            result = aggregation_result[0]
-            repo_stats.total_additions = result.get('total_additions', 0)
-            repo_stats.total_deletions = result.get('total_deletions', 0)
-        
-        # Get first commit date
-        first_commit = Commit.objects(repository_full_name=repo_stats.repository_full_name)\
-                           .order_by('authored_date').first()
-        if first_commit:
-            repo_stats.first_commit_date = first_commit.authored_date
+        # Update last sync time
+        repo_stats.last_sync_at = datetime.utcnow()
         
         repo_stats.save()
     

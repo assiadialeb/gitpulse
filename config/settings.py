@@ -200,6 +200,9 @@ SOCIALACCOUNT_PROVIDERS = {
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
+# Custom adapter to capture GitHub tokens
+SOCIALACCOUNT_ADAPTER = 'users.adapters.CustomSocialAccountAdapter'
+
 # GitHub OAuth configuration with required scopes
 SOCIALACCOUNT_PROVIDERS = {
     'github': {
