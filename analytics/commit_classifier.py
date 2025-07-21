@@ -23,13 +23,13 @@ def classify_commit(message: str) -> str:
     
     # Pattern matching with priority order
     patterns = {
-        'fix': r'^(fix|bug|hotfix|patch|resolve|correct)',
-        'feature': r'^(feat|add|implement|new|enhance|improve)',
-        'docs': r'^(docs|readme|documentation|comment)',
-        'refactor': r'^(refactor|cleanup|restructure|optimize|reorganize)',
-        'test': r'^(test|spec|specs|testing|coverage)',
-        'style': r'^(style|format|lint|prettier|indent)',
-        'chore': r'^(chore|ci|build|deploy|maintenance|deps)'
+        'fix': r'^(fix|bug|hotfix|patch|resolve|correct|repair|revert|rollback|undo|restore)',
+        'feature': r'^(feat|add|implement|new|enhance|improve|create|introduce|enable)',
+        'docs': r'^(docs|readme|documentation|comment|doc|clarify|document)',
+        'refactor': r'^(refactor|cleanup|restructure|optimize|reorganize|simplify|migrate|port|rewrite)',
+        'test': r'^(test|spec|specs|testing|coverage|unit|integration|e2e)',
+        'style': r'^(style|format|lint|prettier|indent|whitespace)',
+        'chore': r'^(chore|ci|build|deploy|maintenance|deps|update|change|modify|configure|setup|install|uninstall|bump|upgrade|downgrade|pin|unpin|sync|merge|wip|tmp|temp)'
     }
     
     # Check patterns in priority order
@@ -48,6 +48,16 @@ def classify_commit(message: str) -> str:
         prefix = message.split('(')[0]
         if prefix in ['feat', 'fix', 'docs', 'refactor', 'test', 'style', 'chore']:
             return prefix
+    
+    # Check for common words in the message (not just at the beginning)
+    words = message.split()
+    for word in words:
+        if word in ['update', 'change', 'modify', 'improve', 'add', 'remove', 'delete', 'fix', 'bug', 'feature', 'new', 'test', 'doc', 'format', 'style', 'chore', 'ci', 'build', 'deploy', 'maintenance', 'deps', 'configure', 'setup', 'install', 'uninstall', 'bump', 'upgrade', 'downgrade', 'pin', 'unpin', 'sync', 'merge', 'wip', 'tmp', 'temp', 'revert', 'rollback', 'undo', 'restore', 'repair', 'resolve', 'correct', 'patch', 'hotfix', 'bugfix', 'implement', 'create', 'introduce', 'enable', 'disable', 'migrate', 'port', 'rewrite', 'restructure', 'reorganize', 'simplify', 'clarify', 'document', 'comment', 'lint', 'prettier', 'indent', 'whitespace', 'testing', 'coverage', 'unit', 'integration', 'e2e', 'performance', 'optimization']:
+            # Map common words to categories
+            word_mapping = {
+                'update': 'chore', 'change': 'refactor', 'modify': 'refactor', 'improve': 'feature', 'add': 'feature', 'remove': 'refactor', 'delete': 'refactor', 'fix': 'fix', 'bug': 'fix', 'feature': 'feature', 'new': 'feature', 'test': 'test', 'doc': 'docs', 'format': 'style', 'style': 'style', 'chore': 'chore', 'ci': 'chore', 'build': 'chore', 'deploy': 'chore', 'maintenance': 'chore', 'deps': 'chore', 'configure': 'chore', 'setup': 'chore', 'install': 'chore', 'uninstall': 'chore', 'bump': 'chore', 'upgrade': 'chore', 'downgrade': 'chore', 'pin': 'chore', 'unpin': 'chore', 'sync': 'chore', 'merge': 'chore', 'wip': 'chore', 'tmp': 'chore', 'temp': 'chore', 'revert': 'fix', 'rollback': 'fix', 'undo': 'fix', 'restore': 'fix', 'repair': 'fix', 'resolve': 'fix', 'correct': 'fix', 'patch': 'fix', 'hotfix': 'fix', 'bugfix': 'fix', 'implement': 'feature', 'create': 'feature', 'introduce': 'feature', 'enable': 'feature', 'disable': 'fix', 'migrate': 'refactor', 'port': 'refactor', 'rewrite': 'refactor', 'restructure': 'refactor', 'reorganize': 'refactor', 'simplify': 'refactor', 'clarify': 'docs', 'document': 'docs', 'comment': 'docs', 'lint': 'style', 'prettier': 'style', 'indent': 'style', 'whitespace': 'style', 'testing': 'test', 'coverage': 'test', 'unit': 'test', 'integration': 'test', 'e2e': 'test', 'performance': 'refactor', 'optimization': 'refactor'
+            }
+            return word_mapping.get(word, 'other')
     
     # Heuristics for short messages
     if len(message) < 15:
@@ -117,7 +127,7 @@ Answer with only one word:"""
         response.raise_for_status()
         
         result = response.json()
-        llm_response = result.get('response', '').strip().lower()
+        llm_response = result.get('response', '').strip().lower()  # Normalize to lowercase
         
         # Extract the category from response - only use valid MongoDB choices
         valid_categories = ['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other']
@@ -145,19 +155,90 @@ Answer with only one word:"""
             'ci': 'chore',           # Map 'ci' to 'chore'
             'build': 'chore',
             'deploy': 'chore',
-            'maintenance': 'chore'
+            'maintenance': 'chore',
+            'wip': 'chore',          # Work in progress
+            'tmp': 'chore',          # Temporary
+            'temp': 'chore',         # Temporary
+            'bump': 'chore',         # Version bump
+            'upgrade': 'chore',      # Dependency upgrade
+            'downgrade': 'chore',    # Dependency downgrade
+            'pin': 'chore',          # Pin dependency
+            'unpin': 'chore',        # Unpin dependency
+            'sync': 'chore',         # Sync
+            'merge': 'chore',        # Merge
+            'revert': 'fix',         # Revert
+            'rollback': 'fix',       # Rollback
+            'undo': 'fix',           # Undo
+            'restore': 'fix',        # Restore
+            'repair': 'fix',         # Repair
+            'resolve': 'fix',        # Resolve
+            'correct': 'fix',        # Correct
+            'patch': 'fix',          # Patch
+            'hotfix': 'fix',         # Hotfix
+            'bugfix': 'fix',         # Bugfix
+            'implement': 'feature',  # Implement
+            'create': 'feature',     # Create
+            'new': 'feature',        # New
+            'introduce': 'feature',  # Introduce
+            'enable': 'feature',     # Enable
+            'disable': 'fix',        # Disable
+            'configure': 'chore',    # Configure
+            'setup': 'chore',        # Setup
+            'install': 'chore',      # Install
+            'uninstall': 'chore',    # Uninstall
+            'migrate': 'refactor',   # Migrate
+            'port': 'refactor',      # Port
+            'rewrite': 'refactor',   # Rewrite
+            'restructure': 'refactor', # Restructure
+            'reorganize': 'refactor', # Reorganize
+            'simplify': 'refactor',  # Simplify
+            'clarify': 'docs',       # Clarify
+            'document': 'docs',      # Document
+            'comment': 'docs',       # Comment
+            'format': 'style',       # Format
+            'lint': 'style',         # Lint
+            'prettier': 'style',     # Prettier
+            'indent': 'style',       # Indent
+            'whitespace': 'style',   # Whitespace
+            'test': 'test',          # Test
+            'testing': 'test',       # Testing
+            'spec': 'test',          # Spec
+            'specs': 'test',         # Specs
+            'coverage': 'test',      # Coverage
+            'unit': 'test',          # Unit
+            'integration': 'test',   # Integration
+            'e2e': 'test',           # End-to-end
+            'performance': 'refactor', # Performance
+            'optimization': 'refactor', # Optimization
         }
         
+        # Check variations in both LLM response and original message
+        message_lower = message.lower()
+        
+        # First check LLM response for variations
         for variation, category in variations.items():
-            if variation in llm_response.lower():
+            if variation in llm_response:
                 return category
+        
+        # Then check original message for variations (fallback)
+        for variation, category in variations.items():
+            if variation in message_lower:
+                return category
+        
+        # If LLM said "other" but we found variations in the message, use the variation
+        # This is a fallback for when LLM fails to recognize obvious patterns
+        if 'other' in llm_response:
+            # Check if message contains obvious patterns that LLM missed
+            if any(word in message_lower for word in ['update', 'change', 'modify', 'improve', 'add', 'remove', 'delete', 'fix', 'bug', 'feature', 'new', 'test', 'doc', 'format', 'style']):
+                # Use simple classifier as final fallback
+                return classify_commit(message)
         
         # If no category found in LLM response, return 'other'
         return 'other'
         
     except Exception as e:
-        # If Ollama fails, return 'other'
-        return 'other'
+        # If Ollama fails, use simple classifier as fallback
+        return classify_commit(message)
 
 
 def classify_commit_with_confidence(message: str) -> Tuple[str, float]:

@@ -134,7 +134,7 @@ class GitSyncService:
 
         return results
     
-    def sync_repository(self, repo_full_name: str, repo_url: str, application_id: int, 
+    def sync_repository(self, repo_full_name: str, repo_url: str, application_id: int = None, 
                        sync_type: str = 'incremental') -> Dict:
         """
         Sync commits for a specific repository using Git local operations
@@ -142,7 +142,7 @@ class GitSyncService:
         Args:
             repo_full_name: Repository name in format "owner/repo"
             repo_url: Git repository URL
-            application_id: Application ID
+            application_id: Application ID (optional for repository-based indexing)
             sync_type: 'full' or 'incremental'
             
         Returns:
@@ -232,14 +232,14 @@ class GitSyncService:
             raise
     
     def _process_commits(self, commits_data: List[Dict], repo_full_name: str, 
-                        application_id: int) -> Dict:
+                        application_id: int = None) -> Dict:
         """
         Process and store commits in MongoDB
         
         Args:
             commits_data: List of commit dictionaries from Git
             repo_full_name: Repository name
-            application_id: Application ID
+            application_id: Application ID (optional for repository-based indexing)
             
         Returns:
             Dictionary with processing results
@@ -309,14 +309,14 @@ class GitSyncService:
         
         return results
     
-    def _parse_commit_data(self, commit_data: Dict, repo_full_name: str, application_id: int) -> Dict:
+    def _parse_commit_data(self, commit_data: Dict, repo_full_name: str, application_id: int = None) -> Dict:
         """
         Parse commit data into MongoDB document format
         
         Args:
             commit_data: Raw commit data from Git
             repo_full_name: Repository name
-            application_id: Application ID
+            application_id: Application ID (optional for repository-based indexing)
             
         Returns:
             Dictionary ready for MongoDB storage

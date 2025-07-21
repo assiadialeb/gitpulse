@@ -326,49 +326,48 @@ def manual_sync_application(application_id: int, sync_type: str = 'incremental')
         raise
 
 
-def manual_indexing_task(application_id: int, user_id: int):
+def manual_indexing_task(repository_id: int, user_id: int):
     """
-    Tâche d'indexation manuelle pour une application spécifique (one-shot)
+    Tâche d'indexation manuelle pour un repository spécifique (one-shot)
     
     Args:
-        application_id: ID de l'application à indexer
+        repository_id: ID du repository à indexer
         user_id: ID de l'utilisateur qui lance l'indexation
         
     Returns:
         Résultats de l'indexation
     """
-    logger.info(f"Starting manual indexing for application {application_id}, user {user_id}")
+    logger.info(f"Starting manual indexing for repository {repository_id}, user {user_id}")
     
     try:
         # Utiliser la même logique que background_indexing_task mais en mode one-shot
-        return background_indexing_task(application_id, user_id, task_id=f"manual_{application_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        return background_indexing_task(repository_id, user_id, task_id=f"manual_{repository_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         
     except Exception as e:
-        logger.error(f"Manual indexing failed for application {application_id}: {e}")
+        logger.error(f"Manual indexing failed for repository {repository_id}: {e}")
         raise
 
 
-def background_indexing_task(application_id: int, user_id: int, task_id: Optional[str] = None):
+def background_indexing_task(repository_id: int, user_id: int, task_id: Optional[str] = None):
     """
     Background task for indexing with progress tracking
     
     Args:
-        application_id: Application ID to index
-        user_id: User ID who owns the application
+        repository_id: Repository ID to index
+        user_id: User ID who owns the repository
         task_id: Optional task ID for progress tracking
     """
-    logger.info(f"Starting background indexing for application {application_id}, user {user_id}")
+    logger.info(f"Starting background indexing for repository {repository_id}, user {user_id}")
     try:
-        # Get application and repositories
-        application = Application.objects.get(id=application_id, owner_id=user_id)
-        repositories = application.repositories.all()
-        total_repos = repositories.count()
-        
-        if total_repos == 0:
-            logger.warning(f"No repositories found for application {application_id}")
+        # Get repository
+        from repositories.models import Repository
+        try:
+            repository = Repository.objects.get(id=repository_id)
+        except Repository.DoesNotExist:
+            logger.error(f"Repository {repository_id} not found")
             return {
                 'success': False,
-                'error': 'No repositories found for this application',
+                'error': f"Repository {repository_id} not found",
                 'task_id': task_id
             }
         
@@ -379,68 +378,62 @@ def background_indexing_task(application_id: int, user_id: int, task_id: Optiona
         if indexing_service == 'github_api':
             from .sync_service import SyncService
             sync_service = SyncService(user_id)
-            logger.info(f"Using GitHub API indexing service for application {application_id}")
+            logger.info(f"Using GitHub API indexing service for repository {repository.full_name}")
         else:
             from .git_sync_service import GitSyncService
             sync_service = GitSyncService(user_id)
-            logger.info(f"Using Git local indexing service for application {application_id}")
+            logger.info(f"Using Git local indexing service for repository {repository.full_name}")
         
         results = {
-            'application_id': application_id,
+            'repository_id': repository_id,
+            'repository_full_name': repository.full_name,
             'indexing_service': indexing_service,
-            'repositories_synced': 0,
-            'total_commits_new': 0,
-            'total_commits_updated': 0,
-            'total_api_calls': 0,
+            'commits_new': 0,
+            'commits_updated': 0,
+            'api_calls': 0,
             'errors': [],
-            'total_repositories': total_repos,
             'task_id': task_id,
             'started_at': datetime.utcnow().isoformat()
         }
         
-        # Process each repository
-        for i, app_repo in enumerate(repositories, 1):
-            try:
-                logger.info(f"Indexing repository {i}/{total_repos}: {app_repo.github_repo_name}")
-                
-                # Check if github_repo_url exists, if not generate it
-                repo_url = getattr(app_repo, 'github_repo_url', None)
-                if not repo_url:
-                    repo_url = f"https://github.com/{app_repo.github_repo_name}.git"
-                    logger.warning(f"Missing github_repo_url for {app_repo.github_repo_name}, using generated URL: {repo_url}")
-                
-                if indexing_service == 'github_api':
-                    # GitHub API service doesn't need repo_url
-                    repo_result = sync_service.sync_repository(
-                        app_repo.github_repo_name,
-                        application_id,
-                        'full'  # Always do full sync for indexing
-                    )
-                else:
-                    # Git local service needs repo_url
-                    repo_result = sync_service.sync_repository(
-                        app_repo.github_repo_name,
-                        repo_url,
-                        application_id,
-                        'full'  # Always do full sync for indexing
-                    )
-                
-                results['repositories_synced'] += 1
-                results['total_commits_new'] += repo_result['commits_new']
-                results['total_commits_updated'] += repo_result['commits_updated']
-                
-                # Track API calls only for GitHub API service
-                if indexing_service == 'github_api':
-                    results['total_api_calls'] += repo_result.get('api_calls', 0)
-                else:
-                    results['total_api_calls'] = 0
-                
-                logger.info(f"Completed {i}/{total_repos} repositories")
-                
-            except Exception as e:
-                error_msg = f"Failed to index repository {app_repo.github_repo_name}: {str(e)}"
-                logger.error(error_msg)
-                results['errors'].append(error_msg)
+        try:
+            logger.info(f"Indexing repository: {repository.full_name}")
+            
+            # Use clone_url for Git local service, or full_name for GitHub API service
+            if indexing_service == 'github_api':
+                # GitHub API service doesn't need repo_url
+                repo_result = sync_service.sync_repository(
+                    repository.full_name,
+                    None,  # No application_id needed for repository-based indexing
+                    'full'  # Always do full sync for indexing
+                )
+            else:
+                # Git local service needs repo_url
+                repo_result = sync_service.sync_repository(
+                    repository.full_name,
+                    repository.clone_url,
+                    None,  # No application_id needed for repository-based indexing
+                    'full'  # Always do full sync for indexing
+                )
+            
+            results['commits_new'] = repo_result['commits_new']
+            results['commits_updated'] = repo_result['commits_updated']
+            
+            # Track API calls only for GitHub API service
+            if indexing_service == 'github_api':
+                results['api_calls'] = repo_result.get('api_calls', 0)
+            
+            # Update repository indexing status
+            repository.is_indexed = True
+            repository.last_indexed = datetime.utcnow()
+            repository.save()
+            
+            logger.info(f"Completed indexing for repository {repository.full_name}")
+            
+        except Exception as e:
+            error_msg = f"Failed to index repository {repository.full_name}: {str(e)}"
+            logger.error(error_msg)
+            results['errors'].append(error_msg)
         
         # Run developer grouping after indexing - DISABLED (using new group_developer_identities_task instead)
         # try:
@@ -453,11 +446,11 @@ def background_indexing_task(application_id: int, user_id: int, task_id: Optiona
         #     results['errors'].append(f"Developer grouping failed: {str(e)}")
         
         results['completed_at'] = datetime.utcnow().isoformat()
-        logger.info(f"Background indexing completed for application {application_id}: {results}")
+        logger.info(f"Background indexing completed for repository {repository_id}: {results}")
         return results
         
     except Exception as e:
-        logger.error(f"Background indexing failed for application {application_id}: {e}")
+        logger.error(f"Background indexing failed for repository {repository_id}: {e}")
         return {
             'success': False,
             'error': str(e),
@@ -467,38 +460,30 @@ def background_indexing_task(application_id: int, user_id: int, task_id: Optiona
 
 def daily_indexing_release():
     """
-    Django-Q task to index GitHub releases for all repositories of all applications (daily)
+    Django-Q task to index GitHub releases for all indexed repositories (daily)
     """
     logger.info("Starting daily release indexing task")
     results = {
-        'applications_processed': 0,
         'repositories_processed': 0,
         'releases_indexed': 0,
         'errors': []
     }
     try:
-        applications_with_repos = Application.objects.filter(
-            repositories__isnull=False
-        ).distinct()
-        for app in applications_with_repos:
+        from repositories.models import Repository
+        indexed_repositories = Repository.objects.filter(is_indexed=True)
+        
+        for repo in indexed_repositories:
             try:
-                user_id = app.owner_id
+                user_id = repo.owner_id
                 release_service = ReleaseIndexingService(user_id)
-                repos = app.repositories.all()
-                for repo in repos:
-                    try:
-                        release_ids = release_service.index_releases(app.id, repo.github_repo_name)
-                        results['repositories_processed'] += 1
-                        results['releases_indexed'] += len(release_ids)
-                    except Exception as e:
-                        error_msg = f"Failed to index releases for repo {repo.github_repo_name} (app {app.id}): {e}"
-                        logger.error(error_msg)
-                        results['errors'].append(error_msg)
-                results['applications_processed'] += 1
+                release_ids = release_service.index_releases(None, repo.full_name)
+                results['repositories_processed'] += 1
+                results['releases_indexed'] += len(release_ids)
             except Exception as e:
-                error_msg = f"Failed to process application {app.id}: {e}"
+                error_msg = f"Failed to index releases for repo {repo.full_name}: {e}"
                 logger.error(error_msg)
                 results['errors'].append(error_msg)
+        
         logger.info(f"Daily release indexing completed: {results}")
         return results
     except Exception as e:
@@ -524,15 +509,17 @@ def developer_grouping_task(application_id):
     return {"disabled": True, "message": "Use group_developer_identities_task instead"} 
 
 
-def quality_analysis_all_apps_task():
+def quality_analysis_all_repos_task():
     """
-    Tâche Q pour lancer l'analyse de qualité sur toutes les applications.
+    Tâche Q pour lancer l'analyse de qualité sur tous les repositories indexés.
     """
-    from applications.models import Application
+    from repositories.models import Repository
     from analytics.quality_service import QualityAnalysisService
     processed = 0
-    for app in Application.objects.all():
-        processed += QualityAnalysisService().analyze_commits_for_application(app.id)
+    indexed_repos = Repository.objects.filter(is_indexed=True)
+    for repo in indexed_repos:
+        # Process all commits for this repository
+        processed += QualityAnalysisService().analyze_commits_for_repository(repo.full_name)
     return processed
 
 
@@ -550,46 +537,77 @@ def developer_grouping_all_apps_task():
     return {"disabled": True, "message": "Use group_developer_identities_task instead"} 
 
 
-def release_indexing_task(application_id):
+def release_indexing_task(repository_id):
     """
-    Tâche Q pour indexer les releases de toutes les repositories d'une application.
+    Tâche Q pour indexer les releases d'un repository.
     """
-    from applications.models import Application
+    from repositories.models import Repository
     from analytics.services import ReleaseIndexingService
-    app = Application.objects.get(id=application_id)
-    user_id = app.owner_id
+    repo = Repository.objects.get(id=repository_id)
+    user_id = repo.owner_id
     release_service = ReleaseIndexingService(user_id)
+    return release_service.index_releases(None, repo.full_name)
+
+
+def release_indexing_all_repos_task():
+    """
+    Tâche Q pour indexer les releases de tous les repositories indexés.
+    """
+    from repositories.models import Repository
+    from analytics.services import ReleaseIndexingService
     results = []
-    for repo in app.repositories.all():
-        results.append(release_service.index_releases(app.id, repo.github_repo_name))
+    indexed_repositories = Repository.objects.filter(is_indexed=True)
+    for repo in indexed_repositories:
+        user_id = repo.owner_id
+        release_service = ReleaseIndexingService(user_id)
+        results.append(release_service.index_releases(None, repo.full_name))
     return results
 
 
 def release_indexing_all_apps_task():
     """
-    Tâche Q pour indexer les releases de toutes les applications et repositories.
+    DEPRECATED: Temporary stub to prevent errors while cleaning up old tasks.
+    Use release_indexing_all_repos_task instead.
     """
-    from applications.models import Application
-    from analytics.services import ReleaseIndexingService
-    results = []
-    for app in Application.objects.all():
-        user_id = app.owner_id
-        release_service = ReleaseIndexingService(user_id)
-        for repo in app.repositories.all():
-            results.append(release_service.index_releases(app.id, repo.github_repo_name))
-    return results 
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning("DEPRECATED: release_indexing_all_apps_task called. Redirecting to release_indexing_all_repos_task")
+    return release_indexing_all_repos_task()
 
 
-def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=10):
+def daily_indexing_all_apps_task():
     """
-    Tâche Q optimisée : va chercher les PRs FERMÉES pour les repos via l'API GitHub,
-    avec des limites pour éviter les timeouts.
+    DEPRECATED: Temporary stub to prevent errors while cleaning up old tasks.
+    Use daily_indexing_all_repos_task instead.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning("DEPRECATED: daily_indexing_all_apps_task called. Redirecting to daily_indexing_all_repos_task")
+    return daily_indexing_all_repos_task()
+
+
+def quality_analysis_all_apps_task():
+    """
+    DEPRECATED: Temporary stub to prevent errors while cleaning up old tasks.
+    Use quality_analysis_all_repos_task instead.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning("DEPRECATED: quality_analysis_all_apps_task called. Redirecting to quality_analysis_all_repos_task")
+    return quality_analysis_all_repos_task() 
+
+
+def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=None, max_execution_time=1800):
+    """
+    Tâche Q améliorée : va chercher les PRs FERMÉES pour TOUS les repositories indexés,
+    avec une gestion intelligente des limites.
     
     Args:
         max_pages_per_repo: Nombre maximum de pages à traiter par repo (défaut: 50)
-        max_repos_per_run: Nombre maximum de repos à traiter par exécution (défaut: 10)
+        max_repos_per_run: Nombre maximum de repos à traiter par exécution (défaut: None = tous)
+        max_execution_time: Temps max d'exécution en secondes (défaut: 30 minutes)
     """
-    from applications.models import Application
+    from repositories.models import Repository
     from analytics.models import PullRequest
     from analytics.github_service import GitHubService
     from analytics.github_token_service import GitHubTokenService
@@ -600,143 +618,145 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=10):
 
     logger = logging.getLogger(__name__)
     start_time = time.time()
-    max_execution_time = 300  # 5 minutes max
 
     results = []
     repos_processed = 0
+    total_repos_processed = 0
+    total_prs_saved = 0
     
-    for app in Application.objects.all():
-        if repos_processed >= max_repos_per_run:
-            logger.info(f"Reached max repos limit ({max_repos_per_run}), stopping")
-            break
-            
+    # Récupérer tous les repositories indexés
+    indexed_repositories = Repository.objects.filter(is_indexed=True)
+    
+    total_repos = indexed_repositories.count()
+    logger.info(f"Starting PR fetch task for {total_repos} repositories")
+    
+    if max_repos_per_run:
+        indexed_repositories = indexed_repositories[:max_repos_per_run]
+        logger.info(f"Limited to {max_repos_per_run} repositories")
+    
+    for repo in indexed_repositories:
         if time.time() - start_time > max_execution_time:
             logger.info(f"Reached max execution time ({max_execution_time}s), stopping")
             break
             
-        user_id = app.owner_id
+        user_id = repo.owner_id
         access_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
         if not access_token:
-            logger.warning(f"[App {app.id}] No GitHub token found for user {user_id}.")
-            results.append({'app': app.id, 'error': 'No GitHub token'})
+            logger.warning(f"[Repo {repo.full_name}] No GitHub token found for user {user_id}.")
+            results.append({'repo': repo.full_name, 'error': 'No GitHub token'})
             continue
             
         gh = GitHubService(access_token)
+        repo_name = repo.full_name
+        total_repos_processed += 1
         
-        for repo in app.repositories.all():
-            if repos_processed >= max_repos_per_run:
-                break
-                
-            if time.time() - start_time > max_execution_time:
-                break
-                
-            repo_name = repo.github_repo_name
-            repos_processed += 1
+        try:
+            page = 1
+            repo_prs_saved = 0
+            pages_processed = 0
             
-            try:
-                page = 1
-                total_saved = 0
-                pages_processed = 0
+            while page <= max_pages_per_repo and pages_processed < max_pages_per_repo:
+                if time.time() - start_time > max_execution_time:
+                    logger.info(f"[Repo {repo_name}] Timeout reached, stopping at page {page}")
+                    break
+                    
+                url = f"https://api.github.com/repos/{repo_name}/pulls"
+                params = {'state': 'closed', 'per_page': 100, 'page': page}
                 
-                while page <= max_pages_per_repo and pages_processed < max_pages_per_repo:
-                    if time.time() - start_time > max_execution_time:
-                        logger.info(f"[App {app.id}][Repo {repo_name}] Timeout reached, stopping at page {page}")
+                try:
+                    prs, _ = gh._make_request(url, params)
+                    pages_processed += 1
+                    
+                    if not prs or len(prs) == 0:
+                        logger.info(f"[Repo {repo_name}] No more PRs, stopping pagination")
                         break
                         
-                    url = f"https://api.github.com/repos/{repo_name}/pulls"
-                    params = {'state': 'closed', 'per_page': 100, 'page': page}
+                    logger.info(f"[Repo {repo_name}] Page {page}: {len(prs)} PRs fetched.")
                     
-                    try:
-                        prs, _ = gh._make_request(url, params)
-                        pages_processed += 1
-                        
-                        logger.info(f"[App {app.id}][Repo {repo_name}] Page {page}: {len(prs)} PRs fetched.")
-                        
-                        if not prs or len(prs) == 0:
-                            logger.info(f"[App {app.id}][Repo {repo_name}] No more PRs, stopping pagination")
-                            break
+                    for pr in prs:
+                        pr_number = pr.get('number')
+                        try:
+                            obj = PullRequest.objects(
+                                application_id=None, 
+                                repository_full_name=repo_name, 
+                                number=pr_number
+                            ).first()
                             
-                        for pr in prs:
-                            pr_number = pr.get('number')
-                            try:
-                                obj = PullRequest.objects(
-                                    application_id=app.id, 
-                                    repository_full_name=repo_name, 
+                            if not obj:
+                                obj = PullRequest(
+                                    application_id=None,
+                                    repository_full_name=repo_name,
                                     number=pr_number
-                                ).first()
+                                )
                                 
-                                if not obj:
-                                    obj = PullRequest(
-                                        application_id=app.id,
-                                        repository_full_name=repo_name,
-                                        number=pr_number
-                                    )
-                                    
-                                obj.title = pr.get('title')
-                                obj.author = pr.get('user', {}).get('login')
-                                obj.created_at = dateutil.parser.parse(pr.get('created_at')) if pr.get('created_at') else None
-                                obj.updated_at = dateutil.parser.parse(pr.get('updated_at')) if pr.get('updated_at') else None
-                                obj.closed_at = dateutil.parser.parse(pr.get('closed_at')) if pr.get('closed_at') else None
-                                obj.merged_at = dateutil.parser.parse(pr.get('merged_at')) if pr.get('merged_at') else None
-                                obj.state = pr.get('state')
-                                obj.url = pr.get('html_url')
-                                obj.labels = [l['name'] for l in pr.get('labels', [])]
-                                obj.payload = pr
-                                obj.save()
-                                
-                                total_saved += 1
-                                
-                            except Exception as e:
-                                logger.error(f"[App {app.id}][Repo {repo_name}] Error saving PR #{pr_number}: {e}")
-                                
-                        page += 1
-                        
-                        # Petit délai pour éviter de surcharger l'API
-                        time.sleep(0.1)
-                        
-                    except Exception as e:
-                        error_msg = str(e)
-                        if "Repository not found or not accessible" in error_msg:
-                            logger.warning(f"[App {app.id}][Repo {repo_name}] Repository not accessible with current token - skipping")
-                            results.append({
-                                'app': app.id, 
-                                'repo': repo_name, 
-                                'status': 'skipped',
-                                'reason': 'Repository not accessible with current token',
-                                'pages_processed': 0,
-                                'total_saved': 0
-                            })
-                            break
-                        else:
-                            logger.error(f"[App {app.id}][Repo {repo_name}] Error fetching page {page}: {e}")
-                            break
-                
-                execution_time = time.time() - start_time
-                logger.info(f"[App {app.id}][Repo {repo_name}] Completed: {total_saved} PRs saved, {pages_processed} pages processed in {execution_time:.1f}s")
-                
-                results.append({
-                    'app': app.id, 
-                    'repo': repo_name, 
-                    'status': 'ok', 
-                    'total_saved': total_saved,
-                    'pages_processed': pages_processed,
-                    'execution_time': execution_time
-                })
-                
-            except Exception as e:
-                logger.error(f"[App {app.id}][Repo {repo_name}] Error: {e}")
-                results.append({'app': app.id, 'repo': repo_name, 'error': str(e)})
+                            obj.title = pr.get('title')
+                            obj.author = pr.get('user', {}).get('login')
+                            obj.created_at = dateutil.parser.parse(pr.get('created_at')) if pr.get('created_at') else None
+                            obj.updated_at = dateutil.parser.parse(pr.get('updated_at')) if pr.get('updated_at') else None
+                            obj.closed_at = dateutil.parser.parse(pr.get('closed_at')) if pr.get('closed_at') else None
+                            obj.merged_at = dateutil.parser.parse(pr.get('merged_at')) if pr.get('merged_at') else None
+                            obj.state = pr.get('state')
+                            obj.url = pr.get('html_url')
+                            obj.labels = [l['name'] for l in pr.get('labels', [])]
+                            obj.payload = pr
+                            obj.save()
+                            
+                            repo_prs_saved += 1
+                            total_prs_saved += 1
+                            
+                        except Exception as e:
+                            logger.error(f"[Repo {repo_name}] Error saving PR #{pr_number}: {e}")
+                            
+                    page += 1
+                    
+                    # Petit délai pour éviter de surcharger l'API
+                    time.sleep(0.1)
+                    
+                except Exception as e:
+                    error_msg = str(e)
+                    if "Repository not found or not accessible" in error_msg:
+                        logger.warning(f"[Repo {repo_name}] Repository not accessible with current token - skipping")
+                        results.append({
+                            'repo': repo_name, 
+                            'status': 'skipped',
+                            'reason': 'Repository not accessible with current token',
+                            'pages_processed': 0,
+                            'total_saved': 0
+                        })
+                        break
+                    else:
+                        logger.error(f"[Repo {repo_name}] Error fetching page {page}: {e}")
+                        break
+            
+            execution_time = time.time() - start_time
+            logger.info(f"[Repo {repo_name}] Completed: {repo_prs_saved} PRs saved, {pages_processed} pages processed in {execution_time:.1f}s")
+            
+            results.append({
+                'repo': repo_name, 
+                'status': 'ok', 
+                'total_saved': repo_prs_saved,
+                'pages_processed': pages_processed,
+                'execution_time': execution_time
+            })
+            
+            repos_processed += 1
+            
+        except Exception as e:
+            logger.error(f"[Repo {repo_name}] Error: {e}")
+            results.append({'repo': repo_name, 'error': str(e)})
     
     total_execution_time = time.time() - start_time
-    logger.info(f"Task completed: {repos_processed} repos processed in {total_execution_time:.1f}s")
+    logger.info(f"Task completed: {repos_processed}/{total_repos} repos processed, {total_prs_saved} PRs saved in {total_execution_time:.1f}s")
     
     return {
         'results': results,
         'repos_processed': repos_processed,
+        'total_repos': total_repos,
+        'total_prs_saved': total_prs_saved,
         'total_execution_time': total_execution_time,
         'max_pages_per_repo': max_pages_per_repo,
         'max_repos_per_run': max_repos_per_run
-    } 
+    }
 
 
 def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_run=10):
@@ -910,11 +930,10 @@ def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_r
                 results.append({'app': app.id, 'repo': repo_name, 'error': str(e)})
     
     total_execution_time = time.time() - start_time
-    logger.info(f"Task completed: {repos_processed} repos processed in {total_execution_time:.1f}s")
+    logger.info(f"Task completed: {len(results)} repos processed in {total_execution_time:.1f}s")
     
     return {
         'results': results,
-        'repos_processed': repos_processed,
         'total_execution_time': total_execution_time,
         'max_pages_per_repo': max_pages_per_repo,
         'max_repos_per_run': max_repos_per_run
@@ -1212,15 +1231,16 @@ def group_developer_identities_task(application_id=None):
         raise
 
 
-def daily_indexing_all_apps_task():
+def daily_indexing_all_repos_task():
     """
-    Tâche planifiée unique : lance l'indexation pour toutes les applications.
+    Tâche planifiée unique : lance l'indexation pour tous les repositories indexés.
     """
-    from applications.models import Application
+    from repositories.models import Repository
     from django.utils import timezone
     results = []
-    for app in Application.objects.all():
-        # Lancer l'indexation en asynchrone pour chaque application
-        task_id = async_task('analytics.tasks.background_indexing_task', app.id, app.owner_id, None)
-        results.append({'app_id': app.id, 'task_id': task_id})
+    indexed_repos = Repository.objects.filter(is_indexed=True)
+    for repo in indexed_repos:
+        # Lancer l'indexation en asynchrone pour chaque repository
+        task_id = async_task('analytics.tasks.background_indexing_task', repo.id, repo.owner_id, None)
+        results.append({'repo_id': repo.id, 'task_id': task_id, 'repo_name': repo.full_name})
     return results

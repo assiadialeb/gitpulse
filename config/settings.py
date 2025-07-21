@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'applications',
     'analytics',
     'developers',
+    'repositories',
     'django.contrib.sites',
     'allauth',
     'allauth.account',
@@ -213,7 +214,7 @@ CACHES = {
 # Cache settings for analytics
 ANALYTICS_CACHE_TIMEOUT = 1  # 1 hour for analytics data
 PR_METRICS_CACHE_TIMEOUT = 1  # 30 minutes for PR metrics
-COMMIT_METRICS_CACHE_TIMEOUT = 1  # 2 hours for commit metrics
+COMMIT_METRICS_CACHE_TIMEOUT = 1 # 2 hours for commit metrics
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
 

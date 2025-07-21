@@ -534,7 +534,7 @@ class DeploymentIndexingService:
             raise ValueError(f"No GitHub token found for user {self.user_id}")
         return GitHubService(access_token)
 
-    def index_deployments(self, application_id: int, repo_full_name: str) -> List[str]:
+    def index_deployments(self, application_id: int = None, repo_full_name: str = None) -> List[str]:
         """
         Fetch and index deployments for a given repo and application.
         Returns a list of deployment IDs indexed.
@@ -589,7 +589,7 @@ class ReleaseIndexingService:
             raise ValueError(f"No GitHub token found for user {self.user_id}")
         return GitHubService(access_token)
 
-    def index_releases(self, application_id: int, repo_full_name: str) -> list:
+    def index_releases(self, application_id: int = None, repo_full_name: str = None) -> list:
         """
         Fetch and index releases for a given repo and application.
         Returns a list of release IDs indexed.

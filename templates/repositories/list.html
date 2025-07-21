@@ -1,0 +1,375 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Repositories - GitPulse{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Repositories</h1>
+                <p class="text-gray-600 mt-2">Manage your indexed repositories</p>
+            </div>
+            <button onclick="openIndexModal()" class="btn btn-primary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Index Repository
+            </button>
+        </div>
+        
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Repositories</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ total_repos }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Indexed</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ indexed_repos }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Commits</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ total_commits|floatformat:0 }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Search and Filters -->
+    <div class="bg-white rounded-lg shadow mb-6 p-4 border border-gray-200">
+        <form method="GET" class="flex gap-4">
+            <div class="flex-1">
+                <input type="text" name="search" value="{{ search_query }}" 
+                       placeholder="Search repositories..." 
+                       class="input input-bordered w-full">
+            </div>
+            <button type="submit" class="btn btn-outline">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Search
+            </button>
+        </form>
+    </div>
+    
+    <!-- Repositories Grid -->
+    {% if page_obj %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for repo in page_obj %}
+            <div class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow duration-200 border border-gray-200">
+                <div class="p-6">
+                    <!-- Repository Header -->
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-900 truncate">
+                                <a href="{% url 'repositories:detail' repo.id %}" class="hover:text-blue-600">
+                                    {{ repo.name }}
+                                </a>
+                            </h3>
+                            <p class="text-sm text-gray-500">{{ repo.full_name }}</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            {% if repo.private %}
+                                <span class="badge badge-warning">Private</span>
+                            {% endif %}
+                            {% if repo.fork %}
+                                <span class="badge badge-info">Fork</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Description -->
+                    {% if repo.description %}
+                        <p class="text-gray-600 text-sm mb-4 line-clamp-2">{{ repo.description }}</p>
+                    {% endif %}
+                    
+                    <!-- Stats -->
+                    <div class="flex items-center justify-between text-sm text-gray-500 mb-4">
+                        <div class="flex items-center space-x-4">
+                            {% if repo.language %}
+                                <span class="flex items-center">
+                                    <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                                    {{ repo.language }}
+                                </span>
+                            {% endif %}
+                            <span class="text-xs text-gray-500">⭐ {{ repo.stars }}</span>
+                            <span class="text-xs text-gray-500">🔀 {{ repo.forks }}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Indexing Status -->
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            {% if repo.is_indexed %}
+                                <div class="flex items-center text-green-600">
+                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span class="text-sm font-medium">Indexed</span>
+                                </div>
+                            {% else %}
+                                <div class="flex items-center text-gray-500">
+                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span class="text-sm font-medium">Not Indexed</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if repo.commit_count > 0 %}
+                            <span class="text-sm text-gray-500">
+                                {{ repo.commit_count }} commits
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="mt-8 flex justify-center">
+            <div class="join">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="join-item btn btn-outline">«</a>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="join-item btn btn-active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" class="join-item btn btn-outline">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="join-item btn btn-outline">»</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+    {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-12">
+            <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No repositories found</h3>
+            <p class="text-gray-600 mb-6">
+                {% if search_query %}
+                    No repositories match your search criteria.
+                {% else %}
+                    Get started by indexing your first repository.
+                {% endif %}
+            </p>
+            <button onclick="openIndexModal()" class="btn btn-primary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Index Repository
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Index Repository Modal -->
+<div id="indexModal" class="modal">
+    <div class="modal-box w-11/12 max-w-4xl">
+        {% csrf_token %}
+        <h3 class="font-bold text-lg mb-4">Index Repository</h3>
+        
+        <div class="space-y-6">
+            <!-- Step 1: Repository Selection -->
+            <div>
+                <h4 class="text-md font-semibold mb-3">Step 1: Select Repository</h4>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-1">
+                            <input type="text" id="repoSearch" placeholder="Search repositories..." 
+                                   class="input input-bordered w-full">
+                        </div>
+                        <button class="btn btn-outline" onclick="searchRepositories()">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                            Search
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Repository Results -->
+                <div id="repoResults" class="mt-4 space-y-2 max-h-64 overflow-y-auto">
+                    <!-- Results will be populated by JavaScript -->
+                </div>
+            </div>
+            
+
+        </div>
+        
+        <div class="modal-action">
+            <button class="btn" onclick="closeIndexModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="addRepository()">Add</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function openIndexModal() {
+    document.getElementById('indexModal').classList.add('modal-open');
+}
+
+function closeIndexModal() {
+    document.getElementById('indexModal').classList.remove('modal-open');
+}
+
+function searchRepositories() {
+    const searchTerm = document.getElementById('repoSearch').value;
+    const resultsDiv = document.getElementById('repoResults');
+    
+    if (!searchTerm.trim()) {
+        resultsDiv.innerHTML = '<div class="text-center text-gray-500 py-4">Enter a repository name to search</div>';
+        return;
+    }
+    
+    // Show loading state
+    resultsDiv.innerHTML = '<div class="text-center py-4"><span class="loading loading-spinner loading-md"></span><p class="mt-2 text-gray-600">Searching repositories...</p></div>';
+    
+    // Call Django view to search GitHub
+    fetch(`/repositories/search/?q=${encodeURIComponent(searchTerm)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.repositories && data.repositories.length > 0) {
+                resultsDiv.innerHTML = data.repositories.map(repo => `
+                    <div class="bg-white rounded-lg p-4 border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <h5 class="font-semibold">${repo.name}</h5>
+                                <p class="text-sm text-gray-600">${repo.full_name}</p>
+                                ${repo.description ? `<p class="text-sm text-gray-500 mt-1">${repo.description}</p>` : ''}
+                                <div class="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                    ${repo.language ? `<span class="flex items-center"><div class="w-2 h-2 rounded-full bg-blue-500 mr-1"></div>${repo.language}</span>` : ''}
+                                    <span class="text-xs">⭐ ${repo.stargazers_count}</span>
+                                    <span class="text-xs">🔀 ${repo.forks_count}</span>
+                                    ${repo.private ? '<span class="badge badge-warning badge-xs">Private</span>' : '<span class="badge badge-success badge-xs">Public</span>'}
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-primary ml-4" onclick="selectRepository('${repo.full_name}', '${repo.name}', ${JSON.stringify(repo).replace(/"/g, '&quot;')})">
+                                Select
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                resultsDiv.innerHTML = '<div class="text-center text-gray-500 py-4">No repositories found</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resultsDiv.innerHTML = '<div class="text-center text-red-500 py-4">Error searching repositories</div>';
+        });
+}
+
+function selectRepository(fullName, name, repoData) {
+    // Store repository data for indexing
+    window.selectedRepository = repoData;
+    
+    // Update UI to show selected repository
+    document.getElementById('repoResults').innerHTML = `
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <h5 class="font-semibold text-blue-900">${name}</h5>
+                    <p class="text-sm text-blue-700">${fullName}</p>
+                    ${repoData.description ? `<p class="text-sm text-blue-600 mt-1">${repoData.description}</p>` : ''}
+                    <div class="flex items-center space-x-4 mt-2 text-xs text-blue-600">
+                        ${repoData.language ? `<span class="flex items-center"><div class="w-2 h-2 rounded-full bg-blue-500 mr-1"></div>${repoData.language}</span>` : ''}
+                        <span class="text-xs">⭐ ${repoData.stargazers_count}</span>
+                        <span class="text-xs">🔀 ${repoData.forks_count}</span>
+                        ${repoData.private ? '<span class="badge badge-warning badge-xs">Private</span>' : '<span class="badge badge-success badge-xs">Public</span>'}
+                    </div>
+                </div>
+                <span class="badge badge-primary ml-4">Selected</span>
+            </div>
+        </div>
+    `;
+}
+
+function addRepository() {
+    if (!window.selectedRepository) {
+        alert('Please select a repository first');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('repository_data', JSON.stringify(window.selectedRepository));
+    
+    // Show loading state
+    const button = document.querySelector('.modal-action .btn-primary');
+    const originalText = button.textContent;
+    button.textContent = 'Adding...';
+    button.disabled = true;
+    
+    fetch('/repositories/index/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeIndexModal();
+            // Reload page to show new repository
+            window.location.reload();
+        } else {
+            alert(data.error || 'Failed to add repository');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error adding repository');
+    })
+    .finally(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+    });
+}
+</script>
+{% endblock %} 

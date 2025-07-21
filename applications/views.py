@@ -834,10 +834,19 @@ def _generate_pr_health_metrics(application):
                 "open_prs": {"$sum": {"$cond": [{"$eq": ["$state", "open"]}, 1, 0]}},
                 "merged_prs": {"$sum": {"$cond": [{"$ne": ["$merged_at", None]}, 1, 0]}},
                 "closed_prs": {"$sum": {"$cond": [{"$eq": ["$state", "closed"]}, 1, 0]}},
+                # PRs that were open for more than 7 days before being closed
                 "old_open_prs": {"$sum": {"$cond": [
                     {"$and": [
-                        {"$eq": ["$state", "open"]},
-                        {"$lt": ["$created_at", cutoff_date]}
+                        {"$eq": ["$state", "closed"]},
+                        {"$ne": ["$created_at", None]},
+                        {"$ne": ["$closed_at", None]},
+                        {"$gte": [
+                            {"$divide": [
+                                {"$subtract": ["$closed_at", "$created_at"]},
+                                1000 * 60 * 60 * 24  # Convert milliseconds to days
+                            ]},
+                            7
+                        ]}
                     ]}, 1, 0]}}
             }}
         ]

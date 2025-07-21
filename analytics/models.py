@@ -89,7 +89,7 @@ class Commit(Document):
     
     # Repository information
     repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
-    application_id = fields.IntField(required=True)  # Link to Django Application
+    application_id = fields.IntField(required=False, null=True)  # Link to Django Application (optional for repository-based indexing)
     
     # Commit metadata
     message = fields.StringField(required=True)
@@ -173,7 +173,7 @@ class SyncLog(Document):
     """MongoDB document for tracking synchronization logs"""
     # Repository information
     repository_full_name = fields.StringField(required=True)
-    application_id = fields.IntField(required=True)
+    application_id = fields.IntField(required=False, null=True)
     
     # Sync metadata
     sync_type = fields.StringField(choices=['full', 'incremental'], required=True)
@@ -222,7 +222,7 @@ class RepositoryStats(Document):
     """MongoDB document for caching repository statistics"""
     # Repository information
     repository_full_name = fields.StringField(required=True, unique=True)
-    application_id = fields.IntField(required=True)
+    application_id = fields.IntField(required=False, null=True)
     
     # Last sync info
     last_sync_at = fields.DateTimeField()
@@ -325,7 +325,7 @@ class RateLimitReset(Document):
 class Deployment(Document):
     """MongoDB document for storing GitHub deployments"""
     deployment_id = fields.StringField(required=True, unique=True)
-    application_id = fields.IntField(required=True)
+    application_id = fields.IntField(required=False, null=True)
     repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
     environment = fields.StringField()
     creator = fields.StringField()
@@ -353,7 +353,7 @@ class Deployment(Document):
 class Release(Document):
     """MongoDB document for storing GitHub releases"""
     release_id = fields.StringField(required=True, unique=True)
-    application_id = fields.IntField(required=True)
+    application_id = fields.IntField(required=False, null=True)
     repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
     tag_name = fields.StringField()
     name = fields.StringField()
@@ -384,7 +384,7 @@ class Release(Document):
 
 class PullRequest(Document):
     """MongoDB document for storing GitHub Pull Requests"""
-    application_id = fields.IntField(required=True)
+    application_id = fields.IntField(required=False, null=True)
     repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
     number = fields.IntField(required=True)
     title = fields.StringField()
@@ -423,6 +423,8 @@ class PullRequest(Document):
             ('application_id', 'repository_full_name'),
             ('application_id', 'number'),
             ('repository_full_name', 'number'),
+            # Index unique pour éviter les doublons
+            ('application_id', 'repository_full_name', 'number'),
         ]
     }
 

@@ -1,0 +1,60 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Debug Repository {{ repository.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-6">Debug: {{ repository.name }}</h1>
+    
+    <div class="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 class="text-xl font-bold mb-4">Repository Info</h2>
+        <p><strong>ID:</strong> {{ repository.id }}</p>
+        <p><strong>Name:</strong> {{ repository.name }}</p>
+        <p><strong>Full Name:</strong> {{ repository.full_name }}</p>
+        <p><strong>Is Indexed:</strong> {{ repository.is_indexed }}</p>
+        <p><strong>Owner:</strong> {{ repository.owner.username }}</p>
+    </div>
+    
+    <div class="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 class="text-xl font-bold mb-4">Overall Stats</h2>
+        <pre>{{ overall_stats|pprint }}</pre>
+    </div>
+    
+    <div class="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 class="text-xl font-bold mb-4">Commit Frequency</h2>
+        <pre>{{ commit_frequency|pprint }}</pre>
+    </div>
+    
+    <div class="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 class="text-xl font-bold mb-4">Developer Activity</h2>
+        <pre>{{ developer_activity|pprint }}</pre>
+    </div>
+    
+    <div class="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 class="text-xl font-bold mb-4">Top Contributors</h2>
+        <pre>{{ top_contributors|pprint }}</pre>
+    </div>
+    
+    {% if error %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+        <h2 class="text-xl font-bold mb-2">Error</h2>
+        <p>{{ error }}</p>
+    </div>
+    {% endif %}
+    
+    {% if debug_error %}
+    <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-6">
+        <p><strong>Debug Mode:</strong> An error occurred during metrics calculation</p>
+    </div>
+    {% endif %}
+    
+    <div class="bg-gray-100 p-6 rounded-lg shadow">
+        <h2 class="text-xl font-bold mb-4">All Available Variables</h2>
+        <ul class="list-disc pl-6">
+            {% for key, value in request.resolver_match.kwargs.items %}
+                <li><strong>{{ key }}:</strong> {{ value }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %} 
