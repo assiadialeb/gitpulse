@@ -5,6 +5,23 @@
 
 {% block content %}
 {% csrf_token %}
+<style>
+/* Force white background for Cally calendar-range and all calendar-months containers, but NOT on days */
+calendar-range,
+calendar-range::part(container),
+calendar-range::part(month),
+calendar-range::part(header),
+calendar-range::part(footer),
+calendar-range calendar-month,
+calendar-range calendar-month::part(container),
+calendar-range calendar-month::part(month),
+calendar-range calendar-month::part(header),
+calendar-range calendar-month::part(footer) {
+  background: #fff !important;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 24px 0 rgb(0 0 0 / 0.08);
+}
+</style>
 <div class="container mx-auto px-4 py-8">
     <!-- Header -->
     <div class="mb-8">
@@ -23,6 +40,31 @@
                 {% endif %}
             </div>
             <div class="flex items-center space-x-3">
+                <!-- Date Range Picker (Cally, popover) -->
+                <div class="relative mr-4">
+                  <button id="date-range-toggle" class="btn btn-outline w-56 flex justify-between items-center">
+                    <span id="date-range-label">Loading...</span>
+                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </button>
+                  <div id="calendar-container" class="absolute z-50 mt-2" style="display:none; min-width:600px; overflow-x:auto;">
+                    <div class="bg-white border border-gray-200 shadow-lg rounded-lg p-2">
+                      <calendar-range id="repo-calendar-range" months="2">
+                        <svg aria-label="Previous" slot="previous" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-5 h-5">
+                          <path d="M15.75 19.5 8.25 12l7.5-7.5"></path>
+                        </svg>
+                        <svg aria-label="Next" slot="next" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-5 h-5">
+                          <path d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
+                        </svg>
+                        <div class="grid grid-cols-2 gap-2">
+                          <calendar-month></calendar-month>
+                          <calendar-month offset="1"></calendar-month>
+                        </div>
+                      </calendar-range>
+                    </div>
+                  </div>
+                </div>
                 {% if not repository.is_indexed %}
                     <button class="btn btn-primary" onclick="startIndexing({{ repository.id }})" id="index-btn">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -643,6 +685,7 @@
 
 <!-- Modals and JavaScript -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="module" src="https://unpkg.com/cally"></script>
 <script>
 // Chart initialization
 {% if repository.is_indexed %}
@@ -739,6 +782,64 @@ document.addEventListener('DOMContentLoaded', function() {
     {% endif %}
 });
 {% endif %}
+
+// Set default range to last 30 days for Cally calendar-range
+window.addEventListener('DOMContentLoaded', () => {
+  const cal = document.getElementById('repo-calendar-range');
+  if (cal) {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+    // Format: yyyy-mm-dd
+    cal.value = `${start.toISOString().slice(0,10)} to ${now.toISOString().slice(0,10)}`;
+  }
+});
+
+// Date range picker initialization (Cally)
+window.addEventListener('DOMContentLoaded', () => {
+  const input = document.querySelector('#repo-date-range input');
+  if (input && window.Cally) {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29); // 30 last days
+    const end = now;
+    input.value = `${start.toISOString().slice(0,10)} - ${end.toISOString().slice(0,10)}`;
+    new window.Cally(input, {
+      range: true,
+      defaultDate: [start, end],
+      theme: 'daisyui',
+    });
+  }
+});
+
+// Date range popover logic for Cally
+window.addEventListener('DOMContentLoaded', () => {
+  const cal = document.getElementById('repo-calendar-range');
+  const label = document.getElementById('date-range-label');
+  const toggle = document.getElementById('date-range-toggle');
+  const container = document.getElementById('calendar-container');
+  if (cal && label && toggle && container) {
+    // Default: last 30 days
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+    cal.value = `${start.toISOString().slice(0,10)} to ${now.toISOString().slice(0,10)}`;
+    label.textContent = `${start.toISOString().slice(0,10)} to ${now.toISOString().slice(0,10)}`;
+    // Toggle calendar
+    toggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      container.style.display = (container.style.display === 'none' || !container.style.display) ? 'block' : 'none';
+    });
+    // Update label and hide calendar on change
+    cal.addEventListener('change', () => {
+      label.textContent = cal.value;
+      container.style.display = 'none';
+    });
+    // Hide if click outside
+    document.addEventListener('click', (e) => {
+      if (!container.contains(e.target) && !toggle.contains(e.target)) {
+        container.style.display = 'none';
+      }
+    });
+  }
+});
 
 // Repository management functions
 function startIndexing(repoId) {
