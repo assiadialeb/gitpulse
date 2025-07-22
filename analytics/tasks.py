@@ -15,6 +15,10 @@ from applications.models import Application, ApplicationRepository
 from .services import DeploymentIndexingService
 from .services import ReleaseIndexingService
 from .github_token_service import GitHubTokenService
+from .deployment_indexing_service import DeploymentIndexingService
+from .commit_indexing_service import CommitIndexingService
+from .pullrequest_indexing_service import PullRequestIndexingService
+from .release_indexing_service import ReleaseIndexingService
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -152,9 +156,7 @@ def daily_sync_task():
                 # Schedule async task for each application
                 task_id = async_task(
                     'analytics.tasks.sync_application_task',
-                    application.id,
-                    application.owner_id,
-                    'incremental',
+                    application.id, application.owner_id, 'incremental',
                     group=f'daily_sync_{datetime.now().strftime("%Y%m%d")}',
                     timeout=3600  # 1 hour timeout
                 )
@@ -200,9 +202,7 @@ def weekly_full_sync_task():
                 
                 task_id = async_task(
                     'analytics.tasks.sync_application_task',
-                    application.id,
-                    application.owner_id,
-                    'full',
+                    application.id, application.owner_id, 'full',
                     group=f'weekly_sync_{datetime.now().strftime("%Y%m%d")}',
                     timeout=7200,  # 2 hour timeout for full sync
                     schedule=datetime.now() + timedelta(minutes=delay_minutes)
@@ -310,9 +310,7 @@ def manual_sync_application(application_id: int, sync_type: str = 'incremental')
         
         task_id = async_task(
             'analytics.tasks.sync_application_task',
-            application_id,
-            application.owner_id,
-            sync_type,
+            application_id, application.owner_id, sync_type,
             group=f'manual_sync_{datetime.now().strftime("%Y%m%d_%H%M%S")}',
             timeout=3600
         )
@@ -1245,3 +1243,393 @@ def daily_indexing_all_repos_task():
         task_id = async_task('analytics.tasks.background_indexing_task', repo.id, repo.owner_id, None)
         results.append({'repo_id': repo.id, 'task_id': task_id, 'repo_name': repo.full_name})
     return results
+
+
+def index_deployments_intelligent_task(repository_id: int, user_id: int, batch_size_days: int = 30):
+    """
+    Django-Q task for intelligent deployment indexing
+    
+    Args:
+        repository_id: Repository ID to index deployments for
+        user_id: User ID (owner of the repository)
+        batch_size_days: Number of days per batch (default: 30)
+    """
+    logger.info(f"Starting intelligent deployment indexing for repository {repository_id}")
+    
+    try:
+        # Run intelligent indexing
+        result = DeploymentIndexingService.index_deployments_for_repository(
+            repository_id=repository_id,
+            user_id=user_id,
+            batch_size_days=batch_size_days
+        )
+        
+        # If there's more to index, schedule the next batch
+        if result.get('has_more', False) and result.get('status') == 'success':
+            logger.info(f"Scheduling next deployment indexing batch for repository {repository_id}")
+            # Schedule next run in 2 minutes to allow for API rate limiting
+            next_run = timezone.now() + timedelta(minutes=2)
+            
+            from django_q.models import Schedule
+            Schedule.objects.create(
+                func='analytics.tasks.index_deployments_intelligent_task',
+                args=[repository_id, user_id, batch_size_days],
+                next_run=next_run,
+                schedule_type=Schedule.ONCE,
+                name=f'deployment_indexing_repo_{repository_id}'
+            )
+        
+        logger.info(f"Deployment indexing completed for repository {repository_id}: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Deployment indexing task failed for repository {repository_id}: {e}")
+        raise
+
+
+def index_all_deployments_task():
+    """
+    Django-Q task to start deployment indexing for all indexed repositories
+    """
+    logger.info("Starting deployment indexing for all repositories")
+    
+    try:
+        from repositories.models import Repository
+        
+        results = []
+        indexed_repos = Repository.objects.filter(is_indexed=True)
+        
+        for repo in indexed_repos:
+            try:
+                # Start deployment indexing for this repository
+                task_id = async_task(
+                    'analytics.tasks.index_deployments_intelligent_task',
+                    repo.id, repo.owner.id, 30  # batch_size_days par défaut pour deployments
+                )
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': task_id,
+                    'status': 'scheduled'
+                })
+                logger.info(f"Scheduled deployment indexing for repository {repo.full_name}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to schedule deployment indexing for repository {repo.full_name}: {e}")
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': None,
+                    'status': 'failed',
+                    'error': str(e)
+                })
+        
+        summary = {
+            'total_repositories': len(indexed_repos),
+            'successfully_scheduled': len([r for r in results if r['status'] == 'scheduled']),
+            'failed_to_schedule': len([r for r in results if r['status'] == 'failed']),
+            'results': results
+        }
+        
+        logger.info(f"Deployment indexing scheduling completed: {summary}")
+        return summary
+        
+    except Exception as e:
+        logger.error(f"Failed to start deployment indexing for all repositories: {e}")
+        raise
+
+
+def index_commits_intelligent_task(*args):
+    """
+    Django-Q task for intelligent commit indexing with PR links
+    
+    Args:
+        *args: Positional arguments (repository_id, batch_size_days)
+    """
+    # Unpack arguments with protection against nested lists
+    repository_id = args[0]
+    batch_size_days = args[1] if len(args) > 1 else 7
+    
+    # Handle case where repository_id is still a list (from old corrupted tasks)
+    if isinstance(repository_id, list):
+        if len(repository_id) > 0:
+            repository_id = repository_id[0]
+        else:
+            raise ValueError("repository_id is an empty list")
+    
+    logger.info(f"Starting intelligent commit indexing for repository {repository_id}")
+    
+    try:
+        # Get repository to get user_id
+        from repositories.models import Repository
+        repository = Repository.objects.get(id=repository_id)
+        user_id = repository.owner.id
+        
+        # Run intelligent indexing
+        result = CommitIndexingService.index_commits_for_repository(
+            repository_id=repository_id,
+            user_id=user_id,
+            batch_size_days=batch_size_days
+        )
+        
+        # If there's more to index, schedule the next batch
+        if result.get('has_more', False) and result.get('status') == 'success':
+            logger.info(f"Scheduling next commit indexing batch for repository {repository_id}")
+            # Schedule next run in 1 minute to allow for API rate limiting
+            next_run = timezone.now() + timedelta(minutes=1)
+            
+            from django_q.models import Schedule
+            Schedule.objects.create(
+                func='analytics.tasks.index_commits_intelligent_task',
+                args=[repository_id, batch_size_days],
+                next_run=next_run,
+                schedule_type=Schedule.ONCE,
+                name=f'commit_indexing_repo_{repository_id}'
+            )
+        
+        logger.info(f"Commit indexing completed for repository {repository_id}: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Commit indexing task failed for repository {repository_id}: {e}")
+        raise
+
+
+def index_all_commits_task():
+    """
+    Django-Q task to start commit indexing for all indexed repositories
+    """
+    logger.info("Starting commit indexing for all repositories")
+    
+    try:
+        from repositories.models import Repository
+        
+        results = []
+        indexed_repos = Repository.objects.filter(is_indexed=True)
+        
+        for repo in indexed_repos:
+            try:
+                # Start commit indexing for this repository
+                task_id = async_task(
+                    'analytics.tasks.index_commits_intelligent_task',
+                    repo.id, 7  # batch_size_days par défaut pour commits
+                )
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': task_id,
+                    'status': 'scheduled'
+                })
+                logger.info(f"Scheduled commit indexing for repository {repo.full_name}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to schedule commit indexing for repository {repo.full_name}: {e}")
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': None,
+                    'status': 'failed',
+                    'error': str(e)
+                })
+        
+        summary = {
+            'total_repositories': len(indexed_repos),
+            'successfully_scheduled': len([r for r in results if r['status'] == 'scheduled']),
+            'failed_to_schedule': len([r for r in results if r['status'] == 'failed']),
+            'results': results
+        }
+        
+        logger.info(f"Commit indexing scheduling completed: {summary}")
+        return summary
+        
+    except Exception as e:
+        logger.error(f"Failed to start commit indexing for all repositories: {e}")
+        raise
+
+
+def index_pullrequests_intelligent_task(repository_id: int, user_id: int, batch_size_days: int = 30):
+    """
+    Django-Q task for intelligent pull request indexing
+    
+    Args:
+        repository_id: Repository ID to index pull requests for
+        user_id: User ID (owner of the repository)
+        batch_size_days: Number of days per batch (default: 30 for PRs)
+    """
+    logger.info(f"Starting intelligent pull request indexing for repository {repository_id}")
+    
+    try:
+        # Run intelligent indexing
+        result = PullRequestIndexingService.index_pullrequests_for_repository(
+            repository_id=repository_id,
+            user_id=user_id,
+            batch_size_days=batch_size_days
+        )
+        
+        # If there's more to index, schedule the next batch
+        if result.get('has_more', False) and result.get('status') == 'success':
+            logger.info(f"Scheduling next pull request indexing batch for repository {repository_id}")
+            # Schedule next run in 3 minutes to allow for API rate limiting
+            next_run = timezone.now() + timedelta(minutes=3)
+            
+            from django_q.models import Schedule
+            Schedule.objects.create(
+                func='analytics.tasks.index_pullrequests_intelligent_task',
+                args=[repository_id, user_id, batch_size_days],
+                next_run=next_run,
+                schedule_type=Schedule.ONCE,
+                name=f'pullrequest_indexing_repo_{repository_id}'
+            )
+        
+        logger.info(f"Pull request indexing completed for repository {repository_id}: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Pull request indexing task failed for repository {repository_id}: {e}")
+        raise
+
+
+def index_all_pullrequests_task():
+    """
+    Django-Q task to start pull request indexing for all indexed repositories
+    """
+    logger.info("Starting pull request indexing for all repositories")
+    
+    try:
+        from repositories.models import Repository
+        
+        results = []
+        indexed_repos = Repository.objects.filter(is_indexed=True)
+        
+        for repo in indexed_repos:
+            try:
+                # Start pull request indexing for this repository
+                task_id = async_task(
+                    'analytics.tasks.index_pullrequests_intelligent_task',
+                    repo.id, repo.owner.id, 30  # batch_size_days par défaut pour PR
+                )
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': task_id,
+                    'status': 'scheduled'
+                })
+                logger.info(f"Scheduled pull request indexing for repository {repo.full_name}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to schedule pull request indexing for repository {repo.full_name}: {e}")
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': None,
+                    'status': 'failed',
+                    'error': str(e)
+                })
+        
+        summary = {
+            'total_repositories': len(indexed_repos),
+            'successfully_scheduled': len([r for r in results if r['status'] == 'scheduled']),
+            'failed_to_schedule': len([r for r in results if r['status'] == 'failed']),
+            'results': results
+        }
+        
+        logger.info(f"Pull request indexing scheduling completed: {summary}")
+        return summary
+        
+    except Exception as e:
+        logger.error(f"Failed to start pull request indexing for all repositories: {e}")
+        raise
+
+
+def index_releases_intelligent_task(repository_id: int, user_id: int, batch_size_days: int = 90):
+    """
+    Django-Q task for intelligent release indexing
+    
+    Args:
+        repository_id: Repository ID to index releases for
+        user_id: User ID (owner of the repository)
+        batch_size_days: Number of days per batch (default: 90 for releases)
+    """
+    logger.info(f"Starting intelligent release indexing for repository {repository_id}")
+    
+    try:
+        # Run intelligent indexing
+        result = ReleaseIndexingService.index_releases_for_repository(
+            repository_id=repository_id,
+            user_id=user_id,
+            batch_size_days=batch_size_days
+        )
+        
+        # If there's more to index, schedule the next batch
+        if result.get('has_more', False) and result.get('status') == 'success':
+            logger.info(f"Scheduling next release indexing batch for repository {repository_id}")
+            # Schedule next run in 5 minutes to allow for API rate limiting
+            next_run = timezone.now() + timedelta(minutes=5)
+            
+            from django_q.models import Schedule
+            Schedule.objects.create(
+                func='analytics.tasks.index_releases_intelligent_task',
+                args=[repository_id, user_id, batch_size_days],
+                next_run=next_run,
+                schedule_type=Schedule.ONCE,
+                name=f'release_indexing_repo_{repository_id}'
+            )
+        
+        logger.info(f"Release indexing completed for repository {repository_id}: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Release indexing task failed for repository {repository_id}: {e}")
+        raise
+
+
+def index_all_releases_task():
+    """
+    Django-Q task to start release indexing for all indexed repositories
+    """
+    logger.info("Starting release indexing for all repositories")
+    
+    try:
+        from repositories.models import Repository
+        
+        results = []
+        indexed_repos = Repository.objects.filter(is_indexed=True)
+        
+        for repo in indexed_repos:
+            try:
+                # Start release indexing for this repository
+                task_id = async_task(
+                    'analytics.tasks.index_releases_intelligent_task',
+                    repo.id, repo.owner.id, 90  # batch_size_days par défaut pour releases
+                )
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': task_id,
+                    'status': 'scheduled'
+                })
+                logger.info(f"Scheduled release indexing for repository {repo.full_name}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to schedule release indexing for repository {repo.full_name}: {e}")
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': None,
+                    'status': 'failed',
+                    'error': str(e)
+                })
+        
+        summary = {
+            'total_repositories': len(indexed_repos),
+            'successfully_scheduled': len([r for r in results if r['status'] == 'scheduled']),
+            'failed_to_schedule': len([r for r in results if r['status'] == 'failed']),
+            'results': results
+        }
+        
+        logger.info(f"Release indexing scheduling completed: {summary}")
+        return summary
+        
+    except Exception as e:
+        logger.error(f"Failed to start release indexing for all repositories: {e}")
+        raise

@@ -9,6 +9,48 @@ from mongoengine import Document, EmbeddedDocument
 from typing import List, Optional
 
 
+class IndexingState(Document):
+    """MongoDB document for tracking indexing state per repository and entity type"""
+    # Repository information
+    repository_id = fields.IntField(required=True)  # Repository Django model ID
+    repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
+    entity_type = fields.StringField(required=True)  # 'deployments', 'pull_requests', 'releases', etc.
+    
+    # Indexing state
+    last_indexed_at = fields.DateTimeField(null=True)  # Last date/time indexed for this entity
+    last_run_at = fields.DateTimeField(default=django_timezone.now)  # When the task was last executed
+    status = fields.StringField(choices=['pending', 'running', 'completed', 'error'], default='pending')
+    
+    # Statistics
+    total_indexed = fields.IntField(default=0)  # Total number of items indexed
+    batch_size_days = fields.IntField(default=30)  # Days per batch for this entity
+    
+    # Error handling
+    error_message = fields.StringField(null=True)
+    retry_count = fields.IntField(default=0)
+    max_retries = fields.IntField(default=3)
+    
+    # Metadata
+    created_at = fields.DateTimeField(default=django_timezone.now)
+    updated_at = fields.DateTimeField(default=django_timezone.now)
+    
+    # MongoDB settings
+    meta = {
+        'collection': 'indexing_states',
+        'indexes': [
+            'repository_id',
+            'entity_type',
+            'status',
+            'last_run_at',
+            ('repository_id', 'entity_type'),  # Unique combination
+            ('status', 'last_run_at'),
+        ]
+    }
+    
+    def __str__(self):
+        return f"{self.repository_full_name} - {self.entity_type} - {self.status}"
+
+
 class FileChange(EmbeddedDocument):
     """Embedded document for file changes in a commit"""
     filename = fields.StringField(required=True)
