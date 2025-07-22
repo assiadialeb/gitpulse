@@ -237,7 +237,10 @@ def search_repositories(request):
             else:
                 return JsonResponse({'error': 'GitHub API error'}, status=500)
         
-        # Filter repositories based on query
+        # Récupère les github_id déjà indexés pour cet utilisateur
+        from .models import Repository
+        existing_github_ids = set(Repository.objects.filter(owner=request.user).values_list('github_id', flat=True))
+        # Filter repositories based on query and exclude already indexed
         filtered_repos = []
         for repo in all_repos:
             # Check if repo name or description contains the query
@@ -248,22 +251,23 @@ def search_repositories(request):
             if (query in repo_name or 
                 query in repo_full_name or 
                 query in repo_description):
-                filtered_repos.append({
-                    'id': repo['id'],
-                    'name': repo['name'],
-                    'full_name': repo['full_name'],
-                    'description': repo.get('description', ''),
-                    'private': repo['private'],
-                    'fork': repo['fork'],
-                    'language': repo.get('language'),
-                    'stargazers_count': repo['stargazers_count'],
-                    'forks_count': repo['forks_count'],
-                    'size': repo['size'],
-                    'default_branch': repo['default_branch'],
-                    'html_url': repo['html_url'],
-                    'clone_url': repo['clone_url'],
-                    'ssh_url': repo['ssh_url']
-                })
+                if repo['id'] not in existing_github_ids:
+                    filtered_repos.append({
+                        'id': repo['id'],
+                        'name': repo['name'],
+                        'full_name': repo['full_name'],
+                        'description': repo.get('description', ''),
+                        'private': repo['private'],
+                        'fork': repo['fork'],
+                        'language': repo.get('language'),
+                        'stargazers_count': repo['stargazers_count'],
+                        'forks_count': repo['forks_count'],
+                        'size': repo['size'],
+                        'default_branch': repo['default_branch'],
+                        'html_url': repo['html_url'],
+                        'clone_url': repo['clone_url'],
+                        'ssh_url': repo['ssh_url']
+                    })
         
         # Sort by stars (descending) and limit to 10 results
         filtered_repos.sort(key=lambda x: x['stargazers_count'], reverse=True)
