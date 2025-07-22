@@ -151,9 +151,9 @@ class UnifiedMetricsService:
         
         return {
             'avg_commits_per_day': round(avg_commits_per_day, 2),
-            'recent_activity_score': round(recent_activity_score, 1),
-            'consistency_score': round(consistency_score, 1),
-            'overall_frequency_score': round(overall_frequency_score, 1),
+            'recent_activity_score': int(round(recent_activity_score)),
+            'consistency_score': int(round(consistency_score)),
+            'overall_frequency_score': int(round(overall_frequency_score)),
             'commits_last_30_days': commits_last_30_days,
             'commits_last_90_days': commits_last_90_days,
             'days_since_last_commit': days_since_last_commit,
