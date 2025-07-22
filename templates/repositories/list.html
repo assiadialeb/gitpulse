@@ -244,12 +244,15 @@
         
         <div class="modal-action">
             <button class="btn" onclick="closeIndexModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="addRepository()">Add</button>
+            <button class="btn btn-primary" id="add-repos-btn" onclick="addSelectedRepositories()" disabled>Add Selected</button>
         </div>
     </div>
 </div>
 
 <script>
+let selectedRepositories = new Map();
+let lastRepoResults = [];
+
 function openIndexModal() {
     document.getElementById('indexModal').classList.add('modal-open');
 }
@@ -261,91 +264,72 @@ function closeIndexModal() {
 function searchRepositories() {
     const searchTerm = document.getElementById('repoSearch').value;
     const resultsDiv = document.getElementById('repoResults');
-    
     if (!searchTerm.trim()) {
         resultsDiv.innerHTML = '<div class="text-center text-gray-500 py-4">Enter a repository name to search</div>';
         return;
     }
-    
-    // Show loading state
     resultsDiv.innerHTML = '<div class="text-center py-4"><span class="loading loading-spinner loading-md"></span><p class="mt-2 text-gray-600">Searching repositories...</p></div>';
-    
-    // Call Django view to search GitHub
     fetch(`/repositories/search/?q=${encodeURIComponent(searchTerm)}`)
         .then(response => response.json())
         .then(data => {
             if (data.repositories && data.repositories.length > 0) {
-                resultsDiv.innerHTML = data.repositories.map(repo => `
-                    <div class="bg-white rounded-lg p-4 border border-gray-200">
-                        <div class="flex items-center justify-between">
+                lastRepoResults = data.repositories;
+                resultsDiv.innerHTML = data.repositories.map((repo, i) => `
+                    <label class="cursor-pointer block">
+                        <div class="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:shadow-soft transition-all duration-300">
+                            <input type="checkbox" class="checkbox checkbox-primary mr-4" onchange="toggleRepository(this, ${i})">
                             <div class="flex-1">
                                 <h5 class="font-semibold">${repo.name}</h5>
                                 <p class="text-sm text-gray-600">${repo.full_name}</p>
-                                ${repo.description ? `<p class="text-sm text-gray-500 mt-1">${repo.description}</p>` : ''}
+                                ${repo.description ? `<p class=\"text-sm text-gray-500 mt-1\">${repo.description}</p>` : ''}
                                 <div class="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                                    ${repo.language ? `<span class="flex items-center"><div class="w-2 h-2 rounded-full bg-blue-500 mr-1"></div>${repo.language}</span>` : ''}
+                                    ${repo.language ? `<span class=\"flex items-center\"><div class=\"w-2 h-2 rounded-full bg-blue-500 mr-1\"></div>${repo.language}</span>` : ''}
                                     <span class="text-xs">⭐ ${repo.stargazers_count}</span>
                                     <span class="text-xs">🔀 ${repo.forks_count}</span>
                                     ${repo.private ? '<span class="badge badge-warning badge-xs">Private</span>' : '<span class="badge badge-success badge-xs">Public</span>'}
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-primary ml-4" onclick="selectRepository('${repo.full_name}', '${repo.name}', ${JSON.stringify(repo).replace(/"/g, '&quot;')})">
-                                Select
-                            </button>
                         </div>
-                    </div>
+                    </label>
                 `).join('');
             } else {
+                lastRepoResults = [];
                 resultsDiv.innerHTML = '<div class="text-center text-gray-500 py-4">No repositories found</div>';
             }
         })
         .catch(error => {
+            lastRepoResults = [];
             console.error('Error:', error);
             resultsDiv.innerHTML = '<div class="text-center text-red-500 py-4">Error searching repositories</div>';
         });
 }
 
-function selectRepository(fullName, name, repoData) {
-    // Store repository data for indexing
-    window.selectedRepository = repoData;
-    
-    // Update UI to show selected repository
-    document.getElementById('repoResults').innerHTML = `
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div class="flex items-center justify-between">
-                <div class="flex-1">
-                    <h5 class="font-semibold text-blue-900">${name}</h5>
-                    <p class="text-sm text-blue-700">${fullName}</p>
-                    ${repoData.description ? `<p class="text-sm text-blue-600 mt-1">${repoData.description}</p>` : ''}
-                    <div class="flex items-center space-x-4 mt-2 text-xs text-blue-600">
-                        ${repoData.language ? `<span class="flex items-center"><div class="w-2 h-2 rounded-full bg-blue-500 mr-1"></div>${repoData.language}</span>` : ''}
-                        <span class="text-xs">⭐ ${repoData.stargazers_count}</span>
-                        <span class="text-xs">🔀 ${repoData.forks_count}</span>
-                        ${repoData.private ? '<span class="badge badge-warning badge-xs">Private</span>' : '<span class="badge badge-success badge-xs">Public</span>'}
-                    </div>
-                </div>
-                <span class="badge badge-primary ml-4">Selected</span>
-            </div>
-        </div>
-    `;
+function toggleRepository(checkbox, index) {
+    const repoData = lastRepoResults[index];
+    if (!repoData) return;
+    if (checkbox.checked) {
+        selectedRepositories.set(repoData.full_name, repoData);
+    } else {
+        selectedRepositories.delete(repoData.full_name);
+    }
+    updateAddButton();
 }
 
-function addRepository() {
-    if (!window.selectedRepository) {
-        alert('Please select a repository first');
-        return;
-    }
-    
+function updateAddButton() {
+    const addButton = document.getElementById('add-repos-btn');
+    addButton.disabled = selectedRepositories.size === 0;
+    addButton.textContent = selectedRepositories.size > 0 ? `Add Selected (${selectedRepositories.size})` : 'Add Selected';
+}
+
+function addSelectedRepositories() {
+    if (selectedRepositories.size === 0) return;
+    const addButton = document.getElementById('add-repos-btn');
+    const originalText = addButton.textContent;
+    addButton.disabled = true;
+    addButton.textContent = 'Adding...';
     const formData = new FormData();
-    formData.append('repository_data', JSON.stringify(window.selectedRepository));
-    
-    // Show loading state
-    const button = document.querySelector('.modal-action .btn-primary');
-    const originalText = button.textContent;
-    button.textContent = 'Adding...';
-    button.disabled = true;
-    
-    fetch('/repositories/index/', {
+    formData.append('repositories_data', JSON.stringify(Array.from(selectedRepositories.values())));
+    fetch('/repositories/index-batch/', {
         method: 'POST',
         body: formData,
         headers: {
@@ -356,19 +340,18 @@ function addRepository() {
     .then(data => {
         if (data.success) {
             closeIndexModal();
-            // Reload page to show new repository
             window.location.reload();
         } else {
-            alert(data.error || 'Failed to add repository');
+            alert(data.error || 'Failed to add repositories');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error adding repository');
+        alert('Error adding repositories');
     })
     .finally(() => {
-        button.textContent = originalText;
-        button.disabled = false;
+        addButton.textContent = originalText;
+        addButton.disabled = false;
     });
 }
 </script>

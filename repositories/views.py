@@ -500,3 +500,42 @@ def api_repository_commit_types(request, repo_id):
         return JsonResponse({'success': False, 'error': 'Repository not found'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def index_repositories(request):
+    """Batch add repositories"""
+    try:
+        repositories_data = json.loads(request.POST.get('repositories_data', '[]'))
+        if not repositories_data:
+            return JsonResponse({'success': False, 'error': 'No repositories data provided'})
+        added = 0
+        skipped = 0
+        for repository_data in repositories_data:
+            if Repository.objects.filter(github_id=repository_data['id'], owner=request.user).exists():
+                skipped += 1
+                continue
+            Repository.objects.create(
+                name=repository_data['name'],
+                full_name=repository_data['full_name'],
+                description=repository_data.get('description', ''),
+                private=repository_data['private'],
+                fork=repository_data['fork'],
+                language=repository_data.get('language'),
+                stars=repository_data['stargazers_count'],
+                forks=repository_data['forks_count'],
+                size=repository_data['size'],
+                default_branch=repository_data['default_branch'],
+                github_id=repository_data['id'],
+                html_url=repository_data['html_url'],
+                clone_url=repository_data['clone_url'],
+                ssh_url=repository_data['ssh_url'],
+                owner=request.user,
+                is_indexed=False,
+                is_indexing=False
+            )
+            added += 1
+        return JsonResponse({'success': True, 'added': added, 'skipped': skipped})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error adding repositories: {str(e)}'})

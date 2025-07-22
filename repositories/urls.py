@@ -14,6 +14,7 @@ urlpatterns = [
     path('<int:repo_id>/debug/', debug_views.repository_debug, name='debug'),
     path('search/', views.search_repositories, name='search'),
     path('index/', views.index_repository, name='index'),
+    path('index-batch/', views.index_repositories, name='index_batch'),
     path('<int:repo_id>/start-indexing/', views.start_indexing, name='start_indexing'),
     path('<int:repo_id>/delete/', views.delete_repository, name='delete'),
     

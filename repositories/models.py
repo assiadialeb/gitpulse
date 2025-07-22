@@ -24,6 +24,7 @@ class Repository(models.Model):
     
     # Indexing status
     is_indexed = models.BooleanField(default=False)
+    is_indexing = models.BooleanField(default=False)
     last_indexed = models.DateTimeField(null=True, blank=True)
     commit_count = models.IntegerField(default=0)
     

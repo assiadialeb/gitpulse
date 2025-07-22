@@ -15,6 +15,7 @@ from applications.models import Application, ApplicationRepository
 from .services import DeploymentIndexingService
 from .services import ReleaseIndexingService
 from .github_token_service import GitHubTokenService
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -425,7 +426,7 @@ def background_indexing_task(repository_id: int, user_id: int, task_id: Optional
             
             # Update repository indexing status
             repository.is_indexed = True
-            repository.last_indexed = datetime.utcnow()
+            repository.last_indexed = timezone.now()
             repository.save()
             
             logger.info(f"Completed indexing for repository {repository.full_name}")

@@ -8,6 +8,7 @@ from django.db import transaction
 from mongoengine import Q
 from django.core.exceptions import ObjectDoesNotExist
 from pymongo import MongoClient
+from mongoengine.errors import NotUniqueError
 
 from .models import Commit, SyncLog, RepositoryStats, FileChange
 from .git_service import GitService, GitServiceError
@@ -296,9 +297,14 @@ class GitSyncService:
                     results['commits_updated'] += 1
                 else:
                     # Create new commit
-                    commit = Commit(**parsed_data)
-                    commit.save()
-                    results['commits_new'] += 1
+                    try:
+                        commit = Commit(**parsed_data)
+                        commit.save()
+                        results['commits_new'] += 1
+                    except NotUniqueError:
+                        logger.warning(f"Commit {sha} déjà présent, ignoré.")
+                        results['commits_skipped'] += 1
+                        continue
                 
                 results['commits_processed'] += 1
                 

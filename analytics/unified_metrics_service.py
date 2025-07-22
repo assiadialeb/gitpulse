@@ -263,8 +263,18 @@ class UnifiedMetricsService:
         else:
             # Repository: group by author email
             developer_stats = {}
+            # Prépare un mapping email -> Developer (si existe)
+            email_to_developer = {}
+            for alias in DeveloperAlias.objects():
+                if alias.developer:
+                    email_to_developer[alias.email.lower()] = alias.developer
             for commit in recent_commits:
-                key = commit.author_name
+                email = commit.author_email.lower()
+                developer = email_to_developer.get(email)
+                if developer:
+                    key = developer.primary_name
+                else:
+                    key = commit.author_name
                 if key not in developer_stats:
                     developer_stats[key] = {'commits': 0, 'additions': 0, 'deletions': 0}
                 developer_stats[key]['commits'] += 1
@@ -453,10 +463,20 @@ class UnifiedMetricsService:
                     contributor_stats[key]['deletions'] += commit.deletions
                     contributor_stats[key]['commits'] += 1
         else:
-            # Repository: group by author
+            # Repository: group by author (corrigé pour alias/group)
             contributor_stats = {}
+            # Prépare un mapping email -> Developer (si existe)
+            email_to_developer = {}
+            for alias in DeveloperAlias.objects():
+                if alias.developer:
+                    email_to_developer[alias.email.lower()] = alias.developer
             for commit in self.commits:
-                key = commit.author_name
+                email = commit.author_email.lower()
+                developer = email_to_developer.get(email)
+                if developer:
+                    key = developer.primary_name
+                else:
+                    key = commit.author_name
                 if key not in contributor_stats:
                     contributor_stats[key] = {'additions': 0, 'deletions': 0, 'commits': 0}
                 contributor_stats[key]['additions'] += commit.additions

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 from django.db import transaction
 from mongoengine import Q
+from mongoengine.errors import NotUniqueError
 
 from .models import Commit, SyncLog, RepositoryStats
 from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
@@ -340,9 +341,14 @@ class SyncService:
                     results['commits_updated'] += 1
                 else:
                     # Create new commit
-                    commit = Commit(**parsed_data)
-                    commit.save()
-                    results['commits_new'] += 1
+                    try:
+                        commit = Commit(**parsed_data)
+                        commit.save()
+                        results['commits_new'] += 1
+                    except NotUniqueError:
+                        logger.warning(f"Commit {sha} déjà présent, ignoré.")
+                        results['commits_skipped'] += 1
+                        continue
                 
                 results['commits_processed'] += 1
                 
