@@ -817,7 +817,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// Date range popover logic for Cally
+// Date range popover logic for Cally (fusionné, container toujours défini)
 window.addEventListener('DOMContentLoaded', () => {
   const cal = document.getElementById('repo-calendar-range');
   const label = document.getElementById('date-range-label');
@@ -838,6 +838,22 @@ window.addEventListener('DOMContentLoaded', () => {
     cal.addEventListener('change', () => {
       label.textContent = cal.value;
       container.style.display = 'none';
+      // Parsing robuste de la plage de dates
+      let start = '', end = '';
+      if (cal.value.includes(' to ')) {
+        [start, end] = cal.value.split(' to ');
+      } else if (cal.value.includes('/')) {
+        [start, end] = cal.value.split('/');
+      } else if (cal.value.includes('-')) {
+        [start, end] = cal.value.split('-');
+      }
+      start = start.trim();
+      end = end.trim();
+      if (!start || !end) return;
+      const url = new URL(window.location.href);
+      url.searchParams.set('start', start);
+      url.searchParams.set('end', end);
+      window.location.href = url.toString();
     });
     // Hide if click outside
     document.addEventListener('click', (e) => {
@@ -845,34 +861,45 @@ window.addEventListener('DOMContentLoaded', () => {
         container.style.display = 'none';
       }
     });
-  }
-});
-
-// Plages prédéfinies
-window.addEventListener('DOMContentLoaded', () => {
-  const cal = document.getElementById('repo-calendar-range');
-  const rangeButtons = container.querySelectorAll('button[data-range]');
-  rangeButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const now = new Date();
-      let start, end = now;
-      if (btn.dataset.range === '30') {
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
-      } else if (btn.dataset.range === '60') {
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 59);
-      } else if (btn.dataset.range === '90') {
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
-      } else if (btn.dataset.range === 'year') {
-        start = new Date(now.getFullYear(), 0, 1);
-      } else if (btn.dataset.range === 'all') {
-        start = new Date(2000, 0, 1);
-      }
-      cal.value = `${start.toISOString().slice(0,10)} to ${end.toISOString().slice(0,10)}`;
-      label.textContent = cal.value;
-      container.style.display = 'none';
-      cal.dispatchEvent(new Event('change'));
+    // Plages prédéfinies
+    const rangeButtons = container.querySelectorAll('button[data-range]');
+    rangeButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const now = new Date();
+        let start, end = now;
+        if (btn.dataset.range === '30') {
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+        } else if (btn.dataset.range === '60') {
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 59);
+        } else if (btn.dataset.range === '90') {
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
+        } else if (btn.dataset.range === 'year') {
+          start = new Date(now.getFullYear(), 0, 1);
+        } else if (btn.dataset.range === 'all') {
+          start = new Date(2000, 0, 1);
+        }
+        cal.value = `${start.toISOString().slice(0,10)} to ${end.toISOString().slice(0,10)}`;
+        label.textContent = cal.value;
+        container.style.display = 'none';
+        // Parsing robuste de la plage de dates
+        let s = '', e = '';
+        if (cal.value.includes(' to ')) {
+          [s, e] = cal.value.split(' to ');
+        } else if (cal.value.includes('/')) {
+          [s, e] = cal.value.split('/');
+        } else if (cal.value.includes('-')) {
+          [s, e] = cal.value.split('-');
+        }
+        s = s.trim();
+        e = e.trim();
+        if (!s || !e) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set('start', s);
+        url.searchParams.set('end', e);
+        window.location.href = url.toString();
+      });
     });
-  });
+  }
 });
 
 // Repository management functions

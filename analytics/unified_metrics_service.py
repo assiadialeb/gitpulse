@@ -22,7 +22,7 @@ class UnifiedMetricsService:
     - Developer (D): single developer metrics
     """
     
-    def __init__(self, entity_type: str, entity_id: Union[int, str]):
+    def __init__(self, entity_type: str, entity_id: Union[int, str], start_date=None, end_date=None):
         """
         Initialize the service for a specific entity
         
@@ -32,6 +32,8 @@ class UnifiedMetricsService:
         """
         self.entity_type = entity_type.lower()
         self.entity_id = entity_id
+        self.start_date = start_date
+        self.end_date = end_date
         
         # Initialize commits queryset based on entity type
         self._setup_entity_data()
@@ -67,11 +69,49 @@ class UnifiedMetricsService:
             self.releases = Release.objects.filter(repository_full_name__in=repo_names)
         else:
             raise ValueError(f"Invalid entity_type: {self.entity_type}")
+        
+        # Filtrage des commits, releases, PRs sur la plage si fournie
+        self.commits = self._filter_queryset(self.commits)
+        self.releases = self._filter_queryset(self.releases)
+        self.prs = self._filter_queryset(self.prs)
+    
+    def _filter_queryset(self, qs):
+        if self.start_date and self.end_date:
+            field = None
+            if hasattr(qs, 'model'):
+                model = qs.model
+                if model.__name__ == 'Commit':
+                    field = 'authored_date'
+                elif model.__name__ == 'Release':
+                    field = 'published_at'
+                elif model.__name__ == 'PullRequest':
+                    field = 'created_at'
+            # Fallback: test le premier objet
+            if not field and hasattr(qs, 'first'):
+                first = qs.first()
+                if first:
+                    if hasattr(first, 'authored_date'):
+                        field = 'authored_date'
+                    elif hasattr(first, 'published_at'):
+                        field = 'published_at'
+                    elif hasattr(first, 'created_at'):
+                        field = 'created_at'
+            if field:
+                return qs.filter(**{f"{field}__gte": self.start_date, f"{field}__lte": self.end_date})
+            else:
+                return qs
+        return qs
     
     # Basic Stats (DAR - Developers, Applications, Repositories)
     def get_total_commits(self) -> int:
         """Total Commits (DAR)"""
         return self.commits.count()
+    
+    def get_total_releases(self) -> int:
+        """Total Releases (AR)"""
+        if self.entity_type == 'developer':
+            return 0  # Developers don't own releases
+        return self.releases.count()
     
     def get_total_developers(self) -> int:
         """Total Developers (AR)"""
@@ -84,14 +124,9 @@ class UnifiedMetricsService:
             return len(grouping_service.get_all_developers_for_application(self.entity_id))
         else:
             # Repository: count unique authors
+            # Uniquement les auteurs présents dans la plage filtrée
             unique_emails = set(commit.author_email for commit in self.commits)
             return len(unique_emails)
-    
-    def get_total_releases(self) -> int:
-        """Total Releases (AR)"""
-        if self.entity_type == 'developer':
-            return 0  # Developers don't own releases
-        return self.releases.count()
     
     def get_lines_added(self) -> int:
         """Lines Added (DAR)"""
@@ -108,6 +143,7 @@ class UnifiedMetricsService:
     # Frequency Metrics (DAR for commits, AR for releases)
     def get_commit_frequency(self) -> Dict:
         """Commit Frequency (DAR)"""
+        # Toujours utiliser self.commits filtré (déjà filtré sur la plage si fournie)
         commits_list = list(self.commits.order_by('authored_date'))
         
         if not commits_list:
@@ -165,29 +201,32 @@ class UnifiedMetricsService:
         """Release Frequency (AR)"""
         if self.entity_type == 'developer':
             return {'releases_per_month': 0, 'releases_per_week': 0, 'total_releases': 0, 'period_days': period_days}
-        
-        cutoff = timezone.now() - timedelta(days=period_days)
-        recent_releases = self.releases.filter(published_at__gte=cutoff)
-        total_releases = recent_releases.count()
-        
+        # Si plage personnalisée, utiliser self.releases filtré, sinon period_days
+        if self.start_date and self.end_date:
+            releases = self.releases
+            total_releases = releases.count()
+            days_span = (self.end_date - self.start_date).days + 1
+        else:
+            cutoff = timezone.now() - timedelta(days=period_days)
+            releases = self.releases.filter(published_at__gte=cutoff)
+            total_releases = releases.count()
+            days_span = period_days
         if total_releases == 0:
-            return {'releases_per_month': 0, 'releases_per_week': 0, 'total_releases': 0, 'period_days': period_days}
-        
-        months = period_days / 30.44
-        weeks = period_days / 7
-        
+            return {'releases_per_month': 0, 'releases_per_week': 0, 'total_releases': 0, 'period_days': days_span}
+        months = days_span / 30.44
+        weeks = days_span / 7
         return {
             'releases_per_month': round(total_releases / months, 2),
             'releases_per_week': round(total_releases / weeks, 2),
             'total_releases': total_releases,
-            'period_days': period_days
+            'period_days': days_span
         }
     
     def get_pr_cycle_time(self) -> Dict:
         """PR Cycle Time (AR)"""
         if self.entity_type == 'developer':
             return {'avg_cycle_time_hours': 0, 'median_cycle_time_hours': 0, 'total_prs': 0}
-        
+        # Toujours utiliser self.prs filtré (déjà filtré sur la plage si fournie)
         prs_with_times = self.prs.filter(created_at__ne=None, closed_at__ne=None)
         cycle_times = []
         
@@ -211,11 +250,12 @@ class UnifiedMetricsService:
     # Activity Metrics
     def get_developer_activity(self, days: int = 30) -> Dict:
         """Developer Activity (AR)"""
-        if self.entity_type == 'developer':
-            # For individual developer, return their activity
+        if self.start_date and self.end_date:
+            recent_commits = self.commits
+        else:
             cutoff_date = timezone.now() - timedelta(days=days)
             recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
-            
+        if self.entity_type == 'developer':
             return {
                 'developers': [{
                     'name': self.developer.primary_name,
@@ -501,8 +541,11 @@ class UnifiedMetricsService:
     # Activity Heatmap (DAR)
     def get_commit_activity_by_hour(self, days: int = 30) -> Dict:
         """Commit Activity by Hour (DAR)"""
-        cutoff_date = timezone.now() - timedelta(days=days)
-        recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
+        if self.start_date and self.end_date:
+            recent_commits = self.commits
+        else:
+            cutoff_date = timezone.now() - timedelta(days=days)
+            recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         # Initialize hourly activity
         hourly_activity = {str(hour): 0 for hour in range(24)}

@@ -1,3 +1,5 @@
+import os
+print(f"[DEBUG] {os.path.abspath(__file__)} loaded (views.py)")
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -57,10 +59,26 @@ def repository_detail(request, repo_id):
     except Repository.DoesNotExist:
         messages.error(request, "Repository not found.")
         return redirect('repositories:list')
-    
+
+    # Récupère la plage de dates depuis les paramètres GET
+    from datetime import datetime, timedelta
+    from django.utils import timezone
+    start_str = request.GET.get('start')
+    end_str = request.GET.get('end')
+    if start_str and end_str:
+        try:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d")
+            end_date = datetime.strptime(end_str, "%Y-%m-%d")
+        except Exception:
+            start_date = timezone.now() - timedelta(days=29)
+            end_date = timezone.now()
+    else:
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=29)
+    print(f"[DEBUG] repository_detail: start_date={start_date}, end_date={end_date}")
+    # Utilise la plage pour filtrer les stats
     try:
-        # Use unified metrics service for repository
-        metrics_service = UnifiedMetricsService('repository', repo_id)
+        metrics_service = UnifiedMetricsService('repository', repo_id, start_date=start_date, end_date=end_date)
         
         # Get all metrics using the unified service
         all_metrics = metrics_service.get_all_metrics()

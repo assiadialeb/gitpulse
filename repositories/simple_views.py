@@ -1,3 +1,5 @@
+import os
+print(f"[DEBUG] {os.path.abspath(__file__)} loaded (simple_views.py)")
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
 from .models import Repository

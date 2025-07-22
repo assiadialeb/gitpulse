@@ -1,13 +1,34 @@
+import os
+print(f"[DEBUG] {os.path.abspath(__file__)} loaded (working_views.py)")
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from .models import Repository
 from analytics.unified_metrics_service import UnifiedMetricsService
 import json
+from datetime import datetime, timedelta
+from django.utils import timezone
 
 
 @login_required
 def working_repository_detail(request, repo_id):
+    print(f"[DEBUG] working_repository_detail called with repo_id={repo_id}, start={request.GET.get('start')}, end={request.GET.get('end')}")
+    start_str = request.GET.get('start')
+    end_str = request.GET.get('end')
+    if start_str and end_str:
+        try:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d")
+            end_date = datetime.strptime(end_str, "%Y-%m-%d")
+        except Exception:
+            start_date = timezone.now() - timedelta(days=29)
+            end_date = timezone.now()
+    else:
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=29)
+    # Passe la plage à UnifiedMetricsService
+    metrics_service = UnifiedMetricsService('repository', repo_id, start_date=start_date, end_date=end_date)
+    all_metrics = metrics_service.get_all_metrics()
+    
     """Working repository detail view with proper charts"""
     try:
         repository = Repository.objects.get(id=repo_id, owner=request.user)
@@ -24,8 +45,8 @@ def working_repository_detail(request, repo_id):
     
     try:
         # Get metrics using unified service
-        metrics_service = UnifiedMetricsService('repository', repo_id)
-        all_metrics = metrics_service.get_all_metrics()
+        # metrics_service = UnifiedMetricsService('repository', repo_id)
+        # all_metrics = metrics_service.get_all_metrics()
         
         # Extract specific metrics for template
         overall_stats = {
