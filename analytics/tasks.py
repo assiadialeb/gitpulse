@@ -1245,18 +1245,96 @@ def daily_indexing_all_repos_task():
     return results
 
 
-def index_deployments_intelligent_task(repository_id: int, user_id: int, batch_size_days: int = 30):
+def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
     """
     Django-Q task for intelligent deployment indexing
     
     Args:
-        repository_id: Repository ID to index deployments for
-        user_id: User ID (owner of the repository)
-        batch_size_days: Number of days per batch (default: 30)
+        repository_id: Repository ID to index (integer)
+        args: Alternative way to pass arguments (for corrupted tasks)
     """
+    # Handle corrupted tasks that pass args as kwargs
+    if repository_id is None and args is not None:
+        if isinstance(args, list) and len(args) > 0:
+            repository_id = args[0]
+    
+    if repository_id is None:
+        raise ValueError("repository_id is required")
+    
+    # Handle corrupted tasks that pass lists instead of integers
+    if isinstance(repository_id, list):
+        if len(repository_id) > 0:
+            repository_id = repository_id[0]  # Take first element
+            if isinstance(repository_id, list) and len(repository_id) > 0:
+                repository_id = repository_id[0]  # Handle nested lists
+        else:
+            raise ValueError("repository_id is an empty list")
+    
+    # Ensure repository_id is an integer
+    try:
+        repository_id = int(repository_id)
+    except (ValueError, TypeError):
+        raise ValueError(f"repository_id must be an integer, got {type(repository_id)}: {repository_id}")
     logger.info(f"Starting intelligent deployment indexing for repository {repository_id}")
     
     try:
+        from repositories.models import Repository
+        repository = Repository.objects.get(id=repository_id)
+        user_id = repository.owner.id
+        
+        # Intelligent rate limit check before proceeding
+        from .github_token_service import GitHubTokenService
+        import requests
+        
+        # Get token for rate limit check
+        github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+        if not github_token:
+            github_token = GitHubTokenService._get_user_token(user_id)
+            if not github_token:
+                github_token = GitHubTokenService._get_oauth_app_token()
+        
+        if github_token:
+            # Check rate limit
+            headers = {'Authorization': f'token {github_token}'}
+            try:
+                rate_response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
+                
+                if rate_response.status_code == 200:
+                    rate_data = rate_response.json()
+                    remaining = rate_data['resources']['core']['remaining']
+                    
+                    # If rate limited, schedule for later
+                    if remaining < 30:  # Deployments need moderate requests
+                        logger.warning(f"GitHub API rate limit low ({remaining} remaining), scheduling deployment indexing for later")
+                        
+                        # Schedule next run after rate limit reset
+                        import datetime
+                        reset_time = datetime.datetime.fromtimestamp(rate_data['resources']['core']['reset'])
+                        next_run = reset_time + timedelta(minutes=7)  # 7 minutes after reset
+                        
+                        from django_q.models import Schedule
+                        Schedule.objects.create(
+                            func='analytics.tasks.index_deployments_intelligent_task',
+                            args=[repository_id],
+                            next_run=next_run,
+                            schedule_type=Schedule.ONCE,
+                            name=f'deployment_indexing_repo_{repository_id}_retry'
+                        )
+                        
+                        return {
+                            'status': 'rate_limited',
+                            'repository_id': repository_id,
+                            'repository_full_name': repository.full_name,
+                            'remaining_requests': remaining,
+                            'scheduled_for': next_run.isoformat(),
+                            'message': f'Scheduled for retry at {next_run}'
+                        }
+                        
+            except Exception as e:
+                logger.warning(f"Could not check rate limit: {e}, proceeding with indexing")
+        
+        batch_size_days = 30
+        
         # Run intelligent indexing
         result = DeploymentIndexingService.index_deployments_for_repository(
             repository_id=repository_id,
@@ -1273,7 +1351,7 @@ def index_deployments_intelligent_task(repository_id: int, user_id: int, batch_s
             from django_q.models import Schedule
             Schedule.objects.create(
                 func='analytics.tasks.index_deployments_intelligent_task',
-                args=[repository_id, user_id, batch_size_days],
+                args=[repository_id],
                 next_run=next_run,
                 schedule_type=Schedule.ONCE,
                 name=f'deployment_indexing_repo_{repository_id}'
@@ -1289,7 +1367,7 @@ def index_deployments_intelligent_task(repository_id: int, user_id: int, batch_s
 
 def index_all_deployments_task():
     """
-    Django-Q task to start deployment indexing for all indexed repositories
+    Django-Q task to start deployment indexing for all repositories
     """
     logger.info("Starting deployment indexing for all repositories")
     
@@ -1297,14 +1375,14 @@ def index_all_deployments_task():
         from repositories.models import Repository
         
         results = []
-        indexed_repos = Repository.objects.filter(is_indexed=True)
+        indexed_repos = Repository.objects.all()  # Index ALL repositories, not just already indexed ones
         
         for repo in indexed_repos:
             try:
                 # Start deployment indexing for this repository
                 task_id = async_task(
                     'analytics.tasks.index_deployments_intelligent_task',
-                    repo.id, repo.owner.id, 30  # batch_size_days par défaut pour deployments
+                    repository_id=repo.id
                 )
                 results.append({
                     'repo_id': repo.id,
@@ -1339,23 +1417,20 @@ def index_all_deployments_task():
         raise
 
 
-def index_commits_intelligent_task(*args):
+def index_commits_intelligent_task(repository_id):
     """
     Django-Q task for intelligent commit indexing with PR links
     
     Args:
-        *args: Positional arguments (repository_id, batch_size_days)
+        repository_id: Repository ID to index (integer or list containing integer)
     """
-    # Unpack arguments with protection against nested lists
-    repository_id = args[0]
-    batch_size_days = args[1] if len(args) > 1 else 7
-    
-    # Handle case where repository_id is still a list (from old corrupted tasks)
+    # Handle corrupted tasks that pass lists
     if isinstance(repository_id, list):
-        if len(repository_id) > 0:
+        repository_id = repository_id[0]
+        if isinstance(repository_id, list):
             repository_id = repository_id[0]
-        else:
-            raise ValueError("repository_id is an empty list")
+    
+    repository_id = int(repository_id)
     
     logger.info(f"Starting intelligent commit indexing for repository {repository_id}")
     
@@ -1365,12 +1440,48 @@ def index_commits_intelligent_task(*args):
         repository = Repository.objects.get(id=repository_id)
         user_id = repository.owner.id
         
-        # Run intelligent indexing
-        result = CommitIndexingService.index_commits_for_repository(
-            repository_id=repository_id,
-            user_id=user_id,
-            batch_size_days=batch_size_days
-        )
+        # Choose indexing service based on configuration
+        from django.conf import settings
+        indexing_service = getattr(settings, 'INDEXING_SERVICE', 'github_api')
+        
+        if indexing_service == 'git_local':
+            # Use Git local service for commits (NO rate limits, NO pagination, FULL backfill)
+            logger.info(f"Using Git local indexing service for FULL BACKFILL of repository {repository.full_name}")
+            from .git_sync_service import GitSyncService
+            sync_service = GitSyncService(user_id)
+            
+            # Use FULL sync to get ALL commits in one go (no artificial batching)
+            result = sync_service.sync_repository(
+                repository.full_name,
+                repository.clone_url,
+                None,  # No application_id needed for repository-based indexing
+                'full'  # FULL sync - get ALL commits, no date restrictions
+            )
+            
+            # Convert GitSyncService result format to match expected format
+            result = {
+                'status': 'success',
+                'repository_id': repository_id,
+                'repository_full_name': repository.full_name,
+                'indexing_service': 'git_local',
+                'commits_processed': result.get('commits_new', 0) + result.get('commits_updated', 0),
+                'commits_new': result.get('commits_new', 0),
+                'commits_updated': result.get('commits_updated', 0),
+                'has_more': False,  # Git local processes ALL commits at once - no batching needed
+                'backfill_complete': True,  # Full backfill completed in one shot
+                'errors': result.get('errors', [])
+            }
+        else:
+            # Use GitHub API service for commits
+            logger.info(f"Using GitHub API indexing service for commits in repository {repository.full_name}")
+            batch_size_days = 7
+            
+            # Run intelligent indexing via API
+            result = CommitIndexingService.index_commits_for_repository(
+                repository_id=repository_id,
+                user_id=user_id,
+                batch_size_days=batch_size_days
+            )
         
         # If there's more to index, schedule the next batch
         if result.get('has_more', False) and result.get('status') == 'success':
@@ -1381,7 +1492,7 @@ def index_commits_intelligent_task(*args):
             from django_q.models import Schedule
             Schedule.objects.create(
                 func='analytics.tasks.index_commits_intelligent_task',
-                args=[repository_id, batch_size_days],
+                args=[repository_id],
                 next_run=next_run,
                 schedule_type=Schedule.ONCE,
                 name=f'commit_indexing_repo_{repository_id}'
@@ -1397,7 +1508,7 @@ def index_commits_intelligent_task(*args):
 
 def index_all_commits_task():
     """
-    Django-Q task to start commit indexing for all indexed repositories
+    Django-Q task to start commit indexing for all repositories
     """
     logger.info("Starting commit indexing for all repositories")
     
@@ -1405,14 +1516,14 @@ def index_all_commits_task():
         from repositories.models import Repository
         
         results = []
-        indexed_repos = Repository.objects.filter(is_indexed=True)
+        indexed_repos = Repository.objects.all()  # Index ALL repositories, not just already indexed ones
         
         for repo in indexed_repos:
             try:
                 # Start commit indexing for this repository
                 task_id = async_task(
                     'analytics.tasks.index_commits_intelligent_task',
-                    repo.id, 7  # batch_size_days par défaut pour commits
+                    repository_id=repo.id
                 )
                 results.append({
                     'repo_id': repo.id,
@@ -1447,18 +1558,98 @@ def index_all_commits_task():
         raise
 
 
-def index_pullrequests_intelligent_task(repository_id: int, user_id: int, batch_size_days: int = 30):
+def index_pullrequests_intelligent_task(repository_id=None, args=None, **kwargs):
     """
     Django-Q task for intelligent pull request indexing
     
     Args:
         repository_id: Repository ID to index pull requests for
-        user_id: User ID (owner of the repository)
-        batch_size_days: Number of days per batch (default: 30 for PRs)
+        args: Alternative way to pass arguments (for corrupted tasks)
     """
+    # Handle corrupted tasks that pass args as kwargs
+    if repository_id is None and args is not None:
+        if isinstance(args, list) and len(args) > 0:
+            repository_id = args[0]
+    
+    if repository_id is None:
+        raise ValueError("repository_id is required")
+    
+    # Handle corrupted tasks that pass lists instead of integers
+    if isinstance(repository_id, list):
+        if len(repository_id) > 0:
+            repository_id = repository_id[0]  # Take first element
+            if isinstance(repository_id, list) and len(repository_id) > 0:
+                repository_id = repository_id[0]  # Handle nested lists
+        else:
+            raise ValueError("repository_id is an empty list")
+    
+    # Ensure repository_id is an integer
+    try:
+        repository_id = int(repository_id)
+    except (ValueError, TypeError):
+        raise ValueError(f"repository_id must be an integer, got {type(repository_id)}: {repository_id}")
+    
     logger.info(f"Starting intelligent pull request indexing for repository {repository_id}")
     
     try:
+        # Get repository to get user_id
+        from repositories.models import Repository
+        repository = Repository.objects.get(id=repository_id)
+        user_id = repository.owner.id
+        
+        # Intelligent rate limit check before proceeding
+        from .github_token_service import GitHubTokenService
+        import requests
+        
+        # Get token for rate limit check
+        github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+        if not github_token:
+            github_token = GitHubTokenService._get_user_token(user_id)
+            if not github_token:
+                github_token = GitHubTokenService._get_oauth_app_token()
+        
+        if github_token:
+            # Check rate limit
+            headers = {'Authorization': f'token {github_token}'}
+            try:
+                rate_response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
+                
+                if rate_response.status_code == 200:
+                    rate_data = rate_response.json()
+                    remaining = rate_data['resources']['core']['remaining']
+                    
+                    # If rate limited, schedule for later
+                    if remaining < 50:  # Keep buffer for PR indexing (needs multiple requests)
+                        logger.warning(f"GitHub API rate limit low ({remaining} remaining), scheduling PR indexing for later")
+                        
+                        # Schedule next run after rate limit reset
+                        import datetime
+                        reset_time = datetime.datetime.fromtimestamp(rate_data['resources']['core']['reset'])
+                        next_run = reset_time + timedelta(minutes=5)  # 5 minutes after reset
+                        
+                        from django_q.models import Schedule
+                        Schedule.objects.create(
+                            func='analytics.tasks.index_pullrequests_intelligent_task',
+                            args=[repository_id],
+                            next_run=next_run,
+                            schedule_type=Schedule.ONCE,
+                            name=f'pullrequest_indexing_repo_{repository_id}_retry'
+                        )
+                        
+                        return {
+                            'status': 'rate_limited',
+                            'repository_id': repository_id,
+                            'repository_full_name': repository.full_name,
+                            'remaining_requests': remaining,
+                            'scheduled_for': next_run.isoformat(),
+                            'message': f'Scheduled for retry at {next_run}'
+                        }
+                        
+            except Exception as e:
+                logger.warning(f"Could not check rate limit: {e}, proceeding with indexing")
+        
+        batch_size_days = 30  # Default batch size
+        
         # Run intelligent indexing
         result = PullRequestIndexingService.index_pullrequests_for_repository(
             repository_id=repository_id,
@@ -1475,7 +1666,7 @@ def index_pullrequests_intelligent_task(repository_id: int, user_id: int, batch_
             from django_q.models import Schedule
             Schedule.objects.create(
                 func='analytics.tasks.index_pullrequests_intelligent_task',
-                args=[repository_id, user_id, batch_size_days],
+                args=[repository_id],
                 next_run=next_run,
                 schedule_type=Schedule.ONCE,
                 name=f'pullrequest_indexing_repo_{repository_id}'
@@ -1491,7 +1682,7 @@ def index_pullrequests_intelligent_task(repository_id: int, user_id: int, batch_
 
 def index_all_pullrequests_task():
     """
-    Django-Q task to start pull request indexing for all indexed repositories
+    Django-Q task to start pull request indexing for all repositories
     """
     logger.info("Starting pull request indexing for all repositories")
     
@@ -1499,14 +1690,14 @@ def index_all_pullrequests_task():
         from repositories.models import Repository
         
         results = []
-        indexed_repos = Repository.objects.filter(is_indexed=True)
+        indexed_repos = Repository.objects.all()  # Index ALL repositories, not just already indexed ones
         
         for repo in indexed_repos:
             try:
                 # Start pull request indexing for this repository
                 task_id = async_task(
                     'analytics.tasks.index_pullrequests_intelligent_task',
-                    repo.id, repo.owner.id, 30  # batch_size_days par défaut pour PR
+                    repository_id=repo.id
                 )
                 results.append({
                     'repo_id': repo.id,
@@ -1541,18 +1732,98 @@ def index_all_pullrequests_task():
         raise
 
 
-def index_releases_intelligent_task(repository_id: int, user_id: int, batch_size_days: int = 90):
+def index_releases_intelligent_task(repository_id=None, args=None, **kwargs):
     """
     Django-Q task for intelligent release indexing
     
     Args:
         repository_id: Repository ID to index releases for
-        user_id: User ID (owner of the repository)
-        batch_size_days: Number of days per batch (default: 90 for releases)
+        args: Alternative way to pass arguments (for corrupted tasks)
     """
+    # Handle corrupted tasks that pass args as kwargs
+    if repository_id is None and args is not None:
+        if isinstance(args, list) and len(args) > 0:
+            repository_id = args[0]
+    
+    if repository_id is None:
+        raise ValueError("repository_id is required")
+    
+    # Handle corrupted tasks that pass lists instead of integers
+    if isinstance(repository_id, list):
+        if len(repository_id) > 0:
+            repository_id = repository_id[0]  # Take first element
+            if isinstance(repository_id, list) and len(repository_id) > 0:
+                repository_id = repository_id[0]  # Handle nested lists
+        else:
+            raise ValueError("repository_id is an empty list")
+    
+    # Ensure repository_id is an integer
+    try:
+        repository_id = int(repository_id)
+    except (ValueError, TypeError):
+        raise ValueError(f"repository_id must be an integer, got {type(repository_id)}: {repository_id}")
+    
     logger.info(f"Starting intelligent release indexing for repository {repository_id}")
     
     try:
+        # Get repository to get user_id
+        from repositories.models import Repository
+        repository = Repository.objects.get(id=repository_id)
+        user_id = repository.owner.id
+        
+        # Intelligent rate limit check before proceeding
+        from .github_token_service import GitHubTokenService
+        import requests
+        
+        # Get token for rate limit check
+        github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+        if not github_token:
+            github_token = GitHubTokenService._get_user_token(user_id)
+            if not github_token:
+                github_token = GitHubTokenService._get_oauth_app_token()
+        
+        if github_token:
+            # Check rate limit
+            headers = {'Authorization': f'token {github_token}'}
+            try:
+                rate_response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
+                
+                if rate_response.status_code == 200:
+                    rate_data = rate_response.json()
+                    remaining = rate_data['resources']['core']['remaining']
+                    
+                    # If rate limited, schedule for later
+                    if remaining < 20:  # Releases need fewer requests than PRs
+                        logger.warning(f"GitHub API rate limit low ({remaining} remaining), scheduling release indexing for later")
+                        
+                        # Schedule next run after rate limit reset
+                        import datetime
+                        reset_time = datetime.datetime.fromtimestamp(rate_data['resources']['core']['reset'])
+                        next_run = reset_time + timedelta(minutes=10)  # 10 minutes after reset
+                        
+                        from django_q.models import Schedule
+                        Schedule.objects.create(
+                            func='analytics.tasks.index_releases_intelligent_task',
+                            args=[repository_id],
+                            next_run=next_run,
+                            schedule_type=Schedule.ONCE,
+                            name=f'release_indexing_repo_{repository_id}_retry'
+                        )
+                        
+                        return {
+                            'status': 'rate_limited',
+                            'repository_id': repository_id,
+                            'repository_full_name': repository.full_name,
+                            'remaining_requests': remaining,
+                            'scheduled_for': next_run.isoformat(),
+                            'message': f'Scheduled for retry at {next_run}'
+                        }
+                        
+            except Exception as e:
+                logger.warning(f"Could not check rate limit: {e}, proceeding with indexing")
+        
+        batch_size_days = 90  # Default batch size
+        
         # Run intelligent indexing
         result = ReleaseIndexingService.index_releases_for_repository(
             repository_id=repository_id,
@@ -1569,7 +1840,7 @@ def index_releases_intelligent_task(repository_id: int, user_id: int, batch_size
             from django_q.models import Schedule
             Schedule.objects.create(
                 func='analytics.tasks.index_releases_intelligent_task',
-                args=[repository_id, user_id, batch_size_days],
+                args=[repository_id],
                 next_run=next_run,
                 schedule_type=Schedule.ONCE,
                 name=f'release_indexing_repo_{repository_id}'
@@ -1585,7 +1856,7 @@ def index_releases_intelligent_task(repository_id: int, user_id: int, batch_size
 
 def index_all_releases_task():
     """
-    Django-Q task to start release indexing for all indexed repositories
+    Django-Q task to start release indexing for all repositories
     """
     logger.info("Starting release indexing for all repositories")
     
@@ -1593,14 +1864,14 @@ def index_all_releases_task():
         from repositories.models import Repository
         
         results = []
-        indexed_repos = Repository.objects.filter(is_indexed=True)
+        indexed_repos = Repository.objects.all()  # Index ALL repositories, not just already indexed ones
         
         for repo in indexed_repos:
             try:
                 # Start release indexing for this repository
                 task_id = async_task(
                     'analytics.tasks.index_releases_intelligent_task',
-                    repo.id, repo.owner.id, 90  # batch_size_days par défaut pour releases
+                    repository_id=repo.id
                 )
                 results.append({
                     'repo_id': repo.id,

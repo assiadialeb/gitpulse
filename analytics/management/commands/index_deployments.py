@@ -158,9 +158,7 @@ class Command(BaseCommand):
             try:
                 task_id = async_task(
                     'analytics.tasks.index_deployments_intelligent_task',
-                    repo_id,
-                    repository.owner.id,
-                    options['batch_size']
+                    repo_id
                 )
                 self.stdout.write(
                     self.style.SUCCESS(f'Deployment indexing task scheduled with ID: {task_id}')

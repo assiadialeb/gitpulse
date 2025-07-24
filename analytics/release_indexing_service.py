@@ -52,6 +52,12 @@ class ReleaseIndexingService:
             
             try:
                 response = requests.get(url, headers=headers, params=params)
+                
+                # Handle 403 Forbidden (no access to private repo)
+                if response.status_code == 403:
+                    logger.warning(f"Access denied to repository {owner}/{repo} (403 Forbidden)")
+                    return []  # Return empty list to indicate no access
+                
                 response.raise_for_status()
                 
                 batch = response.json()
@@ -181,39 +187,30 @@ class ReleaseIndexingService:
                         'updated_at': asset.get('updated_at')
                     })
                 
-                # Create or update release
+                # Create or update release (MongoEngine compatible)
                 try:
-                    release, created = Release.objects.get_or_create(
-                        release_id=release_id,
-                        defaults={
-                            'repository_full_name': repository_full_name,
-                            'tag_name': release_data.get('tag_name', ''),
-                            'name': release_data.get('name', ''),
-                            'author': release_data.get('author', {}).get('login', '') if release_data.get('author') else '',
-                            'published_at': published_at,
-                            'draft': release_data.get('draft', False),
-                            'prerelease': release_data.get('prerelease', False),
-                            'body': release_data.get('body', ''),
-                            'html_url': release_data.get('html_url', ''),
-                            'assets': assets,
-                            'payload': release_data
-                        }
-                    )
+                    # Try to get existing release
+                    release = Release.objects(release_id=release_id).first()
                     
-                    # If release already exists, update it
-                    if not created:
-                        release.repository_full_name = repository_full_name
-                        release.tag_name = release_data.get('tag_name', '')
-                        release.name = release_data.get('name', '')
-                        release.author = release_data.get('author', {}).get('login', '') if release_data.get('author') else ''
-                        release.published_at = published_at
-                        release.draft = release_data.get('draft', False)
-                        release.prerelease = release_data.get('prerelease', False)
-                        release.body = release_data.get('body', '')
-                        release.html_url = release_data.get('html_url', '')
-                        release.assets = assets
-                        release.payload = release_data
-                        release.save()
+                    created = False
+                    if not release:
+                        # Create new release
+                        release = Release(release_id=release_id)
+                        created = True
+                    
+                    # Update release fields
+                    release.repository_full_name = repository_full_name
+                    release.tag_name = release_data.get('tag_name', '')
+                    release.name = release_data.get('name', '')
+                    release.author = release_data.get('author', {}).get('login', '') if release_data.get('author') else ''
+                    release.published_at = published_at
+                    release.draft = release_data.get('draft', False)
+                    release.prerelease = release_data.get('prerelease', False)
+                    release.body = release_data.get('body', '')
+                    release.html_url = release_data.get('html_url', '')
+                    release.assets = assets
+                    release.payload = release_data
+                    release.save()
                     
                     if created:
                         processed += 1
@@ -253,14 +250,23 @@ class ReleaseIndexingService:
             # Get repository info
             repository = Repository.objects.get(id=repository_id)
             
-            # Get GitHub token
-            github_token = GitHubTokenService.get_token_for_repository_access(
-                user_id=user_id,
-                repo_full_name=repository.full_name
-            )
+            # Get GitHub token (simplified approach)
+            github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
             
             if not github_token:
-                raise Exception(f"No GitHub token available for repository {repository.full_name}")
+                # Fallback to any available token
+                github_token = GitHubTokenService._get_user_token(user_id)
+                if not github_token:
+                    github_token = GitHubTokenService._get_oauth_app_token()
+            
+            if not github_token:
+                logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
+                return {
+                    'status': 'skipped',
+                    'reason': 'No GitHub token available',
+                    'repository_id': repository_id,
+                    'repository_full_name': repository.full_name
+                }
             
             # Initialize intelligent indexing service
             indexing_service = IntelligentIndexingService(

@@ -158,8 +158,7 @@ class Command(BaseCommand):
             try:
                 task_id = async_task(
                     'analytics.tasks.index_commits_intelligent_task',
-                    repo_id,
-                    repository.owner.id,
+                    repo_id
                     options['batch_size']
                 )
                 self.stdout.write(

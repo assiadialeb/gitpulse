@@ -544,27 +544,24 @@ class DeploymentIndexingService:
         indexed_ids = []
         for dep in deployments:
             deployment_id = str(dep.get('id'))
-            # Upsert by deployment_id
-            obj, created = Deployment.objects.get_or_create(
-                deployment_id=deployment_id,
-                defaults={
-                    'application_id': application_id,
-                    'repository_full_name': repo_full_name,
-                    'environment': dep.get('environment'),
-                    'creator': dep.get('creator', {}).get('login'),
-                    'created_at': dep.get('created_at'),
-                    'updated_at': dep.get('updated_at'),
-                    'payload': dep,
-                }
-            )
-            if not created:
-                # Update fields if already exists
-                obj.environment = dep.get('environment')
-                obj.creator = dep.get('creator', {}).get('login')
-                obj.created_at = dep.get('created_at')
-                obj.updated_at = dep.get('updated_at')
-                obj.payload = dep
-                obj.save()
+            # Upsert by deployment_id (MongoEngine compatible)
+            obj = Deployment.objects(deployment_id=deployment_id).first()
+            
+            created = False
+            if not obj:
+                # Create new deployment
+                obj = Deployment(deployment_id=deployment_id)
+                created = True
+            
+            # Update deployment fields
+            obj.application_id = application_id
+            obj.repository_full_name = repo_full_name
+            obj.environment = dep.get('environment')
+            obj.creator = dep.get('creator', {}).get('login')
+            obj.created_at = dep.get('created_at')
+            obj.updated_at = dep.get('updated_at')
+            obj.payload = dep
+            obj.save()
             # Fetch deployment statuses
             statuses_url = f"{self.github_service.base_url}/repos/{repo_full_name}/deployments/{deployment_id}/statuses"
             statuses, _ = self.github_service._make_request(statuses_url)

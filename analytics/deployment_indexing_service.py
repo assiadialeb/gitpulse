@@ -54,6 +54,12 @@ class DeploymentIndexingService:
             
             try:
                 response = requests.get(url, headers=headers, params=params)
+                
+                # Handle 403 Forbidden (no access to private repo)
+                if response.status_code == 403:
+                    logger.warning(f"Access denied to repository {owner}/{repo} (403 Forbidden)")
+                    return []  # Return empty list to indicate no access
+                
                 response.raise_for_status()
                 
                 batch = response.json()
@@ -186,29 +192,26 @@ class DeploymentIndexingService:
                     if len(parts) >= 2:
                         repository_full_name = f"{parts[-2]}/{parts[-1]}"
                 
-                # Create or update deployment
-                deployment, created = Deployment.objects.get_or_create(
-                    deployment_id=deployment_id,
-                    defaults={
-                        'repository_full_name': repository_full_name,
-                        'environment': deployment_data.get('environment', ''),
-                        'creator': deployment_data.get('creator', {}).get('login', '') if deployment_data.get('creator') else '',
-                        'created_at': created_at,
-                        'updated_at': updated_at,
-                        'payload': deployment_data.get('payload', {}),
-                        'statuses': []  # We'll populate this separately if needed
-                    }
-                )
+                # Create or update deployment (MongoEngine compatible)
+                # Try to get existing deployment
+                deployment = Deployment.objects(deployment_id=deployment_id).first()
                 
-                # If deployment already exists, update it
-                if not created:
-                    deployment.repository_full_name = repository_full_name
-                    deployment.environment = deployment_data.get('environment', '')
-                    deployment.creator = deployment_data.get('creator', {}).get('login', '') if deployment_data.get('creator') else ''
-                    deployment.created_at = created_at
-                    deployment.updated_at = updated_at
-                    deployment.payload = deployment_data.get('payload', {})
-                    deployment.save()
+                created = False
+                if not deployment:
+                    # Create new deployment
+                    deployment = Deployment(deployment_id=deployment_id)
+                    created = True
+                
+                # Update deployment fields
+                deployment.repository_full_name = repository_full_name
+                deployment.environment = deployment_data.get('environment', '')
+                deployment.creator = deployment_data.get('creator', {}).get('login', '') if deployment_data.get('creator') else ''
+                deployment.created_at = created_at
+                deployment.updated_at = updated_at
+                deployment.payload = deployment_data.get('payload', {})
+                if created:
+                    deployment.statuses = []  # Initialize statuses for new deployments
+                deployment.save()
                 
                 if created:
                     processed += 1
@@ -244,14 +247,23 @@ class DeploymentIndexingService:
             # Get repository info
             repository = Repository.objects.get(id=repository_id)
             
-            # Get GitHub token
-            github_token = GitHubTokenService.get_token_for_repository_access(
-                user_id=user_id,
-                repo_full_name=repository.full_name
-            )
+            # Get GitHub token (simplified approach)
+            github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
             
             if not github_token:
-                raise Exception(f"No GitHub token available for repository {repository.full_name}")
+                # Fallback to any available token
+                github_token = GitHubTokenService._get_user_token(user_id)
+                if not github_token:
+                    github_token = GitHubTokenService._get_oauth_app_token()
+            
+            if not github_token:
+                logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
+                return {
+                    'status': 'skipped',
+                    'reason': 'No GitHub token available',
+                    'repository_id': repository_id,
+                    'repository_full_name': repository.full_name
+                }
             
             # Initialize intelligent indexing service
             indexing_service = IntelligentIndexingService(

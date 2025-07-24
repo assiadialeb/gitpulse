@@ -55,6 +55,12 @@ class PullRequestIndexingService:
             
             try:
                 response = requests.get(url, headers=headers, params=params)
+                
+                # Handle 403 Forbidden (no access to private repo)
+                if response.status_code == 403:
+                    logger.warning(f"Access denied to repository {repo_full_name} (403 Forbidden)")
+                    return []  # Return empty list to indicate no access
+                
                 response.raise_for_status()
                 
                 batch = response.json()
@@ -231,56 +237,44 @@ class PullRequestIndexingService:
                 # Extract repository full name from PR data
                 repo_full_name = pr_data.get('base', {}).get('repo', {}).get('full_name', '')
                 
-                # Create or update pull request
+                # Create or update pull request (MongoEngine compatible)
                 try:
-                    pr, created = PullRequest.objects.get_or_create(
+                    # Try to get existing PR
+                    pr = PullRequest.objects(
                         repository_full_name=repo_full_name,
-                        number=pr_number,
-                        defaults={
-                            'title': pr_data.get('title', ''),
-                            'author': pr_data.get('user', {}).get('login', '') if pr_data.get('user') else '',
-                            'created_at': created_at,
-                            'updated_at': updated_at,
-                            'closed_at': closed_at,
-                            'merged_at': merged_at,
-                            'state': pr_data.get('state', ''),
-                            'url': pr_data.get('html_url', ''),
-                            'labels': pr_data.get('labels_list', []),
-                            'merged_by': pr_data.get('merged_by', {}).get('login', '') if pr_data.get('merged_by') else '',
-                            'requested_reviewers': pr_data.get('requested_reviewers_list', []),
-                            'assignees': pr_data.get('assignees_list', []),
-                            'review_comments_count': pr_data.get('review_comments_count', 0),
-                            'comments_count': pr_data.get('comments_count', 0),
-                            'commits_count': pr_data.get('commits', 0),
-                            'additions_count': pr_data.get('additions', 0),
-                            'deletions_count': pr_data.get('deletions', 0),
-                            'changed_files_count': pr_data.get('changed_files', 0),
-                            'payload': pr_data
-                        }
-                    )
+                        number=pr_number
+                    ).first()
                     
-                    # If PR already exists, update it
-                    if not created:
-                        pr.title = pr_data.get('title', '')
-                        pr.author = pr_data.get('user', {}).get('login', '') if pr_data.get('user') else ''
-                        pr.created_at = created_at
-                        pr.updated_at = updated_at
-                        pr.closed_at = closed_at
-                        pr.merged_at = merged_at
-                        pr.state = pr_data.get('state', '')
-                        pr.url = pr_data.get('html_url', '')
-                        pr.labels = pr_data.get('labels_list', [])
-                        pr.merged_by = pr_data.get('merged_by', {}).get('login', '') if pr_data.get('merged_by') else ''
-                        pr.requested_reviewers = pr_data.get('requested_reviewers_list', [])
-                        pr.assignees = pr_data.get('assignees_list', [])
-                        pr.review_comments_count = pr_data.get('review_comments_count', 0)
-                        pr.comments_count = pr_data.get('comments_count', 0)
-                        pr.commits_count = pr_data.get('commits', 0)
-                        pr.additions_count = pr_data.get('additions', 0)
-                        pr.deletions_count = pr_data.get('deletions', 0)
-                        pr.changed_files_count = pr_data.get('changed_files', 0)
-                        pr.payload = pr_data
-                        pr.save()
+                    created = False
+                    if not pr:
+                        # Create new PR
+                        pr = PullRequest(
+                            repository_full_name=repo_full_name,
+                            number=pr_number
+                        )
+                        created = True
+                    
+                    # Update PR fields
+                    pr.title = pr_data.get('title', '')
+                    pr.author = pr_data.get('user', {}).get('login', '') if pr_data.get('user') else ''
+                    pr.created_at = created_at
+                    pr.updated_at = updated_at
+                    pr.closed_at = closed_at
+                    pr.merged_at = merged_at
+                    pr.state = pr_data.get('state', '')
+                    pr.url = pr_data.get('html_url', '')
+                    pr.labels = pr_data.get('labels_list', [])
+                    pr.merged_by = pr_data.get('merged_by', {}).get('login', '') if pr_data.get('merged_by') else ''
+                    pr.requested_reviewers = pr_data.get('requested_reviewers_list', [])
+                    pr.assignees = pr_data.get('assignees_list', [])
+                    pr.review_comments_count = pr_data.get('review_comments_count', 0)
+                    pr.comments_count = pr_data.get('comments_count', 0)
+                    pr.commits_count = pr_data.get('commits', 0)
+                    pr.additions_count = pr_data.get('additions', 0)
+                    pr.deletions_count = pr_data.get('deletions', 0)
+                    pr.changed_files_count = pr_data.get('changed_files', 0)
+                    pr.payload = pr_data
+                    pr.save()
                     
                     if created:
                         processed += 1
@@ -320,14 +314,23 @@ class PullRequestIndexingService:
             # Get repository info
             repository = Repository.objects.get(id=repository_id)
             
-            # Get GitHub token
-            github_token = GitHubTokenService.get_token_for_repository_access(
-                user_id=user_id,
-                repo_full_name=repository.full_name
-            )
+            # Get GitHub token (simplified approach)
+            github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
             
             if not github_token:
-                raise Exception(f"No GitHub token available for repository {repository.full_name}")
+                # Fallback to any available token
+                github_token = GitHubTokenService._get_user_token(user_id)
+                if not github_token:
+                    github_token = GitHubTokenService._get_oauth_app_token()
+            
+            if not github_token:
+                logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
+                return {
+                    'status': 'skipped',
+                    'reason': 'No GitHub token available',
+                    'repository_id': repository_id,
+                    'repository_full_name': repository.full_name
+                }
             
             # Initialize intelligent indexing service
             indexing_service = IntelligentIndexingService(
