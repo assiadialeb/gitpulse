@@ -244,15 +244,13 @@ calendar-range calendar-month::part(footer) {
                     </div>
                     <div>
                         <p class="text-medium-gray text-sm">Release Frequency</p>
-                        <p class="text-2xl font-bold text-dark-gray">
-                            {% if release_frequency %}
+                        <p class="text-2xl font-bold text-yellow-500">
+                            {% if release_frequency and release_frequency.releases_per_month is not None %}
                                 {{ release_frequency.releases_per_month }}/month
-                                <span class="text-sm text-medium-gray ml-2">({{ release_frequency.releases_per_week }}/week)</span>
                             {% else %}
                                 N/A
                             {% endif %}
                         </p>
-                        <p class="text-xs text-medium-gray">on last {{ release_frequency.period_days }} days</p>
                     </div>
                 </div>
             </div>
@@ -273,6 +271,28 @@ calendar-range calendar-month::part(footer) {
                         {% else %}
                             <p class="text-2xl font-bold text-gray-400">N/A</p>
                         {% endif %}
+                    </div>
+                </div>
+            </div>
+            <!-- Deployment Frequency -->
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <div class="flex items-start">
+                    <div class="p-3 bg-pink-500 bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-medium-gray text-sm">Deployments</p>
+                        <p class="text-2xl font-bold text-pink-500">{{ total_deployments }}</p>
+                        <p class="text-xs text-medium-gray">
+                            {% if deployment_frequency and deployment_frequency.deployments_per_week is not None %}
+                                {{ deployment_frequency.deployments_per_week }}/week
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </p>
                     </div>
                 </div>
             </div>

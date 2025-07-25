@@ -59,6 +59,8 @@ def working_repository_detail(request, repo_id):
         commit_frequency = all_metrics['commit_frequency']
         release_frequency = all_metrics['release_frequency']
         total_releases = all_metrics['total_releases']
+        deployment_frequency = all_metrics['deployment_frequency']
+        total_deployments = all_metrics['total_deployments']
         pr_cycle_time = all_metrics['pr_cycle_time']
         commit_quality = all_metrics['commit_quality']
         commit_types = all_metrics['commit_type_distribution']
@@ -116,6 +118,8 @@ def working_repository_detail(request, repo_id):
             'commit_frequency': commit_frequency,
             'release_frequency': release_frequency,
             'total_releases': total_releases,
+            'deployment_frequency': deployment_frequency,
+            'total_deployments': total_deployments,
             'pr_cycle_time_median': pr_cycle_time_median,
             'pr_cycle_time_avg': pr_cycle_time_avg,
             'pr_cycle_time_count': pr_cycle_time_count,

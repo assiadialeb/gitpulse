@@ -8,7 +8,7 @@ from django.utils import timezone
 import re
 import statistics
 
-from .models import Commit, PullRequest, Release, Developer, DeveloperAlias
+from .models import Commit, PullRequest, Release, Deployment, Developer, DeveloperAlias
 from .cache_service import AnalyticsCacheService
 from .commit_classifier import get_commit_type_stats
 from .developer_grouping_service import DeveloperGroupingService
@@ -46,6 +46,7 @@ class UnifiedMetricsService:
             self.commits = Commit.objects.filter(repository_full_name=self.repository.full_name)
             self.prs = PullRequest.objects.filter(repository_full_name=self.repository.full_name)
             self.releases = Release.objects.filter(repository_full_name=self.repository.full_name)
+            self.deployments = Deployment.objects.filter(repository_full_name=self.repository.full_name)
             
         elif self.entity_type == 'application':
             from applications.models import Application
@@ -53,6 +54,7 @@ class UnifiedMetricsService:
             self.commits = Commit.objects.filter(application_id=self.entity_id)
             self.prs = PullRequest.objects.filter(application_id=self.entity_id)
             self.releases = Release.objects.filter(application_id=self.entity_id)
+            self.deployments = Deployment.objects.filter(application_id=self.entity_id)
             
         elif self.entity_type == 'developer':
             self.developer = Developer.objects.get(id=self.entity_id)
@@ -67,13 +69,15 @@ class UnifiedMetricsService:
                 author__in=[alias.email for alias in aliases]
             )
             self.releases = Release.objects.filter(repository_full_name__in=repo_names)
+            self.deployments = Deployment.objects.filter(repository_full_name__in=repo_names)
         else:
             raise ValueError(f"Invalid entity_type: {self.entity_type}")
         
-        # Filtrage des commits, releases, PRs sur la plage si fournie
+        # Filtrage des commits, releases, PRs, deployments sur la plage si fournie
         self.commits = self._filter_queryset(self.commits)
         self.releases = self._filter_queryset(self.releases)
         self.prs = self._filter_queryset(self.prs)
+        self.deployments = self._filter_queryset(self.deployments)
     
     def _filter_queryset(self, qs):
         if self.start_date and self.end_date:
@@ -85,6 +89,8 @@ class UnifiedMetricsService:
                 elif model.__name__ == 'Release':
                     field = 'published_at'
                 elif model.__name__ == 'PullRequest':
+                    field = 'created_at'
+                elif model.__name__ == 'Deployment':
                     field = 'created_at'
             # Fallback: test le premier objet
             if not field and hasattr(qs, 'first'):
@@ -629,6 +635,48 @@ class UnifiedMetricsService:
             'nb_commits': len(commits)
         }
     
+    def get_total_deployments(self) -> int:
+        """Total Deployments (AR)"""
+        if self.entity_type == 'developer':
+            return 0  # Developers don't own deployments
+        return self.deployments.count()
+    
+    def get_deployment_frequency(self, period_days: int = 90) -> Dict:
+        """
+        Calculate deployment frequency over a period
+        
+        Args:
+            period_days: Number of days to analyze (default: 90)
+            
+        Returns:
+            Dictionary with deployment frequency metrics
+        """
+        if self.entity_type == 'developer':
+            return {'total_deployments': 0, 'deployments_per_week': 0, 'period_days': period_days}
+        
+        # Get deployments in the specified period
+        cutoff_date = timezone.now() - timedelta(days=period_days)
+        recent_deployments = self.deployments.filter(created_at__gte=cutoff_date)
+        
+        total_deployments = recent_deployments.count()
+        
+        if total_deployments == 0:
+            return {
+                'total_deployments': 0,
+                'deployments_per_week': 0,
+                'period_days': period_days
+            }
+        
+        # Calculate deployments per week
+        weeks_in_period = period_days / 7
+        deployments_per_week = total_deployments / weeks_in_period
+        
+        return {
+            'total_deployments': total_deployments,
+            'deployments_per_week': round(deployments_per_week, 2),
+            'period_days': period_days
+        }
+    
     # Comprehensive metrics getter
     def get_all_metrics(self) -> Dict:
         """Get all metrics for the entity"""
@@ -662,6 +710,8 @@ class UnifiedMetricsService:
                 'release_frequency': self.get_release_frequency(),
                 'pr_cycle_time': self.get_pr_cycle_time(),
                 'pr_health_metrics': self.get_pr_health_metrics(),
+                'total_deployments': self.get_total_deployments(),
+                'deployment_frequency': self.get_deployment_frequency(),
             })
         
         # Ajout des stats de changements de commit
