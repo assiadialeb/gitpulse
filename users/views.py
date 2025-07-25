@@ -17,6 +17,8 @@ from allauth.socialaccount.models import SocialAccount, SocialToken
 from analytics.analytics_service import AnalyticsService
 from analytics.models import Developer as MongoDeveloper, DeveloperAlias as MongoDeveloperAlias
 import requests
+from models import Repository
+from repositories.models import Repository
 
 
 def login_view(request):
@@ -276,7 +278,7 @@ def home_view(request):
 @login_required
 def dashboard_view(request):
     """Dashboard view"""
-    total_repositories = applications.models.ApplicationRepository.objects.count()  # Django ORM
+    total_repositories = Repository.objects.count()  # Django ORM, comme sur /repositories/
     total_commits = Commit.objects().count()  # mongoengine
     total_pull_requests = PullRequest.objects().count()  # mongoengine
     total_releases = Release.objects().count()  # mongoengine
