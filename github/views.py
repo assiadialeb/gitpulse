@@ -116,7 +116,7 @@ def test_github_access(request):
     """
     try:
         from analytics.github_utils import get_github_token_for_user
-        from applications.models import Application
+        
         import requests
         
         token = get_github_token_for_user(request.user.id)
@@ -146,18 +146,20 @@ def test_github_access(request):
         total_repos = 0
         accessible_repos = 0
         
-        for app in Application.objects.filter(owner=request.user)[:3]:
-            for repo in app.repositories.all()[:5]:
-                total_repos += 1
-                repo_name = repo.github_repo_name
-                
-                try:
-                    url = f"https://api.github.com/repos/{repo_name}"
-                    repo_response = requests.get(url, headers=headers)
-                    if repo_response.status_code == 200:
-                        accessible_repos += 1
-                except:
-                    pass
+        # Application model no longer exists, test with repositories directly
+        from repositories.models import Repository
+        repos = Repository.objects.filter(owner=request.user)[:5]
+        for repo in repos:
+            total_repos += 1
+            repo_name = repo.full_name
+            
+            try:
+                url = f"https://api.github.com/repos/{repo_name}"
+                repo_response = requests.get(url, headers=headers)
+                if repo_response.status_code == 200:
+                    accessible_repos += 1
+            except:
+                pass
         
         if total_repos == 0:
             return JsonResponse({

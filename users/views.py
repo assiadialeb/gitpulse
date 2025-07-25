@@ -10,7 +10,7 @@ from .models import UserProfile
 from .services import GitHubUserService
 # from models import GitHubUser  # Supprimé car inutilisé et cause une erreur linter
 from analytics.models import Commit, PullRequest, DeveloperAlias, Developer, Release, Deployment  # mongoengine
-import applications.models  # pour accès Django ORM
+
 from django.utils import timezone
 from collections import defaultdict
 from allauth.socialaccount.models import SocialAccount, SocialToken

@@ -3,7 +3,7 @@ Management command to list and manage scheduled tasks
 """
 from django.core.management.base import BaseCommand
 from django_q.models import Schedule
-from applications.models import Application
+
 
 
 class Command(BaseCommand):

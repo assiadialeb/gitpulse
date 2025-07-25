@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from analytics.models import PullRequest
 from analytics.tasks import fetch_all_pull_requests_detailed_task
 from django_q.tasks import async_task
-from applications.models import Application
+
 from analytics.github_service import GitHubService
 from analytics.github_token_service import GitHubTokenService
 import dateutil.parser

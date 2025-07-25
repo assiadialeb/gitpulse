@@ -12,7 +12,7 @@ from mongoengine.errors import NotUniqueError
 
 from .models import Commit, SyncLog, RepositoryStats, FileChange
 from .git_service import GitService, GitServiceError
-from applications.models import Application, ApplicationRepository
+
 from .commit_classifier import classify_commit_with_files
 from analytics.models import DeveloperAlias
 

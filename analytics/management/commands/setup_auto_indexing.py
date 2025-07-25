@@ -3,7 +3,7 @@ Management command to set up automatic indexing for new applications
 """
 from django.core.management.base import BaseCommand
 from django_q.models import Schedule
-from applications.models import Application
+
 from datetime import datetime, timedelta
 from django.utils import timezone
 

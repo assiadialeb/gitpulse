@@ -3,7 +3,7 @@ Commande Django pour tester le nouveau service de tokens GitHub
 """
 from django.core.management.base import BaseCommand
 from analytics.github_token_service import GitHubTokenService
-from applications.models import Application
+
 from django.contrib.auth.models import User
 
 class Command(BaseCommand):

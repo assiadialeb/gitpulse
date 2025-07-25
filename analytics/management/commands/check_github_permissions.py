@@ -4,7 +4,7 @@ Commande Django pour vérifier les permissions du token GitHub
 from django.core.management.base import BaseCommand
 from analytics.github_utils import get_github_token_for_user
 from analytics.github_service import GitHubService
-from applications.models import Application
+
 import requests
 
 class Command(BaseCommand):

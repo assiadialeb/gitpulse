@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from analytics.models import PullRequest
-from applications.models import Application
+
 import logging
 
 logger = logging.getLogger(__name__)

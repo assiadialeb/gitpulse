@@ -10,7 +10,7 @@ from django_q.models import Schedule
 from .git_sync_service import GitSyncService
 from .services import RateLimitService
 from .github_service import GitHubRateLimitError
-from applications.models import Application, ApplicationRepository
+
 # from github.models import GitHubToken  # Deprecated - using django-allauth now
 from .services import DeploymentIndexingService
 from .services import ReleaseIndexingService
@@ -64,7 +64,7 @@ def sync_repository_task(repo_full_name: str, application_id: int, user_id: int,
     try:
         sync_service = GitSyncService(user_id)
         # On a besoin de l'URL du repo pour GitSyncService, on la récupère via ApplicationRepository
-        from applications.models import ApplicationRepository
+        
         app_repo = ApplicationRepository.objects.get(github_repo_name=repo_full_name, application_id=application_id)
         
         # Check if github_repo_url exists, if not generate it
@@ -670,7 +670,7 @@ def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_r
         max_pages_per_repo: Nombre maximum de pages à traiter par repo (défaut: 50)
         max_repos_per_run: Nombre maximum de repos à traiter par exécution (défaut: 10)
     """
-    from applications.models import Application
+    
     from analytics.models import PullRequest
     from analytics.github_service import GitHubService
     from analytics.github_token_service import GitHubTokenService

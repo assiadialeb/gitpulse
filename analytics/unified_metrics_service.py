@@ -49,7 +49,7 @@ class UnifiedMetricsService:
             self.deployments = Deployment.objects.filter(repository_full_name=self.repository.full_name)
             
         elif self.entity_type == 'application':
-            from applications.models import Application
+            
             self.application = Application.objects.get(id=self.entity_id)
             self.commits = Commit.objects.filter(application_id=self.entity_id)
             self.prs = PullRequest.objects.filter(application_id=self.entity_id)

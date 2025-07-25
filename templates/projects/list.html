@@ -1,0 +1,110 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Projects - GitPulse{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Projects</h1>
+                <p class="text-gray-600 mt-2">Group repositories into projects for better organization</p>
+            </div>
+            <a href="{% url 'projects:create' %}" class="btn btn-primary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Create Project
+            </a>
+        </div>
+    </div>
+    
+    <!-- Projects Grid -->
+    {% if projects %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for project in projects %}
+            <div class="bg-white rounded-lg shadow border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-xl font-semibold text-gray-900">
+                            <a href="{% url 'projects:detail' project.id %}" class="hover:text-blue-600">
+                                {{ project.name }}
+                            </a>
+                        </h3>
+                        <div class="dropdown dropdown-end">
+                            <button class="btn btn-ghost btn-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                                </svg>
+                            </button>
+                            <ul class="dropdown-content menu bg-white shadow-lg rounded-lg border border-gray-200 p-2">
+                                <li><a href="{% url 'projects:edit' project.id %}" class="text-sm">Edit</a></li>
+                                <li><a href="{% url 'projects:delete' project.id %}" class="text-sm text-red-600">Delete</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    {% if project.description %}
+                        <p class="text-gray-600 mb-4">{{ project.description }}</p>
+                    {% endif %}
+                    
+                    <!-- Stats -->
+                    <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600">{{ project.get_total_repositories }}</div>
+                            <div class="text-sm text-gray-500">Repositories</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-green-600">{{ project.get_total_commits }}</div>
+                            <div class="text-sm text-gray-500">Commits</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-purple-600">{{ project.get_total_developers }}</div>
+                            <div class="text-sm text-gray-500">Developers</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Repository List -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">Repositories</h4>
+                        <div class="space-y-1">
+                            {% for repo in project.repositories.all|slice:":3" %}
+                                <div class="text-sm text-gray-600 truncate">
+                                    {{ repo.name }}
+                                </div>
+                            {% endfor %}
+                            {% if project.repositories.count > 3 %}
+                                <div class="text-sm text-gray-500">
+                                    +{{ project.repositories.count|add:"-3" }} more
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-12">
+            <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
+            <p class="text-gray-600 mb-6">
+                Create your first project to group related repositories together.
+            </p>
+            <a href="{% url 'projects:create' %}" class="btn btn-primary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Create Project
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

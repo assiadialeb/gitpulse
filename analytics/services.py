@@ -42,26 +42,11 @@ def cleanup_application_data(application_id: int) -> Dict:
         db = client['gitpulse']
         quality_collection = db['developer_quality_metrics']
         
-        # Get repository names for this application to filter quality metrics
-        from applications.models import Application
-        try:
-            application = Application.objects.get(id=application_id)
-            repository_names = list(application.repositories.values_list('github_repo_name', flat=True))
-            
-            if repository_names:
-                # Delete quality metrics for repositories in this application
-                quality_result = quality_collection.delete_many({
-                    'repository': {'$in': repository_names}
-                })
-                results['quality_metrics_deleted'] = int(quality_result.deleted_count)
-            else:
-                results['quality_metrics_deleted'] = 0
-        except Application.DoesNotExist:
-            # Application already deleted, try to delete by application_id if it exists in quality metrics
-            quality_result = quality_collection.delete_many({
-                'application_id': application_id
-            })
-            results['quality_metrics_deleted'] = int(quality_result.deleted_count)
+        # Application model no longer exists, delete by application_id if it exists in quality metrics
+        quality_result = quality_collection.delete_many({
+            'application_id': application_id
+        })
+        results['quality_metrics_deleted'] = int(quality_result.deleted_count)
         
         client.close()
         

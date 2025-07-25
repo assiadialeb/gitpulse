@@ -3,7 +3,7 @@ Management command to schedule daily indexing for all applications
 """
 from django.core.management.base import BaseCommand
 from django_q.models import Schedule
-from applications.models import Application
+
 from analytics.tasks import background_indexing_task
 import logging
 

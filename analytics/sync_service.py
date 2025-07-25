@@ -13,7 +13,7 @@ from .models import Commit, SyncLog, RepositoryStats
 from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
 from .github_token_service import GitHubTokenService
 from .services import RateLimitService
-from applications.models import Application, ApplicationRepository
+
 # from github.models import GitHubToken  # Deprecated - using OAuth App now
 
 logger = logging.getLogger(__name__)

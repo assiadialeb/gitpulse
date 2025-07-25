@@ -2,7 +2,7 @@
 Management command to manually index repositories
 """
 from django.core.management.base import BaseCommand
-from applications.models import Application
+
 from analytics.git_sync_service import GitSyncService
 from analytics.github_service import GitHubAPIError
 import logging

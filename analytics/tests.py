@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from datetime import datetime, timedelta
 from django.utils import timezone
 
-from applications.models import Application
+
 from analytics.models import Commit, DeveloperGroup, DeveloperAlias
 from analytics.developer_grouping_service import DeveloperGroupingService
 from github.models import GitHubToken
@@ -27,12 +27,8 @@ class DeveloperGroupingTestCase(TestCase):
             password='testpass123'
         )
         
-        # Create test application
-        self.application = Application.objects.create(
-            name='Test App',
-            description='Test application for developer grouping',
-            owner=self.user
-        )
+        # Application model no longer exists, using repository-based approach
+        self.application_id = 1  # Dummy ID for tests
         
         # Create test commits with multiple developer identities
         self.create_test_commits()
@@ -43,7 +39,7 @@ class DeveloperGroupingTestCase(TestCase):
         Commit.objects.create(
             sha='abc123',
             repository_full_name='test/repo',
-            application_id=self.application.id,
+            application_id=self.application_id,
             message='Test commit 1',
             author_name='Patrick Qian',
             author_email='patrick.qian@company.com',
@@ -58,7 +54,7 @@ class DeveloperGroupingTestCase(TestCase):
         Commit.objects.create(
             sha='def456',
             repository_full_name='test/repo',
-            application_id=self.application.id,
+            application_id=self.application_id,
             message='Test commit 2',
             author_name='patrick.qian',
             author_email='patrick.qian@different.com',
@@ -74,7 +70,7 @@ class DeveloperGroupingTestCase(TestCase):
         Commit.objects.create(
             sha='ghi789',
             repository_full_name='test/repo',
-            application_id=self.application.id,
+            application_id=self.application_id,
             message='Test commit 3',
             author_name='Krishna Prasad ADHIKARI',
             author_email='krishna.adhikari@company.com',
@@ -89,7 +85,7 @@ class DeveloperGroupingTestCase(TestCase):
         Commit.objects.create(
             sha='jkl012',
             repository_full_name='test/repo',
-            application_id=self.application.id,
+            application_id=self.application_id,
             message='Test commit 4',
             author_name='krishna',
             author_email='krishna.adhikari@different.com',
@@ -105,7 +101,7 @@ class DeveloperGroupingTestCase(TestCase):
         Commit.objects.create(
             sha='mno345',
             repository_full_name='test/repo',
-            application_id=self.application.id,
+            application_id=self.application_id,
             message='Test commit 5',
             author_name='pbench',
             author_email='52410095+pbench@users.noreply.github.com',
@@ -119,7 +115,7 @@ class DeveloperGroupingTestCase(TestCase):
     
     def test_developer_grouping(self):
         """Test that developers are properly grouped"""
-        grouping_service = DeveloperGroupingService(self.application.id)
+        grouping_service = DeveloperGroupingService(self.application_id)
         
         # Run grouping
         results = grouping_service.group_developers()

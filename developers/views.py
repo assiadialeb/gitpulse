@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 
 from analytics.models import Developer, DeveloperAlias
-from applications.models import Application
+
 from analytics.commit_classifier import get_commit_type_stats
 
 
