@@ -1,21 +1,18 @@
 from django import forms
 from .models import GitHubApp
+from allauth.socialaccount.models import SocialApp
 
 
 class GitHubAppForm(forms.ModelForm):
-    """Form for GitHub App configuration"""
+    """Form for GitHub OAuth App configuration"""
     
     class Meta:
         model = GitHubApp
-        fields = ['client_id', 'client_secret']
+        fields = ['client_id']  # Only client_id, client_secret is handled separately
         widgets = {
             'client_id': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',
-                'placeholder': 'GitHub App Client ID'
-            }),
-            'client_secret': forms.PasswordInput(attrs={
-                'class': 'input input-bordered w-full',
-                'placeholder': 'GitHub App Client Secret'
+                'placeholder': 'GitHub OAuth App Client ID (e.g., Ov23li...)'
             }),
         }
     
@@ -50,3 +47,9 @@ class GitHubAppForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance 
+
+
+class SocialAppForm(forms.ModelForm):
+    class Meta:
+        model = SocialApp
+        fields = ['client_id', 'secret'] 

@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import mongoengine
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,10 +41,16 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_q',
     'users',
-    'github',
+    'github.apps.GithubConfig',
     'applications',
     'analytics',
     'developers',
+    'repositories',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.github',
 ]
 
 MIDDLEWARE = [
@@ -52,6 +59,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -82,9 +90,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 import os
 
 # MongoDB Configuration
-MONGODB_HOST = os.environ.get('MONGODB_HOST', 'localhost')
-MONGODB_PORT = int(os.environ.get('MONGODB_PORT', 27017))
-MONGODB_NAME = os.environ.get('MONGODB_NAME', 'gitpulse')
+MONGODB_HOST = config('MONGODB_HOST', default='localhost')
+MONGODB_PORT = int(config('MONGODB_PORT', default=27017))
+MONGODB_NAME = config('MONGODB_NAME', default='gitpulse')
 
 # Connect to MongoDB
 mongoengine.connect(
@@ -125,7 +133,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Paris'
 
 USE_I18N = True
 
@@ -144,23 +152,83 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Authentication settings
 LOGIN_URL = '/users/login/'
-LOGIN_REDIRECT_URL = '/dashboard/'
+LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 # Django-Q Configuration
 Q_CLUSTER = {
     'name': 'GitPulse',
     'workers': 4,
+    'workers': 5,
     'recycle': 500,
-    'timeout': 60,
+    'timeout': 1800,  # 30 minutes for indexing tasks
     'compress': True,
     'save_limit': 250,
     'queue_limit': 500,
     'cpu_affinity': 1,
     'label': 'Django Q',
-    'redis': {
-        'host': os.environ.get('REDIS_HOST', '127.0.0.1'),
-        'port': int(os.environ.get('REDIS_PORT', 6379)),
-        'db': 0,
+    'mongo': {
+        'host': MONGODB_HOST,
+        'port': MONGODB_PORT,
+    },
+    'mongo_db': MONGODB_NAME,
+}
+
+# GitPulse Configuration
+# Choose indexing service: 'git_local' or 'github_api'
+INDEXING_SERVICE = config('INDEXING_SERVICE', default='git_local')
+
+# GitHub API Configuration (only used if INDEXING_SERVICE = 'github_api')
+GITHUB_API_RATE_LIMIT_WARNING = int(config('GITHUB_API_RATE_LIMIT_WARNING', default=10))
+GITHUB_API_TIMEOUT = int(config('GITHUB_API_TIMEOUT', default=30))
+
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # Auth locale
+    'allauth.account.auth_backends.AuthenticationBackend',  # Auth sociale
+]
+
+# allauth settings de base
+ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+
+SOCIALACCOUNT_PROVIDERS = {
+    'github': {}
+}
+
+# Django Cache Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+        'TIMEOUT': 3600,  # 1 hour default timeout
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,  # Maximum number of entries in cache
+        }
+    }
+}
+
+# Cache settings for analytics
+ANALYTICS_CACHE_TIMEOUT = 1  # 1 hour for analytics data
+PR_METRICS_CACHE_TIMEOUT = 1  # 30 minutes for PR metrics
+COMMIT_METRICS_CACHE_TIMEOUT = 1 # 2 hours for commit metrics
+
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+# Custom adapter to capture GitHub tokens
+SOCIALACCOUNT_ADAPTER = 'users.adapters.CustomSocialAccountAdapter'
+
+# GitHub OAuth configuration with required scopes
+SOCIALACCOUNT_PROVIDERS = {
+    'github': {
+        'SCOPE': [
+            'user:email',  # Access to user email addresses
+            'repo',        # Full access to repositories (public and private)
+            'read:org',    # Read organization membership and teams
+        ],
+        'VERIFIED_EMAIL': True,  # Require verified email
     }
 }

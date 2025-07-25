@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 from typing import List, Dict, Optional, Tuple
 from django.conf import settings
 import logging
+from allauth.socialaccount.models import SocialToken
+from django.contrib.auth import get_user_model
+
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +22,9 @@ class GitHubAPIError(Exception):
 class GitHubRateLimitError(GitHubAPIError):
     """Exception raised when GitHub API rate limit is exceeded"""
     pass
+
+
+# Fonction supprimée - utiliser get_github_token_for_user depuis github_utils.py
 
 
 class GitHubService:
@@ -60,7 +66,11 @@ class GitHubService:
                 raise GitHubRateLimitError("Rate limit exceeded")
             
             if response.status_code == 404:
-                raise GitHubAPIError(f"Repository not found or not accessible: {url}")
+                # For releases endpoint, 404 might just mean no releases exist
+                if '/releases' in url:
+                    return [], dict(response.headers)
+                else:
+                    raise GitHubAPIError(f"Repository not found or not accessible: {url}")
             
             if not response.ok:
                 raise GitHubAPIError(f"GitHub API error {response.status_code}: {response.text}")
@@ -145,20 +155,12 @@ class GitHubService:
     def parse_commit_data(self, commit_data: Dict, repo_full_name: str, application_id: int) -> Dict:
         """
         Parse GitHub commit data into our internal format
-        
-        Args:
-            commit_data: Raw commit data from GitHub API
-            repo_full_name: Repository name
-            application_id: Application ID from Django
-            
-        Returns:
-            Parsed commit data ready for MongoDB storage
         """
         commit = commit_data.get('commit', {})
         author = commit.get('author', {})
         committer = commit.get('committer', {})
         stats = commit_data.get('stats', {})
-        
+
         # Parse file changes
         files_changed = []
         for file_data in commit_data.get('files', []):
@@ -171,11 +173,29 @@ class GitHubService:
                 'patch': file_data.get('patch', '')[:5000]  # Limit patch size
             }
             files_changed.append(file_change)
-        
+
         # Parse dates
         authored_date = datetime.fromisoformat(author.get('date', '').replace('Z', '+00:00'))
         committed_date = datetime.fromisoformat(committer.get('date', '').replace('Z', '+00:00'))
-        
+
+        # --- Ajout récupération info PR ---
+        pull_request_number = None
+        pull_request_url = None
+        pull_request_merged_at = None
+        try:
+            pr_url = f"{self.base_url}/repos/{repo_full_name}/commits/{commit_data.get('sha')}/pulls"
+            prs, _ = self._make_request(pr_url, params={"per_page": 1})
+            if prs and isinstance(prs, list) and len(prs) > 0:
+                pr = prs[0]
+                pull_request_number = pr.get('number')
+                pull_request_url = pr.get('html_url')
+                pull_request_merged_at = pr.get('merged_at')
+                if pull_request_merged_at:
+                    pull_request_merged_at = datetime.fromisoformat(pull_request_merged_at.replace('Z', '+00:00'))
+        except Exception as e:
+            pass
+        # --- Fin ajout PR ---
+
         parsed_data = {
             'sha': commit_data.get('sha'),
             'repository_full_name': repo_full_name,
@@ -194,9 +214,13 @@ class GitHubService:
             'parent_shas': [parent.get('sha') for parent in commit_data.get('parents', [])],
             'tree_sha': commit.get('tree', {}).get('sha'),
             'url': commit_data.get('html_url', ''),
-            'synced_at': datetime.utcnow()
+            'synced_at': datetime.utcnow(),
+            # Champs PR
+            'pull_request_number': pull_request_number,
+            'pull_request_url': pull_request_url,
+            'pull_request_merged_at': pull_request_merged_at,
         }
-        
+
         return parsed_data
     
     def get_rate_limit_info(self) -> Dict:

@@ -133,3 +133,9 @@ class GitHubUserService:
         """Sync user data from GitHub and save to MongoDB"""
         user_data = self.get_user_info(username)
         return self.save_user_to_mongodb(user_data) 
+
+    def get_authenticated_user_organizations(self) -> list:
+        """Get all organizations for the authenticated user via GitHub API"""
+        orgs_url = "https://api.github.com/user/orgs"
+        orgs, _ = self._make_request(orgs_url)
+        return orgs if isinstance(orgs, list) else [] 

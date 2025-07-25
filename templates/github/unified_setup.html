@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configuration GitHub Unifiée{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h1 class="text-3xl font-bold text-gray-900 mb-6">Configuration GitHub Unifiée</h1>
+            
+            <!-- Avantages -->
+            <div class="mb-8 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div class="flex items-center mb-3">
+                    <svg class="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <h3 class="text-lg font-medium text-green-800">Approche Unifiée Recommandée</h3>
+                </div>
+                <p class="text-green-700 mb-2">
+                    Une seule OAuth App GitHub pour l'authentification ET l'accès aux repositories.
+                </p>
+                <ul class="text-green-700 text-sm space-y-1">
+                    <li>✅ Chaque utilisateur autorise ses propres repositories</li>
+                    <li>✅ Pas de dépendance à un seul Personal Access Token</li>
+                    <li>✅ Permissions granulaires par utilisateur</li>
+                    <li>✅ Configuration centralisée</li>
+                </ul>
+            </div>
+
+            <!-- Status actuel -->
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Status de votre configuration</h2>
+                <div id="connection-status" class="p-4 bg-gray-50 rounded-lg">
+                    <p class="text-gray-600">Vérification en cours...</p>
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div class="space-y-6">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Comment ça fonctionne</h2>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">1</div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Utilisateur se connecte</h3>
+                                <p class="text-gray-600">L'utilisateur se connecte via GitHub OAuth avec les scopes : <code class="bg-gray-200 px-1 rounded">user:email</code>, <code class="bg-gray-200 px-1 rounded">repo</code>, <code class="bg-gray-200 px-1 rounded">read:org</code></p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">2</div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Token utilisateur stocké</h3>
+                                <p class="text-gray-600">Le token OAuth de l'utilisateur est stocké par django-allauth</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">3</div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Accès aux repositories</h3>
+                                <p class="text-gray-600">GitPulse utilise le token de l'utilisateur pour accéder aux repositories auxquels il a accès</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">4</div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Tâches en arrière-plan</h3>
+                                <p class="text-gray-600">Les tâches d'indexation utilisent le token de l'utilisateur propriétaire de l'application</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Actions -->
+                <div class="border-t pt-6">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Actions</h2>
+                    
+                    <div class="flex flex-wrap gap-4">
+                        <button onclick="checkConnection()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                            Vérifier la connexion
+                        </button>
+                        
+                        <a href="/accounts/github/login/" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                            Se connecter avec GitHub
+                        </a>
+                        
+                        <button onclick="forceReauth()" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">
+                            Reconnecter (nouveaux scopes)
+                        </button>
+                        
+                        <a href="{% url 'github:admin' %}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Configuration avancée
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Troubleshooting -->
+                <div class="border-t pt-6">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Dépannage</h2>
+                    
+                    <div class="space-y-3">
+                        <details class="bg-gray-50 p-4 rounded-lg">
+                            <summary class="cursor-pointer font-medium">Repositories inaccessibles</summary>
+                            <div class="mt-2 text-sm text-gray-600">
+                                <p>Si certains repositories ne sont pas accessibles :</p>
+                                <ul class="list-disc list-inside mt-2 space-y-1">
+                                    <li>Vérifiez que vous avez accès aux repositories sur GitHub</li>
+                                    <li>Pour les organisations, vérifiez que l'OAuth App est autorisée</li>
+                                    <li>Reconnectez-vous pour mettre à jour les permissions</li>
+                                </ul>
+                            </div>
+                        </details>
+                        
+                        <details class="bg-gray-50 p-4 rounded-lg">
+                            <summary class="cursor-pointer font-medium">Scopes manquants</summary>
+                            <div class="mt-2 text-sm text-gray-600">
+                                <p>Si vous n'avez pas tous les scopes requis :</p>
+                                <ul class="list-disc list-inside mt-2 space-y-1">
+                                    <li>Utilisez le bouton "Reconnecter" ci-dessus</li>
+                                    <li>Autorisez tous les scopes demandés par GitHub</li>
+                                    <li>Vérifiez la configuration de votre OAuth App sur GitHub</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function checkConnection() {
+    const statusDiv = document.getElementById('connection-status');
+    statusDiv.innerHTML = '<p class="text-blue-600">Vérification en cours...</p>';
+    
+    try {
+        const response = await fetch('/github/connection-status/');
+        const data = await response.json();
+        
+        if (data.connected) {
+            const hasAllScopes = data.has_all_scopes;
+            const statusClass = hasAllScopes ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200';
+            const iconColor = hasAllScopes ? 'text-green-600' : 'text-yellow-600';
+            const textColor = hasAllScopes ? 'text-green-800' : 'text-yellow-800';
+            
+            statusDiv.className = `p-4 rounded-lg border ${statusClass}`;
+            statusDiv.innerHTML = `
+                <div class="flex items-center mb-2">
+                    <svg class="w-5 h-5 ${iconColor} mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <h3 class="font-medium ${textColor}">Connecté en tant que ${data.username}</h3>
+                </div>
+                <p class="${textColor.replace('800', '700')} text-sm mb-2">
+                    Scopes actuels: ${data.scopes.join(', ') || 'Aucun'}
+                </p>
+                ${data.missing_scopes.length > 0 ? `
+                    <p class="text-yellow-700 text-sm">
+                        Scopes manquants: ${data.missing_scopes.join(', ')}
+                    </p>
+                ` : ''}
+            `;
+        } else {
+            statusDiv.className = 'p-4 bg-red-50 border border-red-200 rounded-lg';
+            statusDiv.innerHTML = `
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-red-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                    </svg>
+                    <h3 class="font-medium text-red-800">Non connecté</h3>
+                </div>
+                <p class="text-red-700 text-sm mt-1">${data.message}</p>
+            `;
+        }
+    } catch (error) {
+        statusDiv.className = 'p-4 bg-red-50 border border-red-200 rounded-lg';
+        statusDiv.innerHTML = `<p class="text-red-700">Erreur: ${error.message}</p>`;
+    }
+}
+
+async function forceReauth() {
+    if (confirm('Cela va déconnecter votre compte GitHub et vous demander de vous reconnecter avec les nouveaux scopes. Continuer ?')) {
+        window.location.href = '/github/force-reauth/';
+    }
+}
+
+// Check connection on page load
+document.addEventListener('DOMContentLoaded', checkConnection);
+</script>
+
+{% csrf_token %}
+{% endblock %}

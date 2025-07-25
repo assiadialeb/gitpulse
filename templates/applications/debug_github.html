@@ -1,154 +1,295 @@
-{% extends 'base/base.html' %}
+{% extends "base/base.html" %}
 
-{% block title %}GitHub Debug - GitPulse{% endblock %}
+{% block title %}Debug GitHub Tokens - GitPulse{% endblock title %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-8">
     <!-- Header -->
-    <div class="text-center py-12">
-        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-primary-green to-primary-blue rounded-2xl shadow-glow mb-6">
-            <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-            </svg>
-        </div>
-        <h1 class="text-4xl font-bold gradient-text mb-4">GitHub Debug</h1>
-        <p class="text-xl text-medium-gray">Diagnosing GitHub connection and repositories</p>
+    <div class="text-center py-8">
+        <h1 class="text-3xl font-bold gradient-text mb-4">GitHub Token Diagnostics</h1>
+        <p class="text-lg text-medium-gray">Diagnose and test GitHub token access</p>
     </div>
 
-    <!-- GitHub Token Info -->
-    <div class="card-modern p-8">
-        <h2 class="text-2xl font-bold text-dark-gray mb-6">GitHub Token Status</h2>
-        
-        <div class="space-y-4">
-            <div class="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-xl">
-                <div class="flex items-center">
-                    <svg class="w-6 h-6 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- Token Status Cards -->
+    <div class="grid md:grid-cols-2 gap-6">
+        <!-- OAuth App Token -->
+        <div class="card-modern p-6">
+            <div class="flex items-center mb-4">
+                <div class="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center mr-3">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    <span class="font-semibold text-green-800">GitHub Token Found</span>
                 </div>
-                <span class="text-sm text-green-600">{{ github_token.access_token|slice:":10" }}...</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- User API Test -->
-    <div class="card-modern p-8">
-        <h2 class="text-2xl font-bold text-dark-gray mb-6">User API Test</h2>
-        
-        <div class="space-y-4">
-            {% if user_response.status_code == 200 %}
-            <div class="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-xl">
-                <div class="flex items-center">
-                    <svg class="w-6 h-6 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="font-semibold text-green-800">User API Success</span>
+                <div>
+                    <h3 class="text-lg font-semibold text-dark-gray">OAuth App Token</h3>
+                    <p class="text-sm text-medium-gray">For basic operations</p>
                 </div>
-                <span class="text-sm text-green-600">Status: {{ user_response.status_code }}</span>
             </div>
             
-            <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                <h3 class="font-semibold text-dark-gray mb-2">User Data:</h3>
-                <pre class="text-sm text-medium-gray overflow-x-auto">{{ user_response.json|pprint }}</pre>
-            </div>
+            {% if basic_token %}
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                        <span class="text-sm text-dark-gray">Token available</span>
+                    </div>
+                    <div class="text-xs text-medium-gray font-mono bg-gray-100 p-2 rounded">
+                        {{ basic_token|slice:":20 }}...
+                    </div>
+                    
+                    {% if basic_validation %}
+                        {% if basic_validation.valid %}
+                            <div class="space-y-2">
+                                <div class="flex items-center">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                    <span class="text-sm text-dark-gray">Valid token</span>
+                                </div>
+                                <div class="text-xs text-medium-gray">
+                                    <strong>Scopes:</strong> {{ basic_validation.scopes|join:", " }}
+                                </div>
+                                <div class="text-xs text-medium-gray">
+                                    <strong>Rate Limit:</strong> {{ basic_validation.rate_limit.remaining }}/{{ basic_validation.rate_limit.limit }}
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="flex items-center">
+                                <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                <span class="text-sm text-red-600">{{ basic_validation.error }}</span>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
             {% else %}
-            <div class="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-xl">
                 <div class="flex items-center">
-                    <svg class="w-6 h-6 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="font-semibold text-red-800">User API Failed</span>
+                    <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                    <span class="text-sm text-red-600">No OAuth App token found</span>
                 </div>
-                <span class="text-sm text-red-600">Status: {{ user_response.status_code }}</span>
+            {% endif %}
+        </div>
+
+        <!-- User Token -->
+        <div class="card-modern p-6">
+            <div class="flex items-center mb-4">
+                <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center mr-3">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-dark-gray">User OAuth Token</h3>
+                    <p class="text-sm text-medium-gray">For repository access</p>
+                </div>
             </div>
             
-            <div class="bg-red-50 border border-red-200 rounded-xl p-4">
-                <h3 class="font-semibold text-red-800 mb-2">Error Response:</h3>
-                <pre class="text-sm text-red-700 overflow-x-auto">{{ user_response.text }}</pre>
-            </div>
+            {% if user_token %}
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                        <span class="text-sm text-dark-gray">Token available</span>
+                    </div>
+                    <div class="text-xs text-medium-gray font-mono bg-gray-100 p-2 rounded">
+                        {{ user_token|slice:":20 }}...
+                    </div>
+                    
+                    {% if user_validation %}
+                        {% if user_validation.valid %}
+                            <div class="space-y-2">
+                                <div class="flex items-center">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                    <span class="text-sm text-dark-gray">Valid token</span>
+                                </div>
+                                <div class="text-xs text-medium-gray">
+                                    <strong>Scopes:</strong> {{ user_validation.scopes|join:", " }}
+                                </div>
+                                <div class="text-xs text-medium-gray">
+                                    <strong>Rate Limit:</strong> {{ user_validation.rate_limit.remaining }}/{{ user_validation.rate_limit.limit }}
+                                </div>
+                                
+                                {% if user_validation.missing_scopes %}
+                                    <div class="text-xs text-orange-600">
+                                        <strong>Missing scopes:</strong> {{ user_validation.missing_scopes|join:", " }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="flex items-center">
+                                <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                <span class="text-sm text-red-600">{{ user_validation.error }}</span>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="flex items-center">
+                    <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                    <span class="text-sm text-red-600">No user token found</span>
+                </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Repositories API Test -->
-    <div class="card-modern p-8">
-        <h2 class="text-2xl font-bold text-dark-gray mb-6">Repositories API Test</h2>
+    <!-- Token Testing -->
+    <div class="card-modern p-6">
+        <h3 class="text-xl font-semibold text-dark-gray mb-4">Token Testing</h3>
         
         <div class="space-y-4">
-            {% if repos_response.status_code == 200 %}
-            <div class="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-xl">
-                <div class="flex items-center">
-                    <svg class="w-6 h-6 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="font-semibold text-green-800">Repositories API Success</span>
-                </div>
-                <span class="text-sm text-green-600">Status: {{ repos_response.status_code }}</span>
-            </div>
-            
-            <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                <h3 class="font-semibold text-dark-gray mb-2">Repositories Found:</h3>
-                {% with repos_data=repos_response.json %}
-                <p class="text-medium-gray mb-4">Found {{ repos_data|length }} repositories</p>
-                
+            <!-- Basic Operations Test -->
+            <div class="border border-gray-200 rounded-lg p-4">
+                <h4 class="font-semibold text-dark-gray mb-2">Basic Operations</h4>
                 <div class="space-y-2">
-                    {% for repo in repos_data %}
-                    <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
-                        <div class="flex items-center">
-                            <svg class="w-5 h-5 text-dark-gray mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                            </svg>
-                            <span class="font-medium text-dark-gray">{{ repo.full_name }}</span>
-                        </div>
-                        <div class="flex items-center space-x-4 text-sm text-medium-gray">
-                            {% if repo.private %}
-                            <span class="badge badge-sm bg-yellow-100 text-yellow-800 border-0">Private</span>
-                            {% else %}
-                            <span class="badge badge-sm bg-green-100 text-green-800 border-0">Public</span>
-                            {% endif %}
-                            {% if repo.language %}
-                            <span>{{ repo.language }}</span>
-                            {% endif %}
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-medium-gray">Public repository access</span>
+                        {% if basic_token %}
+                            <span class="text-green-600 text-sm">✓ Available</span>
+                        {% else %}
+                            <span class="text-red-600 text-sm">✗ Not available</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-medium-gray">User info access</span>
+                        {% if basic_token %}
+                            <span class="text-green-600 text-sm">✓ Available</span>
+                        {% else %}
+                            <span class="text-red-600 text-sm">✗ Not available</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Repository Access Test -->
+            <div class="border border-gray-200 rounded-lg p-4">
+                <h4 class="font-semibold text-dark-gray mb-2">Repository Access</h4>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-medium-gray">Private repository access</span>
+                        {% if user_token %}
+                            <span class="text-green-600 text-sm">✓ Available</span>
+                        {% else %}
+                            <span class="text-red-600 text-sm">✗ Not available</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-medium-gray">Commit access</span>
+                        {% if user_token %}
+                            <span class="text-green-600 text-sm">✓ Available</span>
+                        {% else %}
+                            <span class="text-red-600 text-sm">✗ Not available</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-medium-gray">Pull request access</span>
+                        {% if user_token %}
+                            <span class="text-green-600 text-sm">✓ Available</span>
+                        {% else %}
+                            <span class="text-red-600 text-sm">✗ Not available</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="card-modern p-6">
+        <h3 class="text-xl font-semibold text-dark-gray mb-4">Recommendations</h3>
+        
+        <div class="space-y-4">
+            {% if not basic_token %}
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-yellow-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        <div>
+                            <h4 class="font-semibold text-yellow-800">OAuth App Configuration</h4>
+                            <p class="text-sm text-yellow-700 mt-1">
+                                No OAuth App token found. Configure your GitHub OAuth App in the admin panel.
+                            </p>
                         </div>
                     </div>
-                    {% endfor %}
                 </div>
-                {% endwith %}
-            </div>
-            {% else %}
-            <div class="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-xl">
-                <div class="flex items-center">
-                    <svg class="w-6 h-6 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="font-semibold text-red-800">Repositories API Failed</span>
+            {% endif %}
+
+            {% if not user_token %}
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-blue-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <h4 class="font-semibold text-blue-800">GitHub Connection Required</h4>
+                            <p class="text-sm text-blue-700 mt-1">
+                                Connect your GitHub account to access private repositories and perform advanced operations.
+                            </p>
+                            <a href="{% url 'github:admin' %}" class="btn btn-sm bg-blue-600 text-white mt-2">
+                                Connect GitHub Account
+                            </a>
+                        </div>
+                    </div>
                 </div>
-                <span class="text-sm text-red-600">Status: {{ repos_response.status_code }}</span>
-            </div>
-            
-            <div class="bg-red-50 border border-red-200 rounded-xl p-4">
-                <h3 class="font-semibold text-red-800 mb-2">Error Response:</h3>
-                <pre class="text-sm text-red-700 overflow-x-auto">{{ repos_response.text }}</pre>
-            </div>
+            {% endif %}
+
+            {% if user_validation and user_validation.missing_scopes %}
+                <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-orange-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        <div>
+                            <h4 class="font-semibold text-orange-800">Missing Scopes</h4>
+                            <p class="text-sm text-orange-700 mt-1">
+                                Your GitHub token is missing required scopes: {{ user_validation.missing_scopes|join:", " }}
+                            </p>
+                            <a href="{% url 'github:force_reauth' %}" class="btn btn-sm bg-orange-600 text-white mt-2">
+                                Reconnect with New Scopes
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if basic_token and user_token %}
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-green-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <h4 class="font-semibold text-green-800">All Systems Operational</h4>
+                            <p class="text-sm text-green-700 mt-1">
+                                Both OAuth App and user tokens are properly configured. All features should work correctly.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Actions -->
-    <div class="flex justify-center space-x-4">
+    <!-- Action Buttons -->
+    <div class="flex justify-between items-center">
         <a href="{% url 'applications:list' %}" class="btn btn-outline border-gray-300 text-dark-gray hover:bg-gray-50 rounded-xl">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19l-7-7m0 0l7-7m-7 7h18"></path>
             </svg>
             Back to Applications
         </a>
-        <a href="{% url 'github:admin' %}" class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-6 py-3 font-semibold shadow-soft hover:shadow-glow transition-all duration-300">
-            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-            </svg>
-            GitHub Admin
-        </a>
+        
+        <div class="flex space-x-3">
+            <a href="{% url 'github:admin' %}" class="btn bg-gradient-to-r from-primary-green to-primary-blue text-white border-0 rounded-xl px-6 py-3 font-semibold shadow-soft hover:shadow-glow transition-all duration-300">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                GitHub Settings
+            </a>
+            
+            <button onclick="location.reload()" class="btn bg-gray-600 text-white border-0 rounded-xl px-6 py-3 font-semibold shadow-soft hover:shadow-glow transition-all duration-300">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Refresh
+            </button>
+        </div>
     </div>
 </div>
-{% endblock %} 
+{% endblock content %} 

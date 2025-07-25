@@ -7,7 +7,7 @@ from datetime import datetime
 from difflib import SequenceMatcher
 from collections import defaultdict
 
-from .models import DeveloperGroup, DeveloperAlias, Commit
+from .models import Developer, DeveloperAlias, Commit
 
 
 class DeveloperGroupingService:
@@ -28,46 +28,105 @@ class DeveloperGroupingService:
             Dictionary with grouping results
         """
         try:
-            # Get all commits from all applications
-            commits = Commit.objects.all()
-            all_developers = self._extract_unique_developers(commits)
+            # Get all existing aliases (not commits)
+            all_aliases = DeveloperAlias.objects.all()
+            
+            if not all_aliases:
+                return {
+                    'success': False,
+                    'error': 'No aliases found to group'
+                }
+            
+            # Convert aliases to developer data format
+            all_developers = []
+            for alias in all_aliases:
+                if not alias.developer:  # Only process ungrouped aliases
+                    all_developers.append({
+                        'name': alias.name,
+                        'email': alias.email,
+                        'first_seen': alias.first_seen,
+                        'last_seen': alias.last_seen,
+                        'commit_count': alias.commit_count,
+                        'alias_id': str(alias.id)
+                    })
             
             if not all_developers:
                 return {
-                    'success': False,
-                    'error': 'No developers found to group'
+                    'success': True,
+                    'developers_created': 0,
+                    'developers': [],
+                    'message': 'All aliases are already grouped'
                 }
             
             # Track which developers have been processed
             processed_developers = set()
-            groups_to_create = []
-            created_groups = []
+            developers_to_create = []
+            created_developers = []
             
-            # Step 1: Group by exact email match (highest priority)
+            # Step 1: Group by GitHub ID (highest priority - unique identifier)
+            github_groups = defaultdict(list)
+            for dev in all_developers:
+                github_id = self._extract_github_id(dev['email'])
+                if github_id:
+                    github_groups[github_id].append(dev)
+            
+            for github_id, developers in github_groups.items():
+                if len(developers) > 1:
+                    # Check if any of these developers are already in existing developers
+                    existing_developer = self._find_existing_developer_for_developers(developers)
+                    
+                    if existing_developer:
+                        # Add to existing developer
+                        added_count = self._add_developers_to_developer(existing_developer, developers)
+                        created_developers.append({
+                            'developer_id': str(existing_developer.pk),
+                            'primary_name': existing_developer.primary_name,
+                            'primary_email': existing_developer.primary_email,
+                            'type': 'github_id',
+                            'key': github_id,
+                            'added_count': added_count,
+                            'action': 'added_to_existing'
+                        })
+                    else:
+                        # Create new developer
+                        developers_to_create.append({
+                            'type': 'github_id',
+                            'key': github_id,
+                            'developers': developers,
+                            'primary_name': developers[0]['name'],
+                            'primary_email': developers[0]['email']
+                        })
+                    
+                    for dev in developers:
+                        processed_developers.add(dev['name'] + '|' + dev['email'])
+            
+            # Step 2: Group by exact email match
             email_groups = defaultdict(list)
             for dev in all_developers:
-                email_groups[dev['email'].lower()].append(dev)
+                dev_key = dev['name'] + '|' + dev['email']
+                if dev_key not in processed_developers:
+                    email_groups[dev['email'].lower()].append(dev)
             
             for email, developers in email_groups.items():
                 if len(developers) > 1:
-                    # Check if any of these developers are already in existing groups
-                    existing_group = self._find_existing_group_for_developers(developers)
+                    # Check if any of these developers are already in existing developers
+                    existing_developer = self._find_existing_developer_for_developers(developers)
                     
-                    if existing_group:
-                        # Add to existing group
-                        added_count = self._add_developers_to_group(existing_group, developers)
-                        created_groups.append({
-                            'group_id': str(existing_group.id),
-                            'primary_name': existing_group.primary_name,
-                            'primary_email': existing_group.primary_email,
+                    if existing_developer:
+                        # Add to existing developer
+                        added_count = self._add_developers_to_developer(existing_developer, developers)
+                        created_developers.append({
+                            'developer_id': str(existing_developer.pk),
+                            'primary_name': existing_developer.primary_name,
+                            'primary_email': existing_developer.primary_email,
                             'type': 'email',
                             'key': email,
                             'added_count': added_count,
                             'action': 'added_to_existing'
                         })
                     else:
-                        # Create new group
-                        groups_to_create.append({
+                        # Create new developer
+                        developers_to_create.append({
                             'type': 'email',
                             'key': email,
                             'developers': developers,
@@ -78,7 +137,60 @@ class DeveloperGroupingService:
                     for dev in developers:
                         processed_developers.add(dev['name'] + '|' + dev['email'])
             
-            # Step 2: Group by name similarity (only unprocessed developers)
+            # Step 3: Group by approximate email (same username before @)
+            approximate_email_groups = defaultdict(list)
+            for dev in all_developers:
+                dev_key = dev['name'] + '|' + dev['email']
+                if dev_key not in processed_developers:
+                    username = self._extract_username_from_email(dev['email'])
+                    if username:
+                        approximate_email_groups[username].append(dev)
+            
+            # Step 3.5: Group GitHub ID with regular emails (same username)
+            github_regular_groups = defaultdict(list)
+            for dev in all_developers:
+                dev_key = dev['name'] + '|' + dev['email']
+                if dev_key not in processed_developers:
+                    github_id = self._extract_github_id(dev['email'])
+                    if github_id:
+                        # Find regular emails with same username
+                        username = self._extract_username_from_email(dev['email'])
+                        if username:
+                            github_regular_groups[username].append(dev)
+            
+            for username, developers in approximate_email_groups.items():
+                if len(developers) > 1:
+                    # Additional validation for approximate email grouping
+                    if self._validate_approximate_email_grouping(developers):
+                        # Check if any of these developers are already in existing developers
+                        existing_developer = self._find_existing_developer_for_developers(developers)
+                        
+                        if existing_developer:
+                            # Add to existing developer
+                            added_count = self._add_developers_to_developer(existing_developer, developers)
+                            created_developers.append({
+                                'developer_id': str(existing_developer.pk),
+                                'primary_name': existing_developer.primary_name,
+                                'primary_email': existing_developer.primary_email,
+                                'type': 'approximate_email',
+                                'key': username,
+                                'added_count': added_count,
+                                'action': 'added_to_existing'
+                            })
+                        else:
+                            # Create new developer
+                            developers_to_create.append({
+                                'type': 'approximate_email',
+                                'key': username,
+                                'developers': developers,
+                                'primary_name': developers[0]['name'],
+                                'primary_email': developers[0]['email']
+                            })
+                        
+                        for dev in developers:
+                            processed_developers.add(dev['name'] + '|' + dev['email'])
+            
+            # Step 4: Group by name similarity (only unprocessed developers)
             name_groups = defaultdict(list)
             for dev in all_developers:
                 dev_key = dev['name'] + '|' + dev['email']
@@ -88,100 +200,97 @@ class DeveloperGroupingService:
             
             for normalized_name, developers in name_groups.items():
                 if len(developers) > 1:
-                    # Use the most common name as the primary name
-                    name_counts = defaultdict(int)
-                    for dev in developers:
-                        name_counts[dev['name']] += 1
-                    
-                    # Use the name with the most occurrences, or the longest if tied
-                    primary_name = max(name_counts.items(), key=lambda x: (x[1], len(x[0])))[0]
-                    
-                    groups_to_create.append({
-                        'type': 'name',
-                        'key': normalized_name,
-                        'developers': developers,
-                        'primary_name': primary_name,
-                        'primary_email': developers[0]['email']
-                    })
-                    for dev in developers:
-                        processed_developers.add(dev['name'] + '|' + dev['email'])
+                    # Additional validation: check if emails are from same domain
+                    if self._validate_name_grouping(developers):
+                        # Use the most common name as the primary name
+                        name_counts = defaultdict(int)
+                        for dev in developers:
+                            name_counts[dev['name']] += 1
+                        
+                        # Use the name with the most occurrences, or the longest if tied
+                        primary_name = max(name_counts.items(), key=lambda x: (x[1], len(x[0])))[0]
+                        
+                        developers_to_create.append({
+                            'type': 'name',
+                            'key': normalized_name,
+                            'developers': developers,
+                            'primary_name': primary_name,
+                            'primary_email': developers[0]['email']
+                        })
+                        for dev in developers:
+                            processed_developers.add(dev['name'] + '|' + dev['email'])
             
-            # Step 3: Group by GitHub ID (only unprocessed developers)
-            github_groups = defaultdict(list)
-            for dev in all_developers:
-                dev_key = dev['name'] + '|' + dev['email']
-                if dev_key not in processed_developers:
-                    github_id = self._extract_github_id(dev['email'])
-                    if github_id:
-                        github_groups[github_id].append(dev)
-            
-            for github_id, developers in github_groups.items():
-                if len(developers) > 1:
-                    groups_to_create.append({
-                        'type': 'github_id',
-                        'key': github_id,
-                        'developers': developers,
-                        'primary_name': developers[0]['name'],
-                        'primary_email': developers[0]['email']
-                    })
-                    for dev in developers:
-                        processed_developers.add(dev['name'] + '|' + dev['email'])
-            
-            # Create the groups
-            created_groups = []
-            for group_data in groups_to_create:
-                # Check if any of these developers are already in existing groups
-                existing_group = self._find_existing_group_for_developers(group_data['developers'])
+            # Create the developers
+            for developer_data in developers_to_create:
+                # Check if any of these developers are already in existing developers
+                existing_developer = self._find_existing_developer_for_developers(developer_data['developers'])
                 
-                if existing_group:
-                    # Add to existing group
-                    added_count = self._add_developers_to_group(existing_group, group_data['developers'])
-                    created_groups.append({
-                        'group_id': str(existing_group.id),
-                        'primary_name': existing_group.primary_name,
-                        'primary_email': existing_group.primary_email,
-                        'type': group_data['type'],
-                        'key': group_data['key'],
+                if existing_developer:
+                    # Add to existing developer
+                    added_count = self._add_developers_to_developer(existing_developer, developer_data['developers'])
+                    created_developers.append({
+                        'developer_id': str(existing_developer.pk),
+                        'primary_name': existing_developer.primary_name,
+                        'primary_email': existing_developer.primary_email,
+                        'type': developer_data['type'],
+                        'key': developer_data['key'],
                         'added_count': added_count,
                         'action': 'added_to_existing'
                     })
                 else:
-                    # Create new group
-                    group = DeveloperGroup(
-                        application_id=None,  # Global group
-                        primary_name=group_data['primary_name'],
-                        primary_email=group_data['primary_email'],
+                    # Create new developer
+                    developer = Developer(
+                        primary_name=developer_data['primary_name'],
+                        primary_email=developer_data['primary_email'],
                         is_auto_grouped=True,
-                        confidence_score=self._calculate_confidence_score(group_data['type'])
+                        confidence_score=self._calculate_confidence_score(developer_data['type'])
                     )
-                    group.save()
+                    developer.save()
                     
-                    # Add all developers as aliases
-                    for dev in group_data['developers']:
-                        alias = DeveloperAlias(
-                            group=group,
-                            name=dev['name'],
-                            email=dev['email'],
-                            first_seen=dev['first_seen'],
-                            last_seen=dev['last_seen'],
-                            commit_count=dev['commit_count']
-                        )
-                        alias.save()
+                    # Link existing aliases to this developer
+                    for dev in developer_data['developers']:
+                        alias = DeveloperAlias.objects(id=dev['alias_id']).first()
+                        if alias and not alias.developer:
+                            alias.developer = developer
+                            alias.save()
                     
-                    created_groups.append({
-                        'group_id': str(group.id),
-                        'primary_name': group.primary_name,
-                        'primary_email': group.primary_email,
-                        'type': group_data['type'],
-                        'key': group_data['key'],
-                        'added_count': len(group_data['developers']),
+                    created_developers.append({
+                        'developer_id': str(developer.pk),
+                        'primary_name': developer.primary_name,
+                        'primary_email': developer.primary_email,
+                        'type': developer_data['type'],
+                        'key': developer_data['key'],
+                        'added_count': len(developer_data['developers']),
                         'action': 'created_new'
                     })
             
+            # Create individual developers for ungrouped aliases
+            ungrouped_count = 0
+            for dev in all_developers:
+                dev_key = dev['name'] + '|' + dev['email']
+                if dev_key not in processed_developers:
+                    # Create individual developer for this alias
+                    developer = Developer(
+                        application_id=None,
+                        primary_name=dev['name'],
+                        primary_email=dev['email'],
+                        is_auto_grouped=True,
+                        confidence_score=100
+                    )
+                    developer.save()
+                    
+                    # Link the alias to this developer
+                    alias = DeveloperAlias.objects(id=dev['alias_id']).first()
+                    if alias and not alias.developer:
+                        alias.developer = developer
+                        alias.save()
+                        ungrouped_count += 1
+            
             return {
                 'success': True,
-                'groups_created': len(created_groups),
-                'groups': created_groups
+                'developers_created': len(created_developers) + ungrouped_count,
+                'developers': created_developers,
+                'ungrouped_individuals': ungrouped_count
             }
             
         except Exception as e:
@@ -218,6 +327,40 @@ class DeveloperGroupingService:
         if significant_words1 & significant_words2:
             return True
         
+        # NEW: Check for email username similarity
+        # If names are similar and emails have same username, likely same person
+        # This catches cases like "Michel S" vs "Michel Sanglier" with same email username
+        if self._emails_have_same_username(name1, name2):
+            return True
+        
+        return False
+    
+    def _emails_have_same_username(self, name1: str, name2: str) -> bool:
+        """
+        Check if the names are associated with emails that have the same username
+        This helps catch cases where someone uses different name variations but same email username
+        """
+        # This is a placeholder - in practice, we'd need to check the actual emails
+        # For now, we'll use a heuristic based on name similarity
+        norm1 = self._normalize_name(name1)
+        norm2 = self._normalize_name(name2)
+        
+        # If names share a significant word and are reasonably similar
+        words1 = set(norm1.split())
+        words2 = set(norm2.split())
+        
+        # Check if they share a significant word (4+ characters)
+        significant_words1 = {w for w in words1 if len(w) >= 4}
+        significant_words2 = {w for w in words2 if len(w) >= 4}
+        
+        shared_words = significant_words1 & significant_words2
+        
+        # If they share a significant word and names are reasonably similar
+        if shared_words and len(norm1) > 3 and len(norm2) > 3:
+            # Check if one name is a variation of the other
+            if any(word in norm1 for word in shared_words) and any(word in norm2 for word in shared_words):
+                return True
+        
         return False
     
     def _extract_github_id(self, email: str) -> Optional[str]:
@@ -234,54 +377,74 @@ class DeveloperGroupingService:
         
         return None
     
-    def _calculate_confidence_score(self, group_type: str) -> int:
+    def _calculate_confidence_score(self, developer_type: str) -> int:
         """Calculate confidence score based on grouping type"""
-        if group_type == 'email':
+        if developer_type == 'github_id':
+            return 100  # GitHub ID match (unique identifier)
+        elif developer_type == 'email':
             return 100  # Exact email match
-        elif group_type == 'name':
+        elif developer_type == 'approximate_email':
+            return 95   # Approximate email match (same username)
+        elif developer_type == 'name':
             return 80   # Name match (could be different people with same name)
-        elif group_type == 'github_id':
-            return 90   # GitHub ID match
         else:
             return 50
     
-    def _find_existing_group_for_developers(self, developers: List[Dict]) -> Optional[DeveloperGroup]:
-        """Find if any of these developers are already in an existing group"""
-        # Check if any developer email is already in any existing group
+    def _find_existing_developer_for_developers(self, developers: List[Dict]) -> Optional[Developer]:
+        """Find if any of these developers are already in an existing developer"""
+        # Check if any developer email is already in any existing developer
         for dev in developers:
-            # Chercher dans TOUS les groupes existants par email
+            # Chercher dans TOUS les developers existants par email
             existing_alias = DeveloperAlias.objects.filter(
                 email=dev['email']  # Chercher par email seulement
             ).first()
             
             if existing_alias:
-                return existing_alias.group
+                return existing_alias.developer
         
-        # Si aucun groupe trouvé par email, chercher par nom similaire
+        # Si aucun developer trouvé par email, chercher par similarité de noms
         if developers:
             # Use the first developer's name as reference
             primary_name = developers[0]['name']
-            existing_group = DeveloperGroup.objects.filter(primary_name=primary_name).first()
-            if existing_group:
-                return existing_group
+            
+            # Get all existing developers
+            existing_developers = Developer.objects.all()
+            
+            # Check for name similarity with existing developers
+            for existing_dev in existing_developers:
+                if self._names_are_similar(primary_name, existing_dev.primary_name):
+                    return existing_dev
+            
+            # If no similarity found, check if any of the developer emails match existing developer emails
+            for dev in developers:
+                for existing_dev in existing_developers:
+                    if dev['email'].lower() == existing_dev.primary_email.lower():
+                        return existing_dev
         
         return None
     
-    def _add_developers_to_group(self, group: DeveloperGroup, developers: List[Dict]) -> int:
-        """Add developers to an existing group, return number of new aliases added"""
+    def _add_developers_to_developer(self, developer: Developer, developers: List[Dict]) -> int:
+        """Add developers to an existing developer, return number of new aliases added"""
         added_count = 0
         
         for dev in developers:
-            # Check if this alias already exists in the group
+            # Check if this alias already exists in the developer (by email AND name)
             existing_alias = DeveloperAlias.objects.filter(
-                group=group,
+                developer=developer,
                 email=dev['email'],
                 name=dev['name']
             ).first()
             
-            if not existing_alias:
+            # Also check if an alias with the same email exists (regardless of name)
+            existing_email_alias = DeveloperAlias.objects.filter(
+                developer=developer,
+                email=dev['email']
+            ).first()
+            
+            if not existing_alias and not existing_email_alias:
+                # Create new alias only if it doesn't exist
                 alias = DeveloperAlias(
-                    group=group,
+                    developer=developer,
                     name=dev['name'],
                     email=dev['email'],
                     first_seen=dev['first_seen'],
@@ -290,30 +453,36 @@ class DeveloperGroupingService:
                 )
                 alias.save()
                 added_count += 1
+            elif existing_email_alias and not existing_alias:
+                # Update existing alias with new name if it's different
+                if existing_email_alias.name != dev['name']:
+                    existing_email_alias.name = dev['name']
+                    existing_email_alias.save()
+                    added_count += 1
         
         return added_count
 
     def get_grouped_developers(self) -> List[Dict]:
         """Get all grouped developers (both auto and manual)"""
-        groups = DeveloperGroup.objects.all()  # Get all groups, not filtered by application
+        developers = Developer.objects.all()  # Get all developers, not filtered by application
         grouped_developers = []
         
-        for group in groups:
-            aliases = DeveloperAlias.objects.filter(group=group)
+        for developer in developers:
+            aliases = DeveloperAlias.objects.filter(developer=developer)
             
-            # Calculate total stats for the group across all applications
+            # Calculate total stats for the developer across all applications
             total_commits = sum(alias.commit_count for alias in aliases)
             
             # Sort aliases by name
             sorted_aliases = sorted(aliases, key=lambda x: x.name.lower())
             
             grouped_developers.append({
-                'group_id': str(group.id),
-                'primary_name': group.primary_name,
-                'primary_email': group.primary_email,
-                'github_id': group.github_id,
-                'confidence_score': group.confidence_score,
-                'is_auto_grouped': group.is_auto_grouped,
+                'developer_id': str(developer.id),
+                'primary_name': developer.primary_name,
+                'primary_email': developer.primary_email,
+                'github_id': developer.github_id,
+                'confidence_score': developer.confidence_score,
+                'is_auto_grouped': developer.is_auto_grouped,
                 'total_commits': total_commits,
                 'aliases': [
                     {
@@ -327,7 +496,7 @@ class DeveloperGroupingService:
                 ]
             })
         
-        # Sort groups by primary name (case-insensitive)
+        # Sort developers by primary name (case-insensitive)
         grouped_developers.sort(key=lambda x: x['primary_name'].lower())
         
         return grouped_developers
@@ -350,12 +519,12 @@ class DeveloperGroupingService:
         for commit in application_commits:
             application_emails.add(commit.author_email.lower())
         
-        # Get all groups and filter by emails that appear in this application
-        groups = DeveloperGroup.objects.all()
+        # Get all developers and filter by emails that appear in this application
+        developers = Developer.objects.all()
         grouped_developers = []
         
-        for group in groups:
-            aliases = DeveloperAlias.objects.filter(group=group)
+        for developer in developers:
+            aliases = DeveloperAlias.objects.filter(developer=developer)
             
             # Filter aliases to only include those that have commits in this application
             relevant_aliases = []
@@ -368,18 +537,18 @@ class DeveloperGroupingService:
                     alias_commits = application_commits.filter(author_email=alias.email)
                     application_commit_count += alias_commits.count()
             
-            # Only include groups that have relevant aliases
+            # Only include developers that have relevant aliases
             if relevant_aliases:
                 # Sort aliases by name
                 sorted_aliases = sorted(relevant_aliases, key=lambda x: x.name.lower())
                 
                 grouped_developers.append({
-                    'group_id': str(group.id),
-                    'primary_name': group.primary_name,
-                    'primary_email': group.primary_email,
-                    'github_id': group.github_id,
-                    'confidence_score': group.confidence_score,
-                    'is_auto_grouped': group.is_auto_grouped,
+                    'developer_id': str(developer.id),
+                    'primary_name': developer.primary_name,
+                    'primary_email': developer.primary_email,
+                    'github_id': developer.github_id,
+                    'confidence_score': developer.confidence_score,
+                    'is_auto_grouped': developer.is_auto_grouped,
                     'total_commits': application_commit_count,  # Only commits in this application
                     'aliases': [
                         {
@@ -393,7 +562,7 @@ class DeveloperGroupingService:
                     ]
                 })
         
-        # Sort groups by primary name (case-insensitive)
+        # Sort developers by primary name (case-insensitive)
         grouped_developers.sort(key=lambda x: x['primary_name'].lower())
         
         return grouped_developers
@@ -416,13 +585,13 @@ class DeveloperGroupingService:
         for commit in application_commits:
             application_emails.add(commit.author_email.lower())
         
-        # Get all groups and filter by emails that appear in this application
-        groups = DeveloperGroup.objects.all()
+        # Get all developers and filter by emails that appear in this application
+        developers = Developer.objects.all()
         grouped_developers = []
-        grouped_emails = set()  # Track emails that are in groups
+        grouped_emails = set()  # Track emails that are in developers
         
-        for group in groups:
-            aliases = DeveloperAlias.objects.filter(group=group)
+        for developer in developers:
+            aliases = DeveloperAlias.objects.filter(developer=developer)
             
             # Filter aliases to only include those that have commits in this application
             relevant_aliases = []
@@ -436,18 +605,18 @@ class DeveloperGroupingService:
                     alias_commits = application_commits.filter(author_email=alias.email)
                     application_commit_count += alias_commits.count()
             
-            # Only include groups that have relevant aliases
+            # Only include developers that have relevant aliases
             if relevant_aliases:
                 # Sort aliases by name
                 sorted_aliases = sorted(relevant_aliases, key=lambda x: x.name.lower())
                 
                 grouped_developers.append({
-                    'group_id': str(group.id),
-                    'primary_name': group.primary_name,
-                    'primary_email': group.primary_email,
-                    'github_id': group.github_id,
-                    'confidence_score': group.confidence_score,
-                    'is_auto_grouped': group.is_auto_grouped,
+                    'developer_id': str(developer.id),
+                    'primary_name': developer.primary_name,
+                    'primary_email': developer.primary_email,
+                    'github_id': developer.github_id,
+                    'confidence_score': developer.confidence_score,
+                    'is_auto_grouped': developer.is_auto_grouped,
                     'total_commits': application_commit_count,  # Only commits in this application
                     'aliases': [
                         {
@@ -461,7 +630,7 @@ class DeveloperGroupingService:
                     ]
                 })
         
-        # Find ungrouped developers (emails that are not in any group)
+        # Find ungrouped developers (emails that are not in any developer)
         ungrouped_emails = application_emails - grouped_emails
         
         # Create individual developer entries for ungrouped developers
@@ -480,7 +649,7 @@ class DeveloperGroupingService:
                 most_common_name = max(name_counts.items(), key=lambda x: x[1])[0]
                 
                 ungrouped_developers.append({
-                    'group_id': None,  # No group
+                    'developer_id': None,  # No developer
                     'primary_name': most_common_name,
                     'primary_email': email,
                     'github_id': None,
@@ -506,17 +675,17 @@ class DeveloperGroupingService:
         
         return all_developers
     
-    def manually_group_developers(self, group_data: Dict) -> Dict:
+    def manually_group_developers(self, developer_data: Dict) -> Dict:
         """
         Manually group developers based on user selection (global grouping)
         
         Args:
-            group_data: Dictionary with group information
+            developer_data: Dictionary with developer information
                 {
                     'primary_name': str,
                     'primary_email': str,
                     'developer_ids': List[str],  # List of developer keys to group
-                    'existing_group_id': str,    # Optional: ID of existing group to add to
+                    'existing_developer_id': str,    # Optional: ID of existing developer to add to
                     'action': str                # 'create' or 'add_to_existing'
                 }
         
@@ -536,10 +705,10 @@ class DeveloperGroupingService:
             
             # Find developers to group
             developers_to_group = []
-            print(f"DEBUG: Looking for {len(group_data['developer_ids'])} developers")
+            print(f"DEBUG: Looking for {len(developer_data['developer_ids'])} developers")
             print(f"DEBUG: Available developers in DB: {len(all_developers)}")
             
-            for dev_id in group_data['developer_ids']:
+            for dev_id in developer_data['developer_ids']:
                 print(f"DEBUG: Processing dev_id: {dev_id}")
                 # Try exact match first
                 if dev_id in dev_key_to_data:
@@ -574,16 +743,16 @@ class DeveloperGroupingService:
                     'error': 'No valid developers found to group'
                 }
             
-            # Check if any of these developers are already in existing groups
-            # Get all groups (global)
-            existing_groups = DeveloperGroup.objects.all()
+            # Check if any of these developers are already in existing developers
+            # Get all developers (global)
+            existing_developers = Developer.objects.all()
             
             # Check for conflicts
             for dev in developers_to_group:
-                # Check if this developer is already in any group
-                for existing_group in existing_groups:
+                # Check if this developer is already in any developer
+                for existing_developer in existing_developers:
                     existing_alias = DeveloperAlias.objects.filter(
-                        group=existing_group,
+                        developer=existing_developer,
                         email=dev['email'],
                         name=dev['name']
                     ).first()
@@ -591,31 +760,31 @@ class DeveloperGroupingService:
                     if existing_alias:
                         return {
                             'success': False,
-                            'error': f'Developer {dev["name"]} ({dev["email"]}) is already grouped in another group'
+                            'error': f'Developer {dev["name"]} ({dev["email"]}) is already grouped in another developer'
                         }
             
-            # Determine action: create new group or add to existing
-            action = group_data.get('action', 'create')
-            existing_group_id = group_data.get('existing_group_id')
+            # Determine action: create new developer or add to existing
+            action = developer_data.get('action', 'create')
+            existing_developer_id = developer_data.get('existing_developer_id')
             
-            if action == 'add_to_existing' and existing_group_id:
-                # Add developers to existing group
+            if action == 'add_to_existing' and existing_developer_id:
+                # Add developers to existing developer
                 try:
-                    existing_group = DeveloperGroup.objects.get(id=existing_group_id)
+                    existing_developer = Developer.objects.get(id=existing_developer_id)
                     
-                    # Add all developers as aliases to the existing group
+                    # Add all developers as aliases to the existing developer
                     added_count = 0
                     for dev in developers_to_group:
-                        # Check if this alias already exists in the group
+                        # Check if this alias already exists in the developer
                         existing_alias = DeveloperAlias.objects.filter(
-                            group=existing_group,
+                            developer=existing_developer,
                             email=dev['email'],
                             name=dev['name']
                         ).first()
                         
                         if not existing_alias:
                             alias = DeveloperAlias(
-                                group=existing_group,
+                                developer=existing_developer,
                                 name=dev['name'],
                                 email=dev['email'],
                                 first_seen=dev['first_seen'],
@@ -627,34 +796,34 @@ class DeveloperGroupingService:
                     
                     return {
                         'success': True,
-                        'group_id': str(existing_group.id),
-                        'primary_name': existing_group.primary_name,
-                        'primary_email': existing_group.primary_email,
+                        'developer_id': str(existing_developer.id),
+                        'primary_name': existing_developer.primary_name,
+                        'primary_email': existing_developer.primary_email,
                         'aliases_count': added_count,
-                        'message': f'Successfully added {added_count} developers to existing group "{existing_group.primary_name}"',
-                        'confidence_score': existing_group.confidence_score
+                        'message': f'Successfully added {added_count} developers to existing developer "{existing_developer.primary_name}"',
+                        'confidence_score': existing_developer.confidence_score
                     }
                     
-                except DeveloperGroup.DoesNotExist:
+                except Developer.DoesNotExist:
                     return {
                         'success': False,
-                        'error': f'Existing group with ID {existing_group_id} not found'
+                        'error': f'Existing developer with ID {existing_developer_id} not found'
                     }
             else:
-                # Create a new group for manual grouping (no application_id)
-                group = DeveloperGroup(
-                    application_id=None,  # Global group
-                    primary_name=group_data['primary_name'],
-                    primary_email=group_data['primary_email'],
+                # Create a new developer for manual grouping (no application_id)
+                developer = Developer(
+                    application_id=None,  # Global developer
+                    primary_name=developer_data['primary_name'],
+                    primary_email=developer_data['primary_email'],
                     is_auto_grouped=False,  # Manual grouping
                     confidence_score=100  # Manual grouping has 100% confidence
                 )
-                group.save()
+                developer.save()
                 
                 # Add all developers as aliases
                 for dev in developers_to_group:
                     alias = DeveloperAlias(
-                        group=group,
+                        developer=developer,
                         name=dev['name'],
                         email=dev['email'],
                         first_seen=dev['first_seen'],
@@ -665,9 +834,9 @@ class DeveloperGroupingService:
                 
                 return {
                     'success': True,
-                    'group_id': str(group.id),
-                    'primary_name': group.primary_name,
-                    'primary_email': group.primary_email,
+                    'developer_id': str(developer.id),
+                    'primary_name': developer.primary_name,
+                    'primary_email': developer.primary_email,
                     'aliases_count': len(developers_to_group),
                     'confidence_score': 100
                 }
@@ -701,53 +870,53 @@ class DeveloperGroupingService:
         
         return list(developers.values()) 
 
-    def merge_existing_groups(self) -> Dict:
+    def merge_existing_developers(self) -> Dict:
         """
-        Merge existing groups that should be combined based on email or name similarity
+        Merge existing developers that should be combined based on email or name similarity
         """
         try:
-            # Get all existing groups
-            existing_groups = DeveloperGroup.objects.all()
+            # Get all existing developers
+            existing_developers = Developer.objects.all()
             
-            # Find groups to merge
-            groups_to_merge = []
+            # Find developers to merge
+            developers_to_merge = []
             
-            for i, group1 in enumerate(existing_groups):
-                for j, group2 in enumerate(existing_groups[i+1:], i+1):
-                    # Check if groups should be merged
+            for i, developer1 in enumerate(existing_developers):
+                for j, developer2 in enumerate(existing_developers[i+1:], i+1):
+                    # Check if developers should be merged
                     should_merge = False
                     merge_reason = ""
                     
                     # Check by email
-                    if group1.primary_email.lower() == group2.primary_email.lower():
+                    if developer1.primary_email.lower() == developer2.primary_email.lower():
                         should_merge = True
                         merge_reason = "same_email"
                     # Check by name similarity
-                    elif self._names_are_similar(group1.primary_name, group2.primary_name):
+                    elif self._names_are_similar(developer1.primary_name, developer2.primary_name):
                         should_merge = True
                         merge_reason = "similar_name"
                     
                     if should_merge:
-                        groups_to_merge.append({
-                            'group1': group1,
-                            'group2': group2,
+                        developers_to_merge.append({
+                            'developer1': developer1,
+                            'developer2': developer2,
                             'reason': merge_reason
                         })
             
-            # Merge the groups
+            # Merge the developers
             merged_count = 0
-            for merge_data in groups_to_merge:
-                group1 = merge_data['group1']
-                group2 = merge_data['group2']
+            for merge_data in developers_to_merge:
+                developer1 = merge_data['developer1']
+                developer2 = merge_data['developer2']
                 
-                # Move all aliases from group2 to group1
-                aliases_to_move = DeveloperAlias.objects.filter(group=group2)
+                # Move all aliases from developer2 to developer1
+                aliases_to_move = DeveloperAlias.objects.filter(developer=developer2)
                 moved_count = 0
                 
                 for alias in aliases_to_move:
-                    # Check if this alias already exists in group1
+                    # Check if this alias already exists in developer1
                     existing_alias = DeveloperAlias.objects.filter(
-                        group=group1,
+                        developer=developer1,
                         email=alias.email,
                         name=alias.name
                     ).first()
@@ -759,22 +928,207 @@ class DeveloperGroupingService:
                         existing_alias.save()
                         alias.delete()
                     else:
-                        # Move alias to group1
-                        alias.group = group1
+                        # Move alias to developer1
+                        alias.developer = developer1
                         alias.save()
                         moved_count += 1
                 
-                # Delete group2
-                group2.delete()
+                # Delete developer2
+                developer2.delete()
                 merged_count += 1
             
             return {
                 'success': True,
-                'groups_merged': merged_count
+                'developers_merged': merged_count
             }
             
         except Exception as e:
             return {
                 'success': False,
-                'error': f'Error merging groups: {str(e)}'
+                'error': f'Error merging developers: {str(e)}'
             } 
+
+    def _validate_name_grouping(self, developers: List[Dict]) -> bool:
+        """
+        Validate if a name-based grouping is legitimate
+        
+        Args:
+            developers: List of developers to validate
+            
+        Returns:
+            True if grouping is valid, False otherwise
+        """
+        if len(developers) < 2:
+            return False
+        
+        # Check if emails are from similar domains (same company/organization)
+        email_domains = set()
+        for dev in developers:
+            domain = dev['email'].split('@')[1] if '@' in dev['email'] else ''
+            email_domains.add(domain)
+        
+        # If all emails are from the same domain, it's likely legitimate
+        if len(email_domains) == 1:
+            return True
+        
+        # If emails are from different domains, use the original similarity logic
+        # This is less strict than the previous version
+        names = [dev['name'] for dev in developers]
+        
+        # Check if any two names are similar using the original logic
+        for i, name1 in enumerate(names):
+            for j, name2 in enumerate(names[i+1:], i+1):
+                if self._names_are_similar(name1, name2):
+                    return True
+        
+        # If names are not similar and emails are from different domains, reject
+        return False
+    
+    def _validate_github_grouping(self, developers: List[Dict]) -> bool:
+        """
+        Validate if a GitHub ID-based grouping is legitimate
+        
+        Args:
+            developers: List of developers to validate
+            
+        Returns:
+            True if grouping is valid, False otherwise
+        """
+        if len(developers) < 2:
+            return False
+        
+        # GitHub ID grouping is generally reliable
+        # For GitHub IDs, we can be more permissive since GitHub IDs are unique
+        # Only reject if names are completely different and suspicious
+        names = [dev['name'] for dev in developers]
+        
+        # Check if names are at least somewhat similar
+        for i, name1 in enumerate(names):
+            for j, name2 in enumerate(names[i+1:], i+1):
+                if self._names_are_similar(name1, name2):
+                    return True
+        
+        # For GitHub IDs, even if names are different, it might still be legitimate
+        # (e.g., someone using different names on different platforms)
+        # So we'll be more permissive and accept most GitHub ID groupings
+        return True
+    
+    def _names_are_very_similar(self, name1: str, name2: str) -> bool:
+        """
+        Check if two names are very similar (stricter than _names_are_similar)
+        
+        Args:
+            name1: First name
+            name2: Second name
+            
+        Returns:
+            True if names are very similar
+        """
+        norm1 = self._normalize_name(name1)
+        norm2 = self._normalize_name(name2)
+        
+        # Exact match
+        if norm1 == norm2:
+            return True
+        
+        # One name contains the other (but be more strict)
+        if len(norm1) > 5 and len(norm2) > 5:  # Only for longer names
+            if norm1 in norm2 or norm2 in norm1:
+                return True
+        
+        # Check if they share significant words (stricter)
+        words1 = set(norm1.split())
+        words2 = set(norm2.split())
+        
+        # If they share at least one significant word (4+ characters)
+        significant_words1 = {w for w in words1 if len(w) >= 4}
+        significant_words2 = {w for w in words2 if len(w) >= 4}
+        
+        shared_words = significant_words1 & significant_words2
+        
+        # Require at least 2 shared significant words or 1 very long word
+        if len(shared_words) >= 2:
+            return True
+        
+        # Check for very long shared words (likely surnames)
+        very_long_words = {w for w in shared_words if len(w) >= 6}
+        if len(very_long_words) >= 1:
+            return True
+        
+        return False 
+
+    def _extract_username_from_email(self, email: str) -> Optional[str]:
+        """Extract username from email (part before @)"""
+        if '@' in email:
+            return email.split('@')[0].lower()
+        return None
+    
+    def _validate_approximate_email_grouping(self, developers: List[Dict]) -> bool:
+        """
+        Validate if an approximate email grouping is legitimate
+        
+        Args:
+            developers: List of developers to validate
+            
+        Returns:
+            True if grouping is valid, False otherwise
+        """
+        if len(developers) < 2:
+            return False
+        
+        # Get usernames and domains
+        usernames = []
+        domains = []
+        for dev in developers:
+            if '@' in dev['email']:
+                username, domain = dev['email'].split('@')
+                usernames.append(username.lower())
+                domains.append(domain.lower())
+        
+        # If all usernames are the same, it's likely legitimate
+        if len(set(usernames)) == 1:
+            return True
+        
+        # If usernames are similar (e.g., john.doe vs jdoe), it might be legitimate
+        # Check if any two usernames are similar
+        for i, username1 in enumerate(usernames):
+            for j, username2 in enumerate(usernames[i+1:], i+1):
+                if self._usernames_are_similar(username1, username2):
+                    return True
+        
+        # If usernames are not similar, reject
+        return False
+    
+    def _usernames_are_similar(self, username1: str, username2: str) -> bool:
+        """
+        Check if two usernames are similar
+        
+        Args:
+            username1: First username
+            username2: Second username
+            
+        Returns:
+            True if usernames are similar
+        """
+        # Exact match
+        if username1 == username2:
+            return True
+        
+        # One contains the other
+        if username1 in username2 or username2 in username1:
+            return True
+        
+        # Check for common patterns like john.doe vs jdoe
+        # Remove dots and compare
+        clean1 = username1.replace('.', '')
+        clean2 = username2.replace('.', '')
+        
+        if clean1 == clean2:
+            return True
+        
+        # Check if one is a shortened version of the other
+        if len(username1) > 3 and len(username2) > 3:
+            if clean1.startswith(clean2) or clean2.startswith(clean1):
+                return True
+        
+        return False 

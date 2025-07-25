@@ -78,7 +78,7 @@ class Command(BaseCommand):
             self.stdout.write(f"\nTesting manual grouping with: {dev_keys}\n")
             
             group_data = {
-                'primary_name': 'Test Group',
+                'primary_name': 'Test Developer',
                 'primary_email': 'test@example.com',
                 'developer_ids': dev_keys
             }

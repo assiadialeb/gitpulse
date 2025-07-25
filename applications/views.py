@@ -7,16 +7,22 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from datetime import datetime, timedelta
+from django.core.exceptions import PermissionDenied
+import re
 
 from .models import Application, ApplicationRepository
 from .forms import ApplicationForm, RepositorySelectionForm
-from github.models import GitHubToken
+from analytics.github_token_service import GitHubTokenService
+from analytics.cache_service import AnalyticsCacheService
+
+
+
 
 
 @login_required
 def application_list(request):
-    """List all applications for the current user"""
-    applications = Application.objects.filter(owner=request.user)
+    """List all applications for all users"""
+    applications = Application.objects.all()
     return render(request, 'applications/list.html', {
         'applications': applications
     })
@@ -45,45 +51,154 @@ def application_create(request):
 def application_detail(request, pk):
     """Display application details and repositories with analytics dashboard"""
     application = get_object_or_404(Application, pk=pk, owner=request.user)
+    
+    # Get repositories for this application
     repositories = application.repositories.all()
     
-    # Get analytics data
+    # Get analytics data with caching
     try:
         from analytics.analytics_service import AnalyticsService
+        from analytics.cache_service import AnalyticsCacheService
         analytics = AnalyticsService(pk)
         
-        # Get commit frequency with error handling
-        try:
-            commit_frequency = analytics.get_application_commit_frequency()
-        except Exception as e:
-            print(f"Error getting commit frequency: {e}")
-            commit_frequency = {
-                'avg_commits_per_day': 0,
-                'recent_activity_score': 0,
-                'consistency_score': 0,
-                'overall_frequency_score': 0,
-                'commits_last_30_days': 0,
-                'commits_last_90_days': 0,
-                'days_since_last_commit': None,
-                'active_days': 0,
-                'total_days': 0
-            }
+        # Try to get all metrics from cache first
+        overall_stats = AnalyticsCacheService.get_overall_stats(application.id)
+        developer_activity = AnalyticsCacheService.get_developer_activity(application.id, days=30)
+        developer_activity_120d = AnalyticsCacheService.get_developer_activity(application.id, days=120)
+        commit_frequency = AnalyticsCacheService.get_commit_frequency(application.id)
+        release_frequency = AnalyticsCacheService.get_release_frequency(application.id, period_days=30)
+        total_releases = AnalyticsCacheService.get_total_releases(application.id)
+        pr_cycle_times = AnalyticsCacheService.get_pr_cycle_times(application.id)
+        code_distribution = AnalyticsCacheService.get_code_distribution(application.id)
+        activity_heatmap = AnalyticsCacheService.get_activity_heatmap(application.id, days=90)
+        bubble_chart = AnalyticsCacheService.get_bubble_chart(application.id, days=30)
+        commit_quality = AnalyticsCacheService.get_commit_quality(application.id)
+        commit_types = AnalyticsCacheService.get_commit_types(application.id)
+        application_quality_metrics = AnalyticsCacheService.get_quality_metrics(application.id)
         
-        # Get application quality metrics
-        application_quality_metrics = _generate_application_quality_metrics(application)
+        # Check if we have cached data for this application
+        cached_data = AnalyticsCacheService.get_overall_stats(application.id)
+        
+        if cached_data is not None:
+            print(f"Using cached metrics for app {application.id}")
+            # Use cached data
+            overall_stats = cached_data
+            developer_activity = AnalyticsCacheService.get_developer_activity(application.id, days=30)
+            developer_activity_120d = AnalyticsCacheService.get_developer_activity(application.id, days=120)
+            commit_frequency = AnalyticsCacheService.get_commit_frequency(application.id)
+            release_frequency = AnalyticsCacheService.get_release_frequency(application.id, period_days=30)
+            total_releases = AnalyticsCacheService.get_total_releases(application.id)
+            pr_cycle_times = AnalyticsCacheService.get_pr_cycle_times(application.id)
+            code_distribution = AnalyticsCacheService.get_code_distribution(application.id)
+            activity_heatmap = AnalyticsCacheService.get_activity_heatmap(application.id, days=90)
+            bubble_chart = AnalyticsCacheService.get_bubble_chart(application.id, days=30)
+            commit_quality = AnalyticsCacheService.get_commit_quality(application.id)
+            commit_types = AnalyticsCacheService.get_commit_types(application.id)
+            application_quality_metrics = AnalyticsCacheService.get_quality_metrics(application.id)
+        else:
+            print(f"Calculating metrics for app {application.id} (not in cache)")
+            
+            # Calculate all metrics
+            overall_stats = analytics.get_overall_stats()
+            developer_activity = analytics.get_developer_activity(days=30)
+            developer_activity_120d = analytics.get_developer_activity(days=120)
+            
+            try:
+                commit_frequency = analytics.get_application_commit_frequency()
+            except Exception as e:
+                print(f"Error getting commit frequency: {e}")
+                commit_frequency = {
+                    'avg_commits_per_day': 0, 'recent_activity_score': 0, 'consistency_score': 0,
+                    'overall_frequency_score': 0, 'commits_last_30_days': 0, 'commits_last_90_days': 0,
+                    'days_since_last_commit': None, 'active_days': 0, 'total_days': 0
+                }
+            
+            try:
+                release_frequency = analytics.get_release_frequency(period_days=30)
+            except Exception as e:
+                print(f"Error getting release frequency: {e}")
+                release_frequency = {
+                    'releases_per_month': 0, 'releases_per_week': 0, 'total_releases': 0, 'period_days': 30
+                }
+            
+            try:
+                total_releases = analytics.get_total_releases()
+            except Exception as e:
+                print(f"Error getting total releases: {e}")
+                total_releases = 0
+            
+            pr_cycle_times = analytics.get_pr_cycle_times()
+            code_distribution = analytics.get_code_distribution()
+            activity_heatmap = analytics.get_activity_heatmap(days=90)
+            bubble_chart = analytics.get_bubble_chart_data(days=30)
+            commit_quality = analytics.get_commit_quality_metrics()
+            commit_types = analytics.get_commit_type_distribution()
+            application_quality_metrics = _generate_application_quality_metrics(application)
+            
+            # Cache all metrics
+            AnalyticsCacheService.set_overall_stats(application.id, overall_stats)
+            AnalyticsCacheService.set_developer_activity(application.id, developer_activity, days=30)
+            AnalyticsCacheService.set_developer_activity(application.id, developer_activity_120d, days=120)
+            AnalyticsCacheService.set_commit_frequency(application.id, commit_frequency)
+            AnalyticsCacheService.set_release_frequency(application.id, release_frequency, period_days=30)
+            AnalyticsCacheService.set_total_releases(application.id, total_releases)
+            AnalyticsCacheService.set_pr_cycle_times(application.id, pr_cycle_times)
+            AnalyticsCacheService.set_code_distribution(application.id, code_distribution)
+            AnalyticsCacheService.set_activity_heatmap(application.id, activity_heatmap, days=90)
+            AnalyticsCacheService.set_bubble_chart(application.id, bubble_chart, days=30)
+            AnalyticsCacheService.set_commit_quality(application.id, commit_quality)
+            AnalyticsCacheService.set_commit_types(application.id, commit_types)
+            AnalyticsCacheService.set_quality_metrics(application.id, application_quality_metrics)
+        
+        # Calculate derived metrics
+        active_developers_count_120d = len(developer_activity_120d.get('developers', []))
+        
+        # Calculate PR cycle time statistics
+        pr_times = [pr['cycle_time_hours'] for pr in pr_cycle_times if pr['cycle_time_hours'] is not None]
+        pr_cycle_time_median = None
+        pr_cycle_time_min = None
+        pr_cycle_time_max = None
+        if pr_times:
+            pr_times_sorted = sorted(pr_times)
+            n = len(pr_times_sorted)
+            pr_cycle_time_min = pr_times_sorted[0]
+            pr_cycle_time_max = pr_times_sorted[-1]
+            if n % 2 == 1:
+                pr_cycle_time_median = pr_times_sorted[n // 2]
+            else:
+                pr_cycle_time_median = (pr_times_sorted[n // 2 - 1] + pr_times_sorted[n // 2]) / 2
+        pr_cycle_time_count = len(pr_times)
+        
+        # PR health metrics will be loaded asynchronously via JavaScript
+        pr_health_metrics = {
+            'total_prs': 0, 'open_prs': 0, 'merged_prs': 0, 'closed_prs': 0,
+            'prs_without_review': 0, 'prs_without_review_rate': 0, 'self_merged_prs': 0,
+            'self_merged_rate': 0, 'old_open_prs': 0, 'old_open_prs_rate': 0,
+            'avg_merge_time_hours': 0, 'median_merge_time_hours': 0
+        }
         
         context = {
             'application': application,
             'repositories': repositories,
-            'overall_stats': analytics.get_overall_stats(),
-            'developer_activity': analytics.get_developer_activity(days=30),
+            'overall_stats': overall_stats,
+            'developer_activity': developer_activity,
+            # Ajout du nombre d'active developers sur 120 jours
+            'active_developers_count_120d': active_developers_count_120d,
             'activity_heatmap': analytics.get_activity_heatmap(days=90),
             'bubble_chart': analytics.get_bubble_chart_data(days=30),
             'code_distribution': analytics.get_code_distribution(),
             'commit_quality': analytics.get_commit_quality_metrics(),
             'commit_types': analytics.get_commit_type_distribution(),
             'commit_frequency': commit_frequency,
+            'release_frequency': release_frequency,
             'application_quality_metrics': application_quality_metrics,
+            'pr_health_metrics': pr_health_metrics,
+            'pr_cycle_times': pr_cycle_times,
+            'pr_cycle_time_median': pr_cycle_time_median,
+            'pr_cycle_time_min': pr_cycle_time_min,
+            'pr_cycle_time_max': pr_cycle_time_max,
+            'pr_cycle_time_count': pr_cycle_time_count,
+            'total_releases': total_releases,  # Ajout pour le template
         }
         doughnut_colors = {
             'fix': '#4caf50',
@@ -96,13 +211,28 @@ def application_detail(request, pk):
             'other': '#bdbdbd',
         }
         context['doughnut_colors'] = doughnut_colors
-        context['commit_type_labels'] = json.dumps(list(context['commit_types']['counts'].keys()))
-        context['commit_type_values'] = json.dumps(list(context['commit_types']['counts'].values()))
+        # Robust preparation for JS variables
+        commit_types = context.get('commit_types') or {}
+        counts = commit_types.get('counts') if isinstance(commit_types, dict) else None
+        if counts and isinstance(counts, dict):
+            labels = list(counts.keys())
+            values = list(counts.values())
+        else:
+            labels = []
+            values = []
+        context['commit_type_labels'] = json.dumps(labels)
+        context['commit_type_values'] = json.dumps(values)
         legend_data = []
-        for label, count in context['commit_types']['counts'].items():
+        for label, count in (counts.items() if counts else []):
             color = context['doughnut_colors'].get(label, '#bdbdbd')
             legend_data.append({'label': label, 'count': count, 'color': color})
         context['commit_type_legend'] = legend_data
+        # Robust JS variables for charts
+        bubble_chart = context.get('bubble_chart') or {}
+        context['bubble_chart_data'] = json.dumps(bubble_chart.get('datasets', []))
+        activity_heatmap = context.get('activity_heatmap') or {}
+        context['activity_heatmap_data'] = json.dumps(activity_heatmap.get('daily_activity', []))
+        context['debug_stats'] = overall_stats
     except ImportError:
         # If analytics app is not available, provide empty data
         context = {
@@ -114,7 +244,18 @@ def application_detail(request, pk):
             'bubble_chart': {'bubbles': [], 'max_commits': 0},
             'code_distribution': {'distribution': []},
             'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
+            'commit_types': {'counts': {}},
+            'commit_frequency': {'avg_commits_per_day': 0, 'recent_activity_score': 0, 'consistency_score': 0, 'overall_frequency_score': 0, 'commits_last_30_days': 0, 'commits_last_90_days': 0, 'days_since_last_commit': None, 'active_days': 0, 'total_days': 0},
+            'application_quality_metrics': {'total_commits': 0, 'real_code_commits': 0, 'real_code_ratio': 0, 'suspicious_commits': 0, 'suspicious_ratio': 0, 'doc_only_commits': 0, 'doc_only_ratio': 0, 'config_only_commits': 0, 'config_only_ratio': 0, 'micro_commits': 0, 'micro_commits_ratio': 0, 'no_ticket_commits': 0, 'no_ticket_ratio': 0, 'avg_code_quality': 0, 'avg_impact': 0, 'avg_complexity': 0},
+            'pr_health_metrics': {'total_prs': 0, 'open_prs': 0, 'open_prs_percentage': 0, 'merged_prs': 0, 'merged_prs_percentage': 0, 'closed_prs': 0, 'prs_without_review': 0, 'prs_without_review_rate': 0, 'self_merged_prs': 0, 'self_merged_rate': 0, 'old_open_prs': 0, 'old_open_prs_rate': 0, 'avg_merge_time_hours': 0, 'median_merge_time_hours': 0},
         }
+        # Robust JS variables for charts (even in import error case)
+        context['commit_type_labels'] = json.dumps([])
+        context['commit_type_values'] = json.dumps([])
+        context['bubble_chart_data'] = json.dumps([])
+        context['activity_heatmap_data'] = json.dumps([])
+        context['commit_type_legend'] = []
+        context['debug_stats'] = context['overall_stats']
     except Exception as e:
         # If analytics service fails, provide empty data
         context = {
@@ -126,14 +267,25 @@ def application_detail(request, pk):
             'bubble_chart': {'bubbles': [], 'max_commits': 0},
             'code_distribution': {'distribution': []},
             'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
+            'commit_types': {'counts': {}},
+            'commit_frequency': {'avg_commits_per_day': 0, 'recent_activity_score': 0, 'consistency_score': 0, 'overall_frequency_score': 0, 'commits_last_30_days': 0, 'commits_last_90_days': 0, 'days_since_last_commit': None, 'active_days': 0, 'total_days': 0},
+            'application_quality_metrics': {'total_commits': 0, 'real_code_commits': 0, 'real_code_ratio': 0, 'suspicious_commits': 0, 'suspicious_ratio': 0, 'doc_only_commits': 0, 'doc_only_ratio': 0, 'config_only_commits': 0, 'config_only_ratio': 0, 'micro_commits': 0, 'micro_commits_ratio': 0, 'no_ticket_commits': 0, 'no_ticket_ratio': 0, 'avg_code_quality': 0, 'avg_impact': 0, 'avg_complexity': 0},
+            'pr_health_metrics': {'total_prs': 0, 'open_prs': 0, 'open_prs_percentage': 0, 'merged_prs': 0, 'merged_prs_percentage': 0, 'closed_prs': 0, 'prs_without_review': 0, 'prs_without_review_rate': 0, 'self_merged_prs': 0, 'self_merged_rate': 0, 'old_open_prs': 0, 'old_open_prs_rate': 0, 'avg_merge_time_hours': 0, 'median_merge_time_hours': 0},
         }
+        # Robust JS variables for charts (even in error case)
+        context['commit_type_labels'] = json.dumps([])
+        context['commit_type_values'] = json.dumps([])
+        context['bubble_chart_data'] = json.dumps([])
+        context['activity_heatmap_data'] = json.dumps([])
+        context['commit_type_legend'] = []
+        context['debug_stats'] = context['overall_stats']
     
     return render(request, 'applications/detail.html', context)
 
 
 @login_required
 def application_edit(request, pk):
-    """Edit an existing application"""
+    """Edit an application"""
     application = get_object_or_404(Application, pk=pk, owner=request.user)
     
     if request.method == 'POST':
@@ -157,29 +309,9 @@ def application_delete(request, pk):
     application = get_object_or_404(Application, pk=pk, owner=request.user)
     
     if request.method == 'POST':
-        application_name = application.name
-        application_id = application.id
-        
-        # Clean up MongoDB data before deleting the application
-        try:
-            from analytics.services import cleanup_application_data
-            cleanup_results = cleanup_application_data(application_id)
-            
-            if 'error' in cleanup_results:
-                messages.warning(request, f'Application deleted but some data cleanup failed: {cleanup_results["error"]}')
-            else:
-                messages.success(request, f'Application "{application_name}" and all related data deleted successfully!')
-                if cleanup_results['total_deleted'] > 0:
-                    messages.info(request, f'Cleaned up {cleanup_results["total_deleted"]} MongoDB records.')
-        except ImportError:
-            # If analytics app is not available, just delete the application
-            messages.success(request, f'Application "{application_name}" deleted successfully!')
-        except Exception as e:
-            # If cleanup fails, still delete the application but warn the user
-            messages.warning(request, f'Application deleted but data cleanup failed: {str(e)}')
-        
-        # Delete the application
+        name = application.name
         application.delete()
+        messages.success(request, f'Application "{name}" deleted successfully!')
         return redirect('applications:list')
     
     return render(request, 'applications/delete.html', {
@@ -188,145 +320,136 @@ def application_delete(request, pk):
 
 
 @login_required
+def remove_repository(request, pk, repo_id):
+    """Remove a repository from an application"""
+    application = get_object_or_404(Application, pk=pk, owner=request.user)
+    repository = get_object_or_404(ApplicationRepository, pk=repo_id, application=application)
+    
+    if request.method == 'POST':
+        repo_name = repository.github_repo_name
+        repository.delete()
+        messages.success(request, f'Repository "{repo_name}" removed from "{application.name}"')
+        return redirect('applications:detail', pk=application.pk)
+    
+    return render(request, 'applications/remove_repository.html', {
+        'application': application,
+        'repository': repository
+    })
+
+
+@login_required
 def add_repositories(request, pk):
     """Add GitHub repositories to an application"""
     application = get_object_or_404(Application, pk=pk, owner=request.user)
     
-    # Get user's GitHub token
-    try:
-        github_token = GitHubToken.objects.get(user=request.user)
-    except GitHubToken.DoesNotExist:
-        messages.error(request, 'Please connect your GitHub account first.')
-        return redirect('github:admin')
+    # Get user's GitHub token for repository access
+    github_token = GitHubTokenService.get_token_for_operation('private_repos', request.user.id)
+    print(f"DEBUG: Token found via service: {bool(github_token)}")
     
-    # Fetch user's repositories from GitHub
-    github_repos = []
+    # If no token via service, try to get it from session or other sources
+    if not github_token:
+        # Try to get token from session (for GitHub SSO)
+        github_token = request.session.get('github_token')
+        print(f"DEBUG: Token from session: {bool(github_token)}")
+        
+        # If still no token, try to get it from the user's social account
+        if not github_token:
+            try:
+                from allauth.socialaccount.models import SocialAccount, SocialToken, SocialApp
+                social_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+                if social_account:
+                    app = SocialApp.objects.filter(provider='github').first()
+                    if app:
+                        social_token = SocialToken.objects.filter(account=social_account, app=app).first()
+                        if social_token:
+                            github_token = social_token.token
+                            print(f"DEBUG: Token from SocialToken: {bool(github_token)}")
+            except Exception as e:
+                print(f"DEBUG: Error getting token from SocialToken: {e}")
+        
+        # If still no token, try to get it from the social account's extra data
+        if not github_token:
+            try:
+                from allauth.socialaccount.models import SocialAccount
+                social_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+                if social_account and social_account.extra_data:
+                    # Try to get access_token from extra_data
+                    github_token = social_account.extra_data.get('access_token')
+                    print(f"DEBUG: Token from extra_data: {bool(github_token)}")
+            except Exception as e:
+                print(f"DEBUG: Error getting token from extra_data: {e}")
+        
+        # If still no token, try to use the OAuth App token for basic operations
+        if not github_token:
+            try:
+                from allauth.socialaccount.models import SocialApp
+                app = SocialApp.objects.filter(provider='github').first()
+                if app and app.secret:
+                    github_token = app.secret
+                    print(f"DEBUG: Using OAuth App token as fallback: {bool(github_token)}")
+            except Exception as e:
+                print(f"DEBUG: Error getting OAuth App token: {e}")
+        
+        # If still no token, redirect to GitHub connection
+        if not github_token:
+            messages.error(request, 'Please connect your GitHub account first.')
+            return redirect('socialaccount_connections')
+        
+        # If we have a token but it's a test token, redirect to GitHub to get a real one
+        if github_token and github_token.startswith('ghp_test_'):
+            messages.warning(request, 'Please reconnect via GitHub to get a valid token.')
+            return redirect('socialaccount_connections')
+    
+    # Get existing repos for this application
     existing_repos = list(application.repositories.values_list('github_repo_name', flat=True))
     print(f"Debug: Found {len(existing_repos)} existing repos: {existing_repos}")
     
-    try:
-        headers = {
-            'Authorization': f'token {github_token.access_token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
-        
-        # Get user's repositories (both owned and collaborated) - get more pages
-        all_repos = []
-        page = 1
-        while True:
-            response = requests.get('https://api.github.com/user/repos', headers=headers, params={
-                'sort': 'updated',
-                'per_page': 100,
-                'type': 'all',  # Include all repos (owned, collaborated, etc.)
-                'page': page
-            })
-            
-            print(f"GitHub API Response Status: {response.status_code}")
-            print(f"GitHub API Response Headers: {dict(response.headers)}")
-            
-            if response.status_code == 200:
-                repos_page = response.json()
-                if not repos_page:  # No more repos
-                    break
-                all_repos.extend(repos_page)
-                print(f"Page {page}: Found {len(repos_page)} repositories")
-                page += 1
-                if page > 10:  # Limit to 1000 repos max
-                    break
-            else:
-                print(f"GitHub API Error: {response.status_code} - {response.text}")
-                messages.error(request, f'Failed to fetch repositories from GitHub. Status: {response.status_code}')
-                return redirect('applications:detail', pk=pk)
-        
-        github_repos = all_repos
-        print(f"Total repositories found: {len(github_repos)}")
-        for repo in github_repos[:3]:  # Show first 3 repos for debug
-            print(f"  - {repo.get('full_name', 'N/A')}: {repo.get('description', 'No description')}")
-            
-    except Exception as e:
-        messages.error(request, f'Error connecting to GitHub: {str(e)}')
-        return redirect('applications:detail', pk=pk)
+    # For GET requests, just render the template - JavaScript will handle the API calls
+    if request.method == 'GET':
+        return render(request, 'applications/add_repositories.html', {
+            'application': application,
+            'existing_repos': existing_repos,
+        })
     
+    # For POST requests, handle repository addition
     if request.method == 'POST':
-        # Check if this is a search request
-        if 'search' in request.POST:
-            # Just re-render with search results
-            form = RepositorySelectionForm(
-                request.POST,
-                github_repos=github_repos,
-                existing_repos=existing_repos,
-                search_query=request.POST.get('search_query', '')
-            )
-            choices = form.fields['repositories'].choices
-            return render(request, 'applications/add_repositories.html', {
-                'form': form,
-                'application': application,
-                'github_repos': github_repos,
-                'existing_repos': existing_repos,
-                'choices_count': len(choices),
-                'choices': choices  # Passer les choix directement
-            })
+        selected_repos = request.POST.getlist('repositories')
+        added_count = 0
         
-        # This is a form submission to add repositories
-        form = RepositorySelectionForm(
-            request.POST,
-            github_repos=github_repos,
-            existing_repos=existing_repos,
-            search_query=request.POST.get('search_query', '')
-        )
-        
-        if form.is_valid():
-            selected_repos = form.cleaned_data['repositories']
-            added_count = 0
-            
-            for repo_name in selected_repos:
-                # Find the repo data in github_repos
-                repo_data = next((repo for repo in github_repos if repo['full_name'] == repo_name), None)
+        if selected_repos:
+            try:
+                from analytics.github_service import GitHubService
+                github_service = GitHubService(github_token)
                 
-                if repo_data:
-                    ApplicationRepository.objects.create(
-                        application=application,
-                        github_repo_name=repo_data['full_name'],
-                        github_repo_id=repo_data['id'],
-                        github_repo_url=repo_data.get('clone_url', ''),
-                        description=repo_data.get('description', ''),
-                        default_branch=repo_data.get('default_branch', 'main'),
-                        is_private=repo_data.get('private', False),
-                        language=repo_data.get('language', ''),
-                        stars_count=repo_data.get('stargazers_count', 0),
-                        forks_count=repo_data.get('forks_count', 0),
-                        last_updated=repo_data.get('pushed_at')
-                    )
-                    added_count += 1
-            
-            if added_count > 0:
-                messages.success(request, f'Added {added_count} repositories to "{application.name}".')
-            else:
-                messages.info(request, 'No repositories were added.')
-            
-            return redirect('applications:detail', pk=pk)
-    else:
-        form = RepositorySelectionForm(
-            github_repos=github_repos,
-            existing_repos=existing_repos,
-            search_query=''  # Toujours vide en GET pour afficher tous les repos
-        )
-    
-    # Debug: vérifier que le formulaire a bien les choix
-    print(f"DEBUG VIEW: Form choices count: {len(form.fields['repositories'].choices)}")
-    print(f"DEBUG VIEW: First 3 choices: {form.fields['repositories'].choices[:3]}")
-    
-    # Passer les choix directement au template
-    choices = form.fields['repositories'].choices
-    
-    return render(request, 'applications/add_repositories.html', {
-        'form': form,
-        'application': application,
-        'github_repos': github_repos,
-        'existing_repos': existing_repos,
-        'choices_count': len(choices),
-        'choices': choices  # Passer les choix directement
-    })
+                for repo_name in selected_repos:
+                    # Get repo details from GitHub API
+                    repo_data, _ = github_service._make_request(f'https://api.github.com/repos/{repo_name}')
+                    
+                    if repo_data:
+                        ApplicationRepository.objects.create(
+                            application=application,
+                            github_repo_name=repo_data['full_name'],
+                            github_repo_id=repo_data['id'],
+                            github_repo_url=repo_data.get('clone_url', ''),
+                            description=repo_data.get('description', ''),
+                            default_branch=repo_data.get('default_branch', 'main'),
+                            is_private=repo_data.get('private', False),
+                            language=repo_data.get('language', ''),
+                            stars_count=repo_data.get('stargazers_count', 0),
+                            forks_count=repo_data.get('forks_count', 0),
+                            last_updated=repo_data.get('pushed_at')
+                        )
+                        added_count += 1
+                
+                if added_count > 0:
+                    messages.success(request, f'Added {added_count} repositories to "{application.name}".')
+                else:
+                    messages.info(request, 'No repositories were added.')
+                    
+            except Exception as e:
+                messages.error(request, f'Error adding repositories: {str(e)}')
+        
+        return redirect('applications:detail', pk=pk)
 
 
 @login_required
@@ -335,10 +458,9 @@ def api_get_repositories(request, pk):
     """API endpoint to get GitHub repositories with caching and real-time search"""
     application = get_object_or_404(Application, pk=pk, owner=request.user)
     
-    # Get user's GitHub token
-    try:
-        github_token = GitHubToken.objects.get(user=request.user)
-    except GitHubToken.DoesNotExist:
+    # Get user's GitHub token for repository access
+    github_token = GitHubTokenService.get_token_for_operation('private_repos', request.user.id)
+    if not github_token:
         return JsonResponse({'error': 'GitHub token not found'}, status=401)
     
     # Get search query
@@ -348,32 +470,32 @@ def api_get_repositories(request, pk):
     existing_repos = list(application.repositories.values_list('github_repo_name', flat=True))
     
     try:
-        headers = {
-            'Authorization': f'token {github_token.access_token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
+        from analytics.github_service import GitHubService
+        github_service = GitHubService(github_token)
         
         # Get user's repositories
         all_repos = []
         page = 1
         while True:
-            response = requests.get('https://api.github.com/user/repos', headers=headers, params={
+            url = 'https://api.github.com/user/repos'
+            params = {
                 'sort': 'updated',
                 'per_page': 100,
                 'type': 'all',
                 'page': page
-            })
+            }
             
-            if response.status_code == 200:
-                repos_page = response.json()
-                if not repos_page:
+            repos_data, _ = github_service._make_request(url, params)
+            
+            if repos_data is not None:
+                if not repos_data:
                     break
-                all_repos.extend(repos_page)
+                all_repos.extend(repos_data)
                 page += 1
                 if page > 10:
                     break
             else:
-                return JsonResponse({'error': f'GitHub API error: {response.status_code}'}, status=500)
+                return JsonResponse({'error': 'GitHub API error'}, status=500)
         
         # Filter repositories
         filtered_repos = []
@@ -412,222 +534,453 @@ def api_get_repositories(request, pk):
 
 
 @login_required
-def remove_repository(request, pk, repo_id):
-    """Remove a repository from an application"""
-    application = get_object_or_404(Application, pk=pk, owner=request.user)
-    repository = get_object_or_404(ApplicationRepository, pk=repo_id, application=application)
-    
-    if request.method == 'POST':
-        repo_name = repository.github_repo_name
-        
-        # Clean up MongoDB data before deleting the repository
-        try:
-            from analytics.services import cleanup_repository_data
-            cleanup_results = cleanup_repository_data(repo_name)
-            
-            if 'error' in cleanup_results:
-                messages.warning(request, f'Repository removed but some data cleanup failed: {cleanup_results["error"]}')
-            else:
-                if cleanup_results['total_deleted'] > 0:
-                    messages.info(request, f'Cleaned up {cleanup_results["total_deleted"]} MongoDB records.')
-        except ImportError:
-            # If analytics app is not available, just delete the repository
-            pass
-        except Exception as e:
-            # If cleanup fails, still delete the repository but warn the user
-            messages.warning(request, f'Repository removed but data cleanup failed: {str(e)}')
-        
-        # Delete the repository
-        repository.delete()
-        messages.success(request, f'Repository "{repo_name}" removed from "{application.name}".')
-    
-    return redirect('applications:detail', pk=pk)
-
-
-@login_required
 def debug_github(request):
-    """Debug GitHub connection and repositories"""
+    """Debug GitHub connection and token access"""
     try:
-        github_token = GitHubToken.objects.get(user=request.user)
-        print(f"Found GitHub token for user {request.user.username}")
-        print(f"Token: {github_token.access_token[:10]}...")
+        # Test different token types
+        basic_token = GitHubTokenService.get_token_for_operation('basic')
+        user_token = GitHubTokenService.get_token_for_operation('private_repos', request.user.id)
         
-        headers = {
-            'Authorization': f'token {github_token.access_token}',
-            'Accept': 'application/vnd.github.v3+json'
+        # Validate tokens
+        basic_validation = GitHubTokenService.validate_token_access(basic_token) if basic_token else None
+        user_validation = GitHubTokenService.validate_token_access(user_token) if user_token else None
+        
+        context = {
+            'basic_token': basic_token,
+            'user_token': user_token,
+            'basic_validation': basic_validation,
+            'user_validation': user_validation,
         }
         
-        # Test user info
-        user_response = requests.get('https://api.github.com/user', headers=headers)
-        print(f"User API Status: {user_response.status_code}")
-        if user_response.status_code == 200:
-            user_data = user_response.json()
-            print(f"GitHub User: {user_data.get('login', 'N/A')}")
+        return render(request, 'applications/debug_github.html', context)
         
-        # Test repositories
-        repos_response = requests.get('https://api.github.com/user/repos', headers=headers, params={
-            'sort': 'updated',
-            'per_page': 10
-        })
-        print(f"Repos API Status: {repos_response.status_code}")
-        if repos_response.status_code == 200:
-            repos_data = repos_response.json()
-            print(f"Found {len(repos_data)} repositories")
-            for repo in repos_data:
-                print(f"  - {repo.get('full_name', 'N/A')}")
-        
-        return render(request, 'applications/debug_github.html', {
-            'github_token': github_token,
-            'user_response': user_response,
-            'repos_response': repos_response
-        })
-        
-    except GitHubToken.DoesNotExist:
-        messages.error(request, 'No GitHub token found. Please connect your GitHub account.')
-        return redirect('github:admin')
     except Exception as e:
-        messages.error(request, f'Error: {str(e)}')
+        messages.error(request, f'Error debugging GitHub: {str(e)}')
         return redirect('applications:list')
 
 
-def _generate_application_quality_metrics(application):
-    """Generate quality metrics data for an application from MongoDB collection"""
-    from pymongo import MongoClient
-    from datetime import datetime, timedelta, timezone
-    
+
+
+def _calculate_application_code_quality_score(app_id):
+    """
+    Calculate code quality score for an application based on the same rules as developers
+    """
     try:
-        # Connect to MongoDB
-        client = MongoClient('localhost', 27017)
-        db = client['gitpulse']
-        quality_collection = db['developer_quality_metrics']
+        from analytics.models import Commit
+        import re
         
-        # Get all repository names for this application
-        repository_names = list(application.repositories.values_list('github_repo_name', flat=True))
+        commits = Commit.objects(application_id=app_id)
+        if commits.count() == 0:
+            return 0.0
         
-        if not repository_names:
+        quality_scores = []
+        
+        for commit in commits:
+            # Base score
+            code_quality = 50
+            
+            # Check for real code files
+            has_code_files = False
+            for file_change in commit.files_changed:
+                filename = file_change.filename.lower()
+                
+                # Check for code files
+                if any(ext in filename for ext in ['.py', '.js', '.ts', '.java', '.cpp', '.c', '.go', '.rs', '.php', '.rb']):
+                    has_code_files = True
+                    break
+                
+                # Check for test files
+                elif any(pattern in filename for pattern in ['test', 'spec', 'specs', '_test.', '.test.']):
+                    has_code_files = True
+                    break
+            
+            # Add points for code files
+            if has_code_files:
+                code_quality += 40
+            
+            # Add points for substantial changes
+            if commit.total_changes > 10:
+                code_quality += 15
+            
+            quality_scores.append(min(100, code_quality))
+        
+        return round(sum(quality_scores) / len(quality_scores), 1)
+        
+    except Exception as e:
+        print(f"Error calculating application code quality score: {e}")
+        return 0.0
+
+
+def _calculate_application_impact_score(app_id):
+    """
+    Calculate impact score for an application based on the same rules as developers
+    """
+    try:
+        from analytics.models import Commit
+        
+        commits = Commit.objects(application_id=app_id)
+        if commits.count() == 0:
+            return 0.0
+        
+        impact_scores = []
+        
+        for commit in commits:
+            # Base score
+            impact_score = 50
+            
+            # Add points based on changes
+            if commit.total_changes > 20:
+                impact_score += 40
+            elif commit.total_changes > 10:
+                impact_score += 30
+            elif commit.total_changes > 5:
+                impact_score += 20
+            
+            impact_scores.append(min(100, impact_score))
+        
+        return round(sum(impact_scores) / len(impact_scores), 1)
+        
+    except Exception as e:
+        print(f"Error calculating application impact score: {e}")
+        return 0.0
+
+
+def _calculate_application_complexity_score(app_id):
+    """
+    Calculate complexity score for an application based on the same rules as developers
+    """
+    try:
+        from analytics.models import Commit
+        
+        commits = Commit.objects(application_id=app_id)
+        if commits.count() == 0:
+            return 0.0
+        
+        complexity_scores = []
+        
+        for commit in commits:
+            # Base score
+            complexity_score = 30
+            
+            # Add points based on commit type
+            if commit.commit_type == 'feature':
+                complexity_score += 40
+            elif commit.commit_type == 'fix':
+                complexity_score += 35
+            elif commit.commit_type == 'refactor':
+                complexity_score += 30
+            
+            complexity_scores.append(min(100, complexity_score))
+        
+        return round(sum(complexity_scores) / len(complexity_scores), 1)
+        
+    except Exception as e:
+        print(f"Error calculating application complexity score: {e}")
+        return 0.0
+
+
+def _generate_application_quality_metrics(application):
+    """Generate application quality metrics using MongoDB aggregation"""
+    try:
+        from analytics.models import Commit
+        from datetime import datetime, timedelta
+        
+        # Get all commits for this application
+        commits = Commit.objects(application_id=application.id)
+        
+        if not commits:
             return {
                 'total_commits': 0,
-                'avg_code_quality': 0,
-                'avg_impact': 0,
-                'avg_complexity': 0,
-                'suspicious_commits': 0,
-                'suspicious_ratio': 0,
                 'real_code_commits': 0,
                 'real_code_ratio': 0,
+                'suspicious_commits': 0,
+                'suspicious_ratio': 0,
                 'doc_only_commits': 0,
+                'doc_only_ratio': 0,
                 'config_only_commits': 0,
+                'config_only_ratio': 0,
                 'micro_commits': 0,
-                'no_ticket_commits': 0
+                'micro_commits_ratio': 0,
+                'no_ticket_commits': 0,
+                'no_ticket_ratio': 0,
+                'avg_code_quality': 0,
+                'avg_impact': 0,
+                'avg_complexity': 0
             }
         
-        # Query MongoDB for quality metrics for this application
-        # Since we don't have application_id in MongoDB, we'll filter by repository names
+        # MongoDB aggregation pipeline for quality metrics
         pipeline = [
-            {
-                '$match': {
-                    'repository': {'$in': repository_names}
-                }
-            },
-            {
-                '$group': {
-                    '_id': None,
-                    'total_commits': {'$sum': 1},
-                    'avg_code_quality': {'$avg': '$code_quality_score'},
-                    'avg_impact': {'$avg': '$impact_score'},
-                    'avg_complexity': {'$avg': '$complexity_score'},
-                    'suspicious_commits': {
-                        '$sum': {
-                            '$cond': [
-                                {
-                                    '$gt': [
-                                        {
-                                            '$size': {
-                                                '$filter': {
-                                                    'input': '$suspicious_patterns',
-                                                    'cond': {'$ne': ['$$this', 'no_ticket_reference']}
-                                                }
-                                            }
-                                        },
-                                        0
-                                    ]
-                                },
-                                1,
-                                0
-                            ]
-                        }
-                    },
-                    'real_code_commits': {
-                        '$sum': {'$cond': ['$is_real_code', 1, 0]}
-                    },
-                    'doc_only_commits': {
-                        '$sum': {'$cond': ['$is_documentation_only', 1, 0]}
-                    },
-                    'config_only_commits': {
-                        '$sum': {'$cond': ['$is_config_only', 1, 0]}
-                    },
-                    'micro_commits': {
-                        '$sum': {'$cond': [{'$in': ['micro_commit', '$suspicious_patterns']}, 1, 0]}
-                    },
-                    'no_ticket_commits': {
-                        '$sum': {'$cond': [{'$in': ['no_ticket_reference', '$suspicious_patterns']}, 1, 0]}
-                    }
-                }
-            }
+            {"$match": {"application_id": application.id}},
+            {"$group": {
+                "_id": None,
+                "total_commits": {"$sum": 1},
+                "real_code_commits": {"$sum": {"$cond": [{"$in": ["$commit_type", ["feat", "fix", "refactor", "perf"]]}, 1, 0]}},
+                "suspicious_commits": {"$sum": {"$cond": [{"$in": ["$commit_type", ["revert", "hotfix"]]}, 1, 0]}},
+                "doc_only_commits": {"$sum": {"$cond": [{"$eq": ["$commit_type", "docs"]}, 1, 0]}},
+                "config_only_commits": {"$sum": {"$cond": [{"$in": ["$commit_type", ["chore", "ci", "build"]]}, 1, 0]}},
+                "micro_commits": {"$sum": {"$cond": [{"$lte": ["$total_changes", 2]}, 1, 0]}},
+                "no_ticket_commits": {"$sum": {"$cond": [{"$not": {"$regexMatch": {"input": "$message", "regex": "(?i)(fix|close|resolve|closes|closed|resolves|resolved|issue|ticket)"}}}, 1, 0]}},
+                "avg_additions": {"$avg": "$additions"},
+                "avg_deletions": {"$avg": "$deletions"},
+                "avg_total_changes": {"$avg": "$total_changes"}
+            }}
         ]
         
-        result = list(quality_collection.aggregate(pipeline))
+        result = list(commits.aggregate(pipeline))
         
         if not result:
             return {
                 'total_commits': 0,
-                'avg_code_quality': 0,
-                'avg_impact': 0,
-                'avg_complexity': 0,
-                'suspicious_commits': 0,
-                'suspicious_ratio': 0,
                 'real_code_commits': 0,
                 'real_code_ratio': 0,
+                'suspicious_commits': 0,
+                'suspicious_ratio': 0,
                 'doc_only_commits': 0,
+                'doc_only_ratio': 0,
                 'config_only_commits': 0,
+                'config_only_ratio': 0,
                 'micro_commits': 0,
-                'no_ticket_commits': 0
+                'micro_commits_ratio': 0,
+                'no_ticket_commits': 0,
+                'no_ticket_ratio': 0,
+                'avg_code_quality': 0,
+                'avg_impact': 0,
+                'avg_complexity': 0
             }
         
-        data = result[0]
-        total_commits = data.get('total_commits', 0)
+        metrics = result[0]
+        total_commits = metrics['total_commits']
         
         return {
             'total_commits': total_commits,
-            'avg_code_quality': round(data.get('avg_code_quality', 0), 1),
-            'avg_impact': round(data.get('avg_impact', 0), 1),
-            'avg_complexity': round(data.get('avg_complexity', 0), 1),
-            'suspicious_commits': data.get('suspicious_commits', 0),
-            'suspicious_ratio': round((data.get('suspicious_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'real_code_commits': data.get('real_code_commits', 0),
-            'real_code_ratio': round((data.get('real_code_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'doc_only_commits': data.get('doc_only_commits', 0),
-            'doc_only_ratio': round((data.get('doc_only_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'config_only_commits': data.get('config_only_commits', 0),
-            'config_only_ratio': round((data.get('config_only_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'micro_commits': data.get('micro_commits', 0),
-            'micro_commits_ratio': round((data.get('micro_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1),
-            'no_ticket_commits': data.get('no_ticket_commits', 0),
-            'no_ticket_ratio': round((data.get('no_ticket_commits', 0) / total_commits * 100) if total_commits > 0 else 0, 1)
+            'real_code_commits': metrics['real_code_commits'],
+            'real_code_ratio': round((metrics['real_code_commits'] / total_commits * 100) if total_commits > 0 else 0, 1),
+            'suspicious_commits': metrics['suspicious_commits'],
+            'suspicious_ratio': round((metrics['suspicious_commits'] / total_commits * 100) if total_commits > 0 else 0, 1),
+            'doc_only_commits': metrics['doc_only_commits'],
+            'doc_only_ratio': round((metrics['doc_only_commits'] / total_commits * 100) if total_commits > 0 else 0, 1),
+            'config_only_commits': metrics['config_only_commits'],
+            'config_only_ratio': round((metrics['config_only_commits'] / total_commits * 100) if total_commits > 0 else 0, 1),
+            'micro_commits': metrics['micro_commits'],
+            'micro_commits_ratio': round((metrics['micro_commits'] / total_commits * 100) if total_commits > 0 else 0, 1),
+            'no_ticket_commits': metrics['no_ticket_commits'],
+            'no_ticket_ratio': round((metrics['no_ticket_commits'] / total_commits * 100) if total_commits > 0 else 0, 1),
+            'avg_code_quality': _calculate_application_code_quality_score(application.id),
+            'avg_impact': _calculate_application_impact_score(application.id),
+            'avg_complexity': _calculate_application_complexity_score(application.id)
         }
         
     except Exception as e:
         print(f"Error generating application quality metrics: {e}")
         return {
             'total_commits': 0,
-            'avg_code_quality': 0,
-            'avg_impact': 0,
-            'avg_complexity': 0,
-            'suspicious_commits': 0,
-            'suspicious_ratio': 0,
             'real_code_commits': 0,
             'real_code_ratio': 0,
+            'suspicious_commits': 0,
+            'suspicious_ratio': 0,
             'doc_only_commits': 0,
+            'doc_only_ratio': 0,
             'config_only_commits': 0,
+            'config_only_ratio': 0,
             'micro_commits': 0,
-            'no_ticket_commits': 0
+            'micro_commits_ratio': 0,
+            'no_ticket_commits': 0,
+            'no_ticket_ratio': 0,
+            'avg_code_quality': 0,
+            'avg_impact': 0,
+            'avg_complexity': 0
         }
+
+
+def _generate_pr_health_metrics(application):
+    """Generate Pull Request Health metrics using MongoDB aggregation"""
+    try:
+        from analytics.models import PullRequest
+        from datetime import datetime, timedelta
+        
+        # Try to get from cache first
+        cached_metrics = AnalyticsCacheService.get_pr_health_metrics(application.id)
+        if cached_metrics is not None:
+            return cached_metrics
+        
+        # Get all PRs for this application
+        prs = PullRequest.objects(application_id=application.id)
+        
+        if not prs:
+            return {
+                'total_prs': 0,
+                'open_prs': 0,
+                'merged_prs': 0,
+                'closed_prs': 0,
+                'prs_without_review': 0,
+                'prs_without_review_rate': 0,
+                'self_merged_prs': 0,
+                'self_merged_rate': 0,
+                'old_open_prs': 0,
+                'old_open_prs_rate': 0,
+                'avg_merge_time_hours': 0,
+                'median_merge_time_hours': 0
+            }
+        
+        # Calculate cutoff date for old PRs (7 days)
+        cutoff_date = datetime.now() - timedelta(days=7)
+        
+        # MongoDB aggregation pipeline for PR health metrics
+        pipeline = [
+            {"$match": {"application_id": application.id}},
+            {"$group": {
+                "_id": None,
+                "total_prs": {"$sum": 1},
+                "open_prs": {"$sum": {"$cond": [{"$eq": ["$state", "open"]}, 1, 0]}},
+                "merged_prs": {"$sum": {"$cond": [{"$ne": ["$merged_at", None]}, 1, 0]}},
+                "closed_prs": {"$sum": {"$cond": [{"$eq": ["$state", "closed"]}, 1, 0]}},
+                # PRs that were open for more than 7 days before being closed
+                "old_open_prs": {"$sum": {"$cond": [
+                    {"$and": [
+                        {"$eq": ["$state", "closed"]},
+                        {"$ne": ["$created_at", None]},
+                        {"$ne": ["$closed_at", None]},
+                        {"$gte": [
+                            {"$divide": [
+                                {"$subtract": ["$closed_at", "$created_at"]},
+                                1000 * 60 * 60 * 24  # Convert milliseconds to days
+                            ]},
+                            7
+                        ]}
+                    ]}, 1, 0]}}
+            }}
+        ]
+        
+        result = list(prs.aggregate(pipeline))
+        
+        if not result:
+            return {
+                'total_prs': 0,
+                'open_prs': 0,
+                'merged_prs': 0,
+                'closed_prs': 0,
+                'prs_without_review': 0,
+                'prs_without_review_rate': 0,
+                'self_merged_prs': 0,
+                'self_merged_rate': 0,
+                'old_open_prs': 0,
+                'old_open_prs_rate': 0,
+                'avg_merge_time_hours': 0,
+                'median_merge_time_hours': 0
+            }
+        
+        metrics = result[0]
+        total_prs = metrics['total_prs']
+        
+        # Calculate merge times for median and average
+        merge_times = []
+        total_merge_time_seconds = 0
+        merged_count = 0
+        
+        for pr in prs:
+            if pr.merged_at and pr.created_at:
+                merge_time_seconds = (pr.merged_at - pr.created_at).total_seconds()
+                merge_time_hours = merge_time_seconds / 3600
+                merge_times.append(merge_time_hours)
+                total_merge_time_seconds += merge_time_seconds
+                merged_count += 1
+        
+        # Calculate average merge time
+        avg_merge_time_hours = (total_merge_time_seconds / merged_count / 3600) if merged_count > 0 else 0
+        
+        # Calculate median merge time
+        median_merge_time = 0
+        if merge_times:
+            merge_times.sort()
+            n = len(merge_times)
+            if n % 2 == 1:
+                median_merge_time = merge_times[n // 2]
+            else:
+                median_merge_time = (merge_times[n // 2 - 1] + merge_times[n // 2]) / 2
+        
+        # Detect self-merges using the new merged_by field
+        self_merged_prs = 0
+        for pr in prs:
+            if pr.merged_at and pr.merged_by and pr.author:
+                if pr.merged_by == pr.author:
+                    self_merged_prs += 1
+        
+        # Estimate PRs without review (simplified logic)
+        # This is an approximation since we don't have detailed review data
+        # Consider self-merged PRs as potentially without proper review
+        # Also include PRs with very few comments as potentially unreviewed
+        prs_without_review = 0
+        for pr in prs:
+            if pr.merged_at:
+                # Self-merged PRs are considered potentially unreviewed
+                if pr.merged_by and pr.author and pr.merged_by == pr.author:
+                    prs_without_review += 1
+                # PRs with very few comments might also be unreviewed
+                elif pr.comments_count <= 1:  # Only author's comment
+                    prs_without_review += 1
+        
+        result_metrics = {
+            'total_prs': total_prs,
+            'open_prs': metrics['open_prs'],
+            'open_prs_percentage': round((metrics['open_prs'] / total_prs * 100) if total_prs > 0 else 0, 1),
+            'merged_prs': metrics['merged_prs'],
+            'merged_prs_percentage': round((metrics['merged_prs'] / total_prs * 100) if total_prs > 0 else 0, 1),
+            'closed_prs': metrics['closed_prs'],
+            'prs_without_review': prs_without_review,
+            'prs_without_review_rate': round((prs_without_review / total_prs * 100) if total_prs > 0 else 0, 1),
+            'self_merged_prs': self_merged_prs,
+            'self_merged_rate': round((self_merged_prs / total_prs * 100) if total_prs > 0 else 0, 1),
+            'old_open_prs': metrics['old_open_prs'],
+            'old_open_prs_rate': round((metrics['old_open_prs'] / total_prs * 100) if total_prs > 0 else 0, 1),
+            'avg_merge_time_hours': round(avg_merge_time_hours, 1),
+            'median_merge_time_hours': round(median_merge_time, 1)
+        }
+        
+        # Cache the results
+        AnalyticsCacheService.set_pr_health_metrics(application.id, result_metrics)
+        
+        return result_metrics
+        
+    except Exception as e:
+        print(f"Error generating PR health metrics: {e}")
+        return {
+            'total_prs': 0,
+            'open_prs': 0,
+            'merged_prs': 0,
+            'closed_prs': 0,
+            'prs_without_review': 0,
+            'prs_without_review_rate': 0,
+            'self_merged_prs': 0,
+            'self_merged_rate': 0,
+            'old_open_prs': 0,
+            'old_open_prs_rate': 0,
+            'avg_merge_time_hours': 0,
+            'median_merge_time_hours': 0
+        }
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_pr_health_metrics(request, pk):
+    """API endpoint to get PR health metrics asynchronously"""
+    try:
+        application = get_object_or_404(Application, pk=pk)
+        
+        # Check if user has access to this application
+        if application.owner != request.user:
+            return JsonResponse({'error': 'Access denied'}, status=403)
+        
+        # Generate or get from cache
+        metrics = _generate_pr_health_metrics(application)
+        
+        return JsonResponse({
+            'success': True,
+            'metrics': metrics,
+            'cached': AnalyticsCacheService.get_pr_health_metrics(application.id) is not None
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)

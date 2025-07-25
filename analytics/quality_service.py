@@ -287,4 +287,24 @@ class QualityAnalysisService:
             
         except Exception as e:
             logger.error(f"Error analyzing commits for application {application_id}: {e}")
+            return 0
+    
+    def analyze_commits_for_repository(self, repository_full_name: str) -> int:
+        """Analyze all commits for a repository"""
+        try:
+            commits = Commit.objects.filter(repository_full_name=repository_full_name)
+            processed = 0
+            
+            for commit in commits:
+                if self.store_commit_quality(commit):
+                    processed += 1
+                
+                if processed % 100 == 0:
+                    logger.info(f"Processed {processed} commits for repository {repository_full_name}")
+            
+            logger.info(f"Completed quality analysis for repository {repository_full_name}: {processed} commits")
+            return processed
+            
+        except Exception as e:
+            logger.error(f"Error analyzing commits for repository {repository_full_name}: {e}")
             return 0 

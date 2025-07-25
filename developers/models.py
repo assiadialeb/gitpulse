@@ -3,8 +3,8 @@ from django.contrib.auth.models import User
 import uuid
 
 
-class DeveloperGroup(models.Model):
-    """A group of developer identities that represent the same person"""
+class Developer(models.Model):
+    """A developer with multiple aliases that represent the same person"""
     id = models.CharField(primary_key=True, max_length=24)  # MongoDB ObjectId length
     name = models.CharField(max_length=255)
     email = models.EmailField()
@@ -12,7 +12,7 @@ class DeveloperGroup(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        db_table = 'developer_groups'
+        db_table = 'developers'
         indexes = [
             models.Index(fields=['name', 'email']),
         ]
@@ -21,28 +21,28 @@ class DeveloperGroup(models.Model):
         return f"{self.name} ({self.email})"
     
     def get_total_commits(self):
-        """Total commits across all identities in this group"""
+        """Total commits across all aliases for this developer"""
         total = 0
-        for identity in self.identities.all():
-            total += identity.commit_count
+        for alias in self.aliases.all():
+            total += alias.commit_count
         return total
 
 
-class DeveloperIdentity(models.Model):
-    """Individual developer identity (name/email combination)"""
+class DeveloperAlias(models.Model):
+    """Individual developer alias (name/email combination)"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     email = models.EmailField()
-    group = models.ForeignKey(DeveloperGroup, on_delete=models.CASCADE, related_name='identities', null=True, blank=True)
+    developer = models.ForeignKey(Developer, on_delete=models.CASCADE, related_name='aliases', null=True, blank=True)
     commit_count = models.IntegerField(default=0)
     first_seen = models.DateTimeField(auto_now_add=True)
     last_seen = models.DateTimeField(auto_now=True)
     
     class Meta:
-        db_table = 'developer_identities'
+        db_table = 'developer_aliases'
         indexes = [
             models.Index(fields=['name', 'email']),
-            models.Index(fields=['group']),
+            models.Index(fields=['developer']),
         ]
         unique_together = ['name', 'email']
     
@@ -51,7 +51,7 @@ class DeveloperIdentity(models.Model):
     
     @property
     def display_name(self):
-        """Display name - either group name or individual name"""
-        if self.group:
-            return self.group.name
+        """Display name - either developer name or individual name"""
+        if self.developer:
+            return self.developer.name
         return self.name

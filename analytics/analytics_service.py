@@ -6,9 +6,10 @@ from typing import Dict, List, Tuple
 from collections import defaultdict, Counter
 import re
 
-from .models import Commit, RepositoryStats
+from .models import Commit, RepositoryStats, Release
 from .developer_grouping_service import DeveloperGroupingService
 from applications.models import Application
+from .models import PullRequest
 
 
 class AnalyticsService:
@@ -29,7 +30,8 @@ class AnalyticsService:
         Returns:
             Dictionary with developer activity metrics
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        from django.utils import timezone
+        cutoff_date = timezone.now() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         # Get grouped developers for this application only
@@ -48,12 +50,12 @@ class AnalyticsService:
             group = email_to_group.get(commit.author_email)
             
             if group:
-                group_id = group['group_id']
-                if group_id not in commits_per_group:
-                    commits_per_group[group_id] = {
+                developer_id = group['developer_id']
+                if developer_id not in commits_per_group:
+                    commits_per_group[developer_id] = {
                         'name': group['primary_name'],
                         'email': group['primary_email'],
-                        'group_id': group_id,
+                        'group_id': developer_id,
                         'confidence_score': group['confidence_score'],
                         'aliases_count': len(group['aliases']),
                         'commits': 0,
@@ -63,10 +65,10 @@ class AnalyticsService:
                         'aliases': group['aliases']
                     }
                 
-                commits_per_group[group_id]['commits'] += 1
-                commits_per_group[group_id]['additions'] += commit.additions
-                commits_per_group[group_id]['deletions'] += commit.deletions
-                commits_per_group[group_id]['files_changed'] += len(commit.files_changed)
+                commits_per_group[developer_id]['commits'] += 1
+                commits_per_group[developer_id]['additions'] += commit.additions
+                commits_per_group[developer_id]['deletions'] += commit.deletions
+                commits_per_group[developer_id]['files_changed'] += len(commit.files_changed)
             else:
                 # Fallback for ungrouped developers
                 dev_key = f"{commit.author_name} ({commit.author_email})"
@@ -89,8 +91,8 @@ class AnalyticsService:
                 commits_per_group[dev_key]['deletions'] += commit.deletions
                 commits_per_group[dev_key]['files_changed'] += len(commit.files_changed)
         
-        # Sort by name (case-insensitive), then by commits count
-        sorted_devs = sorted(commits_per_group.values(), key=lambda x: (x['name'].lower(), -x['commits']))
+        # Sort by commits count in descending order (most active developers first)
+        sorted_devs = sorted(commits_per_group.values(), key=lambda x: -x['commits'])
         
         return {
             'period_days': days,
@@ -109,7 +111,8 @@ class AnalyticsService:
         Returns:
             Dictionary with heatmap data
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        from django.utils import timezone
+        cutoff_date = timezone.now() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         # Group commits by date
@@ -148,15 +151,19 @@ class AnalyticsService:
         Returns:
             Dictionary with bubble chart data organized by repository
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        from django.utils import timezone
+        cutoff_date = timezone.now() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         # Group commits by repository, date, and hour
         repo_bubble_data = defaultdict(lambda: defaultdict(lambda: {'commits': 0}))
         
         for commit in recent_commits:
-            date = commit.authored_date.date()
-            hour = commit.authored_date.hour
+            # Use the new timezone-aware method from the model
+            local_date = commit.get_authored_date_in_timezone()
+            
+            date = local_date.date()
+            hour = local_date.hour
             repo = commit.repository_full_name
             
             key = (date, hour)
@@ -187,7 +194,7 @@ class AnalyticsService:
             }
             
             for (date, hour), data in bubbles.items():
-                days_ago = (datetime.utcnow().date() - date).days
+                days_ago = (timezone.now().date() - date).days
                 dataset['data'].append({
                     'x': days_ago,
                     'y': hour,
@@ -212,8 +219,8 @@ class AnalyticsService:
         Returns:
             Dictionary with code distribution metrics
         """
-        # Get grouped developers
-        grouped_developers = self.grouping_service.get_grouped_developers()
+        # Get grouped developers for this specific application
+        grouped_developers = self.grouping_service.get_grouped_developers_for_application(self.application_id)
         
         # Create mapping from email to group
         email_to_group = {}
@@ -230,7 +237,7 @@ class AnalyticsService:
             group = email_to_group.get(commit.author_email)
             
             if group:
-                group_id = group['group_id']
+                group_id = group['developer_id']
                 author_key = group['primary_name']
             else:
                 # Fallback for ungrouped developers
@@ -575,31 +582,31 @@ class AnalyticsService:
         """
         return self.grouping_service.manually_group_developers(group_data)
     
-    def get_developer_detailed_stats(self, group_id: str) -> Dict:
+    def get_developer_detailed_stats(self, developer_id: str) -> Dict:
         """
-        Get detailed statistics for a specific developer group
+        Get detailed statistics for a specific developer
         
         Args:
-            group_id: The MongoDB ObjectId of the developer group
+            developer_id: The MongoDB ObjectId of the developer
             
         Returns:
             Dictionary with detailed developer statistics
         """
-        from .models import DeveloperGroup, DeveloperAlias
+        from .models import Developer, DeveloperAlias
         
-        # Get the developer group (global grouping, no application_id filter)
+        # Get the developer (global grouping, no application_id filter)
         try:
-            group = DeveloperGroup.objects.get(id=group_id)
+            developer = Developer.objects.get(id=developer_id)
         except:
             return {
-                'error': 'Developer group not found',
+                'error': 'Developer not found',
                 'success': False
             }
         
-        # Get all aliases for this group
-        aliases = DeveloperAlias.objects.filter(group=group)
+        # Get all aliases for this developer
+        aliases = DeveloperAlias.objects.filter(developer=developer)
         
-        # Get all commits for this developer group (global, from all applications)
+        # Get all commits for this developer (global, from all applications)
         alias_emails = [alias.email for alias in aliases]
         from .models import Commit
         developer_commits = Commit.objects.filter(author_email__in=alias_emails)
@@ -667,11 +674,11 @@ class AnalyticsService:
         
         return {
             'success': True,
-            'group_id': group_id,
-            'primary_name': group.primary_name,
-            'primary_email': group.primary_email,
-            'confidence_score': group.confidence_score,
-            'is_auto_grouped': group.is_auto_grouped,
+            'developer_id': developer_id,
+            'primary_name': developer.primary_name,
+            'primary_email': developer.primary_email,
+            'confidence_score': developer.confidence_score,
+            'is_auto_grouped': developer.is_auto_grouped,
             'aliases': [
                 {
                     'name': alias.name,
@@ -871,3 +878,69 @@ class AnalyticsService:
             'avg_gap_between_commits': round(avg_gap, 1),
             'gap_consistency': round(gap_std, 1)
         } 
+
+    def get_pr_cycle_times(self) -> list:
+        """
+        Retourne la liste des PRs avec leur cycle time (en heures) pour l'application, basé sur la collection PullRequest.
+        """
+        # Récupérer tous les repository_full_name associés à l'app
+        from applications.models import Application
+        app = Application.objects.get(id=self.application_id)
+        repo_names = [repo.github_repo_name for repo in app.repositories.all()]
+
+        # Filtrer les PRs de l'app avec created_at et closed_at non nuls
+        prs = PullRequest.objects(
+            application_id=self.application_id,
+            repository_full_name__in=repo_names,
+            created_at__ne=None,
+            closed_at__ne=None
+        )
+        results = []
+        for pr in prs:
+            cycle_time = (pr.closed_at - pr.created_at).total_seconds() / 3600 if pr.closed_at and pr.created_at else None
+            results.append({
+                'repo': pr.repository_full_name,
+                'pr_number': pr.number,
+                'created_at': pr.created_at,
+                'closed_at': pr.closed_at,
+                'cycle_time_hours': cycle_time,
+                'title': pr.title,
+                'author': pr.author,
+                'state': pr.state,
+                'url': pr.url,
+            })
+        results = sorted(results, key=lambda x: x['cycle_time_hours'] if x['cycle_time_hours'] is not None else 1e9)
+        return results 
+
+    def get_release_frequency(self, period_days: int = 90) -> dict:
+        """
+        Calcule la fréquence de release (par mois et par semaine) sur la période donnée.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        cutoff = timezone.now() - timedelta(days=period_days)
+        releases = Release.objects.filter(application_id=self.application_id, published_at__gte=cutoff).order_by('published_at')
+        total_releases = releases.count()
+        if total_releases == 0:
+            return {
+                'releases_per_month': 0,
+                'releases_per_week': 0,
+                'total_releases': 0,
+                'period_days': period_days,
+            }
+        # Correction : toujours utiliser la période demandée
+        days_span = period_days
+        months = days_span / 30.44
+        weeks = days_span / 7
+        return {
+            'releases_per_month': round(total_releases / months, 2),
+            'releases_per_week': round(total_releases / weeks, 2),
+            'total_releases': total_releases,
+            'period_days': days_span,
+        } 
+
+    def get_total_releases(self) -> int:
+        """
+        Retourne le nombre total de releases pour l'application (toutes périodes confondues).
+        """
+        return Release.objects(application_id=self.application_id).count() 

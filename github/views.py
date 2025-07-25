@@ -1,212 +1,269 @@
 import os
 import secrets
 import requests
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.urls import reverse
-from django.utils import timezone
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from .models import GitHubApp, GitHubToken, GitHubOAuthState
-from .forms import GitHubAppForm
-
-
-@login_required
-def oauth_start(request):
-    """Start OAuth2 flow - redirect to GitHub"""
-    try:
-        github_app = GitHubApp.objects.first()
-        if not github_app:
-            messages.error(request, 'GitHub App not configured. Please contact administrator.')
-            return redirect('users:dashboard')
-        
-        # Generate state parameter for CSRF protection
-        state = secrets.token_urlsafe(32)
-        GitHubOAuthState.objects.create(user=request.user, state=state)
-        
-        # Build OAuth2 authorization URL
-        redirect_uri = request.build_absolute_uri(reverse('github:callback'))
-        auth_url = (
-            f"https://github.com/login/oauth/authorize?"
-            f"client_id={github_app.client_id}&"
-            f"redirect_uri={redirect_uri}&"
-            f"scope=repo,user&"
-            f"state={state}"
-        )
-        
-        return redirect(auth_url)
-        
-    except Exception as e:
-        messages.error(request, f'Error starting OAuth flow: {str(e)}')
-        return redirect('users:dashboard')
-
-
-@login_required
-def oauth_callback(request):
-    """Handle OAuth2 callback from GitHub"""
-    try:
-        # Verify state parameter
-        state = request.GET.get('state')
-        if not state:
-            messages.error(request, 'Missing state parameter')
-            return redirect('users:dashboard')
-        
-        oauth_state = get_object_or_404(GitHubOAuthState, state=state, user=request.user)
-        if oauth_state.is_expired:
-            oauth_state.delete()
-            messages.error(request, 'OAuth state expired. Please try again.')
-            return redirect('users:dashboard')
-        
-        # Clean up state
-        oauth_state.delete()
-        
-        # Check for authorization code
-        code = request.GET.get('code')
-        if not code:
-            error = request.GET.get('error')
-            error_description = request.GET.get('error_description', 'Unknown error')
-            messages.error(request, f'OAuth error: {error} - {error_description}')
-            return redirect('users:dashboard')
-        
-        # Exchange code for access token
-        github_app = GitHubApp.objects.first()
-        if not github_app:
-            messages.error(request, 'GitHub App not configured')
-            return redirect('users:dashboard')
-        
-        token_response = requests.post(
-            'https://github.com/login/oauth/access_token',
-            data={
-                'client_id': github_app.client_id,
-                'client_secret': github_app.client_secret,
-                'code': code,
-                'redirect_uri': request.build_absolute_uri(reverse('github:callback'))
-            },
-            headers={'Accept': 'application/json'}
-        )
-        
-        if token_response.status_code != 200:
-            messages.error(request, 'Failed to exchange authorization code for token')
-            return redirect('users:dashboard')
-        
-        token_data = token_response.json()
-        
-        if 'error' in token_data:
-            messages.error(request, f'Token exchange error: {token_data.get("error_description", "Unknown error")}')
-            return redirect('users:dashboard')
-        
-        access_token = token_data.get('access_token')
-        if not access_token:
-            messages.error(request, 'No access token received')
-            return redirect('users:dashboard')
-        
-        # Get user info from GitHub
-        user_response = requests.get(
-            'https://api.github.com/user',
-            headers={
-                'Authorization': f'token {access_token}',
-                'Accept': 'application/vnd.github.v3+json'
-            }
-        )
-        
-        if user_response.status_code != 200:
-            messages.error(request, 'Failed to get user info from GitHub')
-            return redirect('users:dashboard')
-        
-        user_data = user_response.json()
-        
-        # Récupérer l'email principal si non présent dans /user
-        github_email = user_data.get('email', '')
-        if not github_email:
-            emails_response = requests.get(
-                'https://api.github.com/user/emails',
-                headers={
-                    'Authorization': f'token {access_token}',
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            )
-            if emails_response.status_code == 200:
-                emails = emails_response.json()
-                # Prendre le premier email principal et vérifié
-                primary_email = next((e['email'] for e in emails if e.get('primary') and e.get('verified')), None)
-                if primary_email:
-                    github_email = primary_email
-                elif emails:
-                    github_email = emails[0]['email']
-        
-        # Save or update token
-        token, created = GitHubToken.objects.update_or_create(
-            user=request.user,
-            defaults={
-                'access_token': access_token,
-                'token_type': 'bearer',
-                'scope': token_data.get('scope', ''),
-                'expires_at': timezone.now() + timezone.timedelta(hours=1),  # GitHub tokens don't expire by default
-                'github_user_id': user_data['id'],
-                'github_username': user_data['login'],
-                'github_email': github_email or ''
-            }
-        )
-        
-        if created:
-            messages.success(request, f'Successfully connected to GitHub as {user_data["login"]}')
-        else:
-            messages.success(request, f'Successfully updated GitHub connection for {user_data["login"]}')
-        
-        return redirect('github:admin')
-        
-    except Exception as e:
-        messages.error(request, f'Error during OAuth callback: {str(e)}')
-        return redirect('github:admin')
-
-
-@login_required
-def disconnect(request):
-    """Disconnect GitHub account"""
-    try:
-        token = GitHubToken.objects.filter(user=request.user).first()
-        if token:
-            token.delete()
-            messages.success(request, 'GitHub account disconnected successfully')
-        else:
-            messages.info(request, 'No GitHub account connected')
-        
-        return redirect('users:dashboard')
-        
-    except Exception as e:
-        messages.error(request, f'Error disconnecting GitHub account: {str(e)}')
-        return redirect('users:dashboard')
+from django.contrib.sites.models import Site
+from allauth.socialaccount.models import SocialApp, SocialAccount
+from .forms import SocialAppForm, GitHubAppForm
+from .models import GitHubApp
 
 
 @login_required
 def admin_view(request):
-    """Admin view for GitHub App configuration"""
     if not request.user.is_superuser:
         messages.error(request, 'Access denied. Superuser required.')
         return redirect('users:dashboard')
+
+    # Handle GitHub OAuth App (single app for both user SSO and application access)
+    github_app = GitHubApp.objects.first()
+    if not github_app:
+        github_app = GitHubApp.objects.create(
+            client_id='',
+            client_secret='',
+        )
+    
+    # Handle SocialApp (sync with GitHubApp for user SSO)
+    site = Site.objects.get_current()
+    social_app = SocialApp.objects.filter(provider='github', sites=site).first()
+    if not social_app:
+        social_app = SocialApp.objects.create(provider='github', name='GitHub')
+        social_app.sites.set([site])
+    
+    if request.method == 'POST':
+        form = GitHubAppForm(request.POST, instance=github_app)
+        oauth_secret = request.POST.get('oauth_secret', '')
+        
+        if form.is_valid():
+            github_app = form.save()
+            
+            # Update SocialApp with OAuth credentials (for user SSO)
+            social_app.client_id = github_app.client_id
+            if oauth_secret:  # Only update if provided
+                social_app.secret = oauth_secret
+                social_app.save()
+                messages.success(request, f'GitHub configuration saved! OAuth secret: {oauth_secret[:10]}...')
+            else:
+                messages.warning(request, 'GitHub configuration saved but no OAuth secret provided')
+            
+            # Sync GitHubApp with SocialApp (keep them in sync)
+            github_app.client_secret = oauth_secret or github_app.client_secret
+            github_app.save()
+            
+            return redirect('github:admin')
+    else:
+        form = GitHubAppForm(instance=github_app)
+
+    # Check OAuth App configuration status
+    oauth_configured = bool(social_app.client_id and social_app.secret)
+    
+    # Check if current user has GitHub connection with valid token
+    user_github_connected = False
+    user_github_username = None
+    user_has_valid_token = False
     
     try:
-        github_app = GitHubApp.objects.first()
+        from analytics.github_utils import get_github_token_for_user, get_user_github_scopes
         
-        if request.method == 'POST':
-            form = GitHubAppForm(request.POST, instance=github_app)
-            if form.is_valid():
-                form.save()
-                messages.success(request, 'GitHub App configuration saved successfully!')
-                return redirect('github:admin')
-        else:
-            form = GitHubAppForm(instance=github_app)
+        # Check if user has GitHub account connected
+        github_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+        if github_account:
+            user_github_connected = True
+            user_github_username = github_account.extra_data.get('login')
+            
+            # Check if user has valid OAuth token
+            token = get_github_token_for_user(request.user.id)
+            if token:  # OAuth App token is always valid if present
+                user_has_valid_token = True
+                
+    except Exception as e:
+        print(f"User token check error: {e}")  # Debug
+
+    context = {
+        'form': form,
+        'oauth_secret': social_app.secret if social_app.secret else '',
+        'user_redirect_url': request.build_absolute_uri('/accounts/github/login/callback/'),
+        'oauth_configured': oauth_configured,
+        'github_connected': user_github_connected,
+        'github_username': user_github_username,
+        'user_has_valid_token': user_has_valid_token,
+    }
+    return render(request, 'github/admin_simple.html', context)
+
+
+def admin_simple(request):
+    """
+    Simple GitHub configuration interface (alias for admin_view)
+    """
+    return admin_view(request)
+
+
+def token_help(request):
+    """
+    GitHub token configuration help page
+    """
+    return render(request, 'github/token_help.html')
+
+
+from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
+
+@require_http_methods(["POST"])
+def test_github_access(request):
+    """
+    Test GitHub token access via AJAX
+    """
+    try:
+        from analytics.github_utils import get_github_token_for_user
+        from applications.models import Application
+        import requests
         
-        context = {
-            'form': form,
-            'github_app': github_app,
-            'redirect_url': request.build_absolute_uri(reverse('github:callback')),
-            'github_token': GitHubToken.objects.filter(user=request.user).first() if request.user.is_authenticated else None,
+        token = get_github_token_for_user(request.user.id)
+        if not token:
+            return JsonResponse({
+                'success': False,
+                'error': 'Aucun token GitHub configuré'
+            })
+        
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
         }
-        return render(request, 'github/admin.html', context)
+        
+        # Test user info
+        response = requests.get('https://api.github.com/user', headers=headers)
+        if response.status_code != 200:
+            return JsonResponse({
+                'success': False,
+                'error': f'Token invalide (code {response.status_code})'
+            })
+        
+        user_info = response.json()
+        scopes = response.headers.get('X-OAuth-Scopes', '')
+        
+        # Test repository access
+        total_repos = 0
+        accessible_repos = 0
+        
+        for app in Application.objects.filter(owner=request.user)[:3]:
+            for repo in app.repositories.all()[:5]:
+                total_repos += 1
+                repo_name = repo.github_repo_name
+                
+                try:
+                    url = f"https://api.github.com/repos/{repo_name}"
+                    repo_response = requests.get(url, headers=headers)
+                    if repo_response.status_code == 200:
+                        accessible_repos += 1
+                except:
+                    pass
+        
+        if total_repos == 0:
+            return JsonResponse({
+                'success': True,
+                'message': 'Token configuré correctement (aucun repository à tester)',
+                'user': user_info.get('login'),
+                'scopes': scopes,
+                'total_repos': 0,
+                'accessible_repos': 0
+            })
+        
+        success = accessible_repos > 0
+        return JsonResponse({
+            'success': success,
+            'user': user_info.get('login'),
+            'scopes': scopes,
+            'total_repos': total_repos,
+            'accessible_repos': accessible_repos,
+            'error': f'Aucun repository accessible sur {total_repos} testés' if not success else None
+        })
         
     except Exception as e:
-        messages.error(request, f'Error in admin view: {str(e)}')
-        return render(request, 'github/admin.html', {'error': str(e)})
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@login_required
+def force_github_reauth(request):
+    """
+    Force GitHub re-authentication to get new scopes
+    """
+    try:
+        from allauth.socialaccount.models import SocialAccount, SocialToken
+        
+        # Delete existing GitHub connection to force re-auth
+        social_accounts = SocialAccount.objects.filter(user=request.user, provider='github')
+        tokens_deleted = 0
+        accounts_deleted = 0
+        
+        for account in social_accounts:
+            # Delete associated tokens
+            tokens = SocialToken.objects.filter(account=account)
+            tokens_deleted += tokens.count()
+            tokens.delete()
+            
+            # Delete account
+            account.delete()
+            accounts_deleted += 1
+        
+        messages.success(
+            request, 
+            f'GitHub connection reset ({accounts_deleted} accounts, {tokens_deleted} tokens deleted). '
+            'Please reconnect to grant new permissions.'
+        )
+        
+        # Redirect to GitHub OAuth with new scopes
+        from django.urls import reverse
+        from allauth.socialaccount.providers.github.urls import urlpatterns
+        return redirect('github_login')  # This will use the new scopes from settings
+        
+    except Exception as e:
+        messages.error(request, f'Error resetting GitHub connection: {e}')
+        return redirect('github:admin')
+
+
+def github_connection_status(request):
+    """
+    Check GitHub connection status and scopes for current user
+    """
+    try:
+        from analytics.github_utils import get_user_github_scopes
+        from allauth.socialaccount.models import SocialAccount
+        
+        # Check if user has GitHub account connected
+        github_account = SocialAccount.objects.filter(user=request.user, provider='github').first()
+        
+        if not github_account:
+            return JsonResponse({
+                'connected': False,
+                'message': 'No GitHub account connected'
+            })
+        
+        # Get user's current scopes
+        scopes = get_user_github_scopes(request.user.id)
+        required_scopes = ['user:email', 'repo', 'read:org']
+        missing_scopes = [scope for scope in required_scopes if scope not in scopes]
+        
+        return JsonResponse({
+            'connected': True,
+            'username': github_account.extra_data.get('login'),
+            'scopes': scopes,
+            'required_scopes': required_scopes,
+            'missing_scopes': missing_scopes,
+            'has_all_scopes': len(missing_scopes) == 0
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        })
+
+
+def unified_setup(request):
+    """
+    Unified GitHub setup page
+    """
+    return render(request, 'github/unified_setup.html')

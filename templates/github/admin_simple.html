@@ -1,0 +1,135 @@
+{% extends "base/base.html" %}
+{% load socialaccount %}
+
+{% block title %}GitHub Configuration - GitPulse{% endblock title %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+    <!-- Header -->
+    <div class="text-center py-8">
+        <h1 class="text-3xl font-bold gradient-text mb-4">GitHub OAuth Configuration</h1>
+        <p class="text-lg text-medium-gray">Unified OAuth App for authentication and API access</p>
+    </div>
+
+
+
+    <!-- Configuration Form -->
+    <div class="card-modern p-8">
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Left Column: Configuration -->
+                <div class="space-y-6">
+                    <h2 class="text-xl font-bold text-dark-gray">OAuth App Settings</h2>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold">Client ID</span>
+                        </label>
+                        {{ form.client_id }}
+                        {% if form.client_id.errors %}
+                        <div class="text-error text-sm mt-1">{{ form.client_id.errors.0 }}</div>
+                        {% endif %}
+                        <div class="text-sm text-medium-gray mt-1">
+                            From your GitHub OAuth App settings
+                        </div>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold">Client Secret</span>
+                        </label>
+                        <input type="password" name="oauth_secret" class="input input-bordered w-full" 
+                               value="{{ oauth_secret }}"
+                               placeholder="Your OAuth App Client Secret">
+                        <div class="text-sm text-medium-gray mt-1">
+                            Your OAuth App's client secret (NOT a Personal Access Token)
+                        </div>
+                    </div>
+                    
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <h4 class="font-semibold text-yellow-800 mb-2">Required OAuth Scopes</h4>
+                        <div class="text-sm text-yellow-700 space-y-1">
+                            <div>• <code class="bg-yellow-100 px-1 rounded">user:email</code> - Access to user email addresses</div>
+                            <div>• <code class="bg-yellow-100 px-1 rounded">repo</code> - Full access to repositories</div>
+                            <div>• <code class="bg-yellow-100 px-1 rounded">read:org</code> - Read organization membership</div>
+                        </div>
+                        <div class="text-xs text-yellow-600 mt-2">
+                            These scopes are automatically requested when users connect their GitHub account.
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-full">
+                        Save OAuth Configuration
+                    </button>
+                </div>
+
+                <!-- Right Column: Status & Info -->
+                <div class="space-y-6">
+                    <h2 class="text-xl font-bold text-dark-gray">Status & Connection</h2>
+                    
+                    <!-- Callback URL -->
+                    <div>
+                        <h3 class="font-semibold text-dark-gray mb-2">OAuth Callback URL:</h3>
+                        <code class="text-xs bg-gray-100 p-3 rounded block break-all">{{ user_redirect_url }}</code>
+                        <div class="text-sm text-medium-gray mt-1">Add this URL to your GitHub OAuth App configuration</div>
+                    </div>
+                    
+                    <!-- User Connection Status -->
+                    <div>
+                        <h3 class="font-semibold text-dark-gray mb-2">Your GitHub Connection:</h3>
+                        {% if github_connected %}
+                            <div class="alert alert-success">
+                                ✅ Connected as {{ github_username }}
+                            </div>
+                            <a href="{% provider_login_url 'github' %}" class="btn btn-outline btn-sm mt-2">
+                                🔄 Reconnect
+                            </a>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                ⚠️ Not connected to GitHub
+                            </div>
+                            <a href="{% provider_login_url 'github' %}" class="btn btn-primary btn-sm mt-2">
+                                🔗 Connect GitHub Account
+                            </a>
+                        {% endif %}
+                    </div>
+                    
+
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="card-modern p-6">
+        <h2 class="text-lg font-bold text-dark-gray mb-4">Setup Instructions</h2>
+        <div class="grid md:grid-cols-2 gap-6 text-sm">
+            <div>
+                <h3 class="font-semibold mb-2">1. Create GitHub OAuth App</h3>
+                <ul class="space-y-1 text-medium-gray">
+                    <li>• Go to <a href="https://github.com/settings/applications/oauth" target="_blank" class="link">GitHub OAuth Apps</a></li>
+                    <li>• Click "New OAuth App"</li>
+                    <li>• Set Application name: "GitPulse"</li>
+                    <li>• Set Homepage URL: your domain</li>
+                    <li>• Set Authorization callback URL (shown above)</li>
+                    <li>• Copy Client ID and Client Secret</li>
+                </ul>
+            </div>
+            <div>
+                <h3 class="font-semibold mb-2">2. How It Works</h3>
+                <ul class="space-y-1 text-medium-gray">
+                    <li>• Users authenticate via GitHub OAuth</li>
+                    <li>• OAuth tokens are stored per user</li>
+                    <li>• API calls use individual user tokens</li>
+                    <li>• Each user accesses only their authorized repos</li>
+                    <li>• No shared Personal Access Tokens needed</li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock content %}

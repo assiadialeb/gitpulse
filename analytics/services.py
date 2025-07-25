@@ -19,27 +19,58 @@ def cleanup_application_data(application_id: int) -> Dict:
         'commits_deleted': 0,
         'sync_logs_deleted': 0,
         'repository_stats_deleted': 0,
+        'quality_metrics_deleted': 0,
         'total_deleted': 0
     }
     
     try:
         # Delete all commits for this application
-        commits_deleted = Commit.objects(application_id=application_id).delete()
+        commits_deleted = Commit.objects.filter(application_id=application_id).delete()
         results['commits_deleted'] = commits_deleted
         
         # Delete all sync logs for this application
-        sync_logs_deleted = SyncLog.objects(application_id=application_id).delete()
+        sync_logs_deleted = SyncLog.objects.filter(application_id=application_id).delete()
         results['sync_logs_deleted'] = sync_logs_deleted
         
         # Delete all repository stats for this application
-        repo_stats_deleted = RepositoryStats.objects(application_id=application_id).delete()
+        repo_stats_deleted = RepositoryStats.objects.filter(application_id=application_id).delete()
         results['repository_stats_deleted'] = repo_stats_deleted
+        
+        # Delete all quality metrics for this application
+        from pymongo import MongoClient
+        client = MongoClient('localhost', 27017)
+        db = client['gitpulse']
+        quality_collection = db['developer_quality_metrics']
+        
+        # Get repository names for this application to filter quality metrics
+        from applications.models import Application
+        try:
+            application = Application.objects.get(id=application_id)
+            repository_names = list(application.repositories.values_list('github_repo_name', flat=True))
+            
+            if repository_names:
+                # Delete quality metrics for repositories in this application
+                quality_result = quality_collection.delete_many({
+                    'repository': {'$in': repository_names}
+                })
+                results['quality_metrics_deleted'] = int(quality_result.deleted_count)
+            else:
+                results['quality_metrics_deleted'] = 0
+        except Application.DoesNotExist:
+            # Application already deleted, try to delete by application_id if it exists in quality metrics
+            quality_result = quality_collection.delete_many({
+                'application_id': application_id
+            })
+            results['quality_metrics_deleted'] = int(quality_result.deleted_count)
+        
+        client.close()
         
         # Calculate total
         results['total_deleted'] = (
             results['commits_deleted'] + 
             results['sync_logs_deleted'] + 
-            results['repository_stats_deleted']
+            results['repository_stats_deleted'] +
+            results['quality_metrics_deleted']
         )
         
         return results
@@ -64,27 +95,42 @@ def cleanup_repository_data(repository_full_name: str) -> Dict:
         'commits_deleted': 0,
         'sync_logs_deleted': 0,
         'repository_stats_deleted': 0,
+        'quality_metrics_deleted': 0,
         'total_deleted': 0
     }
     
     try:
         # Delete all commits for this repository
-        commits_deleted = Commit.objects(repository_full_name=repository_full_name).delete()
+        commits_deleted = Commit.objects.filter(repository_full_name=repository_full_name).delete()
         results['commits_deleted'] = commits_deleted
         
         # Delete all sync logs for this repository
-        sync_logs_deleted = SyncLog.objects(repository_full_name=repository_full_name).delete()
+        sync_logs_deleted = SyncLog.objects.filter(repository_full_name=repository_full_name).delete()
         results['sync_logs_deleted'] = sync_logs_deleted
         
         # Delete repository stats for this repository
-        repo_stats_deleted = RepositoryStats.objects(repository_full_name=repository_full_name).delete()
+        repo_stats_deleted = RepositoryStats.objects.filter(repository_full_name=repository_full_name).delete()
         results['repository_stats_deleted'] = repo_stats_deleted
+        
+        # Delete quality metrics for this repository
+        from pymongo import MongoClient
+        client = MongoClient('localhost', 27017)
+        db = client['gitpulse']
+        quality_collection = db['developer_quality_metrics']
+        
+        quality_result = quality_collection.delete_many({
+            'repository': repository_full_name
+        })
+        results['quality_metrics_deleted'] = int(quality_result.deleted_count)
+        
+        client.close()
         
         # Calculate total
         results['total_deleted'] = (
             results['commits_deleted'] + 
             results['sync_logs_deleted'] + 
-            results['repository_stats_deleted']
+            results['repository_stats_deleted'] +
+            results['quality_metrics_deleted']
         )
         
         return results
@@ -105,7 +151,7 @@ from django_q.tasks import async_task, Schedule
 from django_q.models import Schedule as ScheduleModel
 
 from .github_service import GitHubRateLimitError
-from github.models import GitHubToken
+# from github.models import GitHubToken  # Deprecated - using PAT now
 
 logger = logging.getLogger(__name__)
 
@@ -468,3 +514,124 @@ def cleanup_old_rate_limit_resets():
             'success': False,
             'error': str(e)
         } 
+
+from .models import Deployment
+# from github.models import GitHubToken  # Deprecated - using PAT now
+from applications.models import ApplicationRepository
+from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
+from .github_utils import get_github_token_for_user
+from typing import List
+
+class DeploymentIndexingService:
+    """Service for indexing GitHub deployments for a repository and application"""
+    def __init__(self, user_id: int):
+        self.user_id = user_id
+        self.github_service = self._init_github_service()
+
+    def _init_github_service(self):
+        access_token = get_github_token_for_user(self.user_id)
+        if not access_token:
+            raise ValueError(f"No GitHub token found for user {self.user_id}")
+        return GitHubService(access_token)
+
+    def index_deployments(self, application_id: int = None, repo_full_name: str = None) -> List[str]:
+        """
+        Fetch and index deployments for a given repo and application.
+        Returns a list of deployment IDs indexed.
+        """
+        url = f"{self.github_service.base_url}/repos/{repo_full_name}/deployments"
+        deployments, _ = self.github_service._make_request(url)
+        indexed_ids = []
+        for dep in deployments:
+            deployment_id = str(dep.get('id'))
+            # Upsert by deployment_id (MongoEngine compatible)
+            obj = Deployment.objects(deployment_id=deployment_id).first()
+            
+            created = False
+            if not obj:
+                # Create new deployment
+                obj = Deployment(deployment_id=deployment_id)
+                created = True
+            
+            # Update deployment fields
+            obj.application_id = application_id
+            obj.repository_full_name = repo_full_name
+            obj.environment = dep.get('environment')
+            obj.creator = dep.get('creator', {}).get('login')
+            obj.created_at = dep.get('created_at')
+            obj.updated_at = dep.get('updated_at')
+            obj.payload = dep
+            obj.save()
+            # Fetch deployment statuses
+            statuses_url = f"{self.github_service.base_url}/repos/{repo_full_name}/deployments/{deployment_id}/statuses"
+            statuses, _ = self.github_service._make_request(statuses_url)
+            obj.statuses = statuses
+            obj.save()
+            indexed_ids.append(deployment_id)
+        return indexed_ids 
+
+from .models import Release
+import dateutil.parser
+from datetime import timezone
+
+class ReleaseIndexingService:
+    """Service for indexing GitHub releases for a repository and application"""
+    def __init__(self, user_id: int):
+        self.user_id = user_id
+        self.github_service = self._init_github_service()
+
+    def _init_github_service(self):
+        access_token = get_github_token_for_user(self.user_id)
+        if not access_token:
+            raise ValueError(f"No GitHub token found for user {self.user_id}")
+        return GitHubService(access_token)
+
+    def index_releases(self, application_id: int = None, repo_full_name: str = None) -> list:
+        """
+        Fetch and index releases for a given repo and application.
+        Returns a list of release IDs indexed.
+        """
+        url = f"{self.github_service.base_url}/repos/{repo_full_name}/releases"
+        releases, _ = self.github_service._make_request(url)
+        indexed_ids = []
+        for rel in releases:
+            release_id = str(rel.get('id'))
+            published_at_raw = rel.get('published_at')
+            published_at = None
+            if published_at_raw:
+                dt = dateutil.parser.parse(published_at_raw)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                published_at = dt
+            obj = Release.objects.filter(release_id=release_id).first()
+            if not obj:
+                obj = Release(
+                    release_id=release_id,
+                    application_id=application_id,
+                    repository_full_name=repo_full_name,
+                    tag_name=rel.get('tag_name'),
+                    name=rel.get('name'),
+                    author=rel.get('author', {}).get('login'),
+                    published_at=published_at,
+                    draft=rel.get('draft', False),
+                    prerelease=rel.get('prerelease', False),
+                    body=rel.get('body'),
+                    html_url=rel.get('html_url'),
+                    assets=rel.get('assets', []),
+                    payload=rel,
+                )
+                obj.save()
+            else:
+                obj.tag_name = rel.get('tag_name')
+                obj.name = rel.get('name')
+                obj.author = rel.get('author', {}).get('login')
+                obj.published_at = published_at
+                obj.draft = rel.get('draft', False)
+                obj.prerelease = rel.get('prerelease', False)
+                obj.body = rel.get('body')
+                obj.html_url = rel.get('html_url')
+                obj.assets = rel.get('assets', [])
+                obj.payload = rel
+                obj.save()
+            indexed_ids.append(release_id)
+        return indexed_ids 

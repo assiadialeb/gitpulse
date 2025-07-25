@@ -7,11 +7,14 @@ from typing import List, Dict, Optional, Tuple
 from django.db import transaction
 from mongoengine import Q
 from django.core.exceptions import ObjectDoesNotExist
+from pymongo import MongoClient
+from mongoengine.errors import NotUniqueError
 
 from .models import Commit, SyncLog, RepositoryStats, FileChange
 from .git_service import GitService, GitServiceError
 from applications.models import Application, ApplicationRepository
 from .commit_classifier import classify_commit_with_files
+from analytics.models import DeveloperAlias
 
 logger = logging.getLogger(__name__)
 
@@ -73,37 +76,6 @@ class GitSyncService:
             # Clean up all cloned repositories
             self.git_service.cleanup_all_repositories()
 
-        # Auto-group developers after successful sync
-        if results['repositories_synced'] > 0:
-            try:
-                logger.info("Starting automatic developer grouping...")
-                from .developer_grouping_service import DeveloperGroupingService
-                grouping_service = DeveloperGroupingService()
-                grouping_result = grouping_service.auto_group_developers()
-                if grouping_result['success']:
-                    logger.info(f"Developer grouping completed: {grouping_result['groups_created']} groups processed")
-                    results['developer_groups_processed'] = grouping_result['groups_created']
-                else:
-                    logger.warning(f"Developer grouping failed: {grouping_result.get('error', 'Unknown error')}")
-                    results['developer_groups_processed'] = 0
-            except Exception as e:
-                logger.error(f"Error during developer grouping: {e}")
-                results['developer_groups_processed'] = 0
-        else:
-            results['developer_groups_processed'] = 0
-
-        # Batch quality metrics analysis after developer grouping
-        try:
-            logger.info("Starting batch commit quality analysis...")
-            from .quality_service import QualityAnalysisService
-            quality_service = QualityAnalysisService()
-            processed = quality_service.analyze_commits_for_application(application_id)
-            logger.info(f"Batch quality analysis completed: {processed} commits processed")
-            results['quality_metrics_processed'] = processed
-        except Exception as e:
-            logger.error(f"Error during batch quality analysis: {e}")
-            results['quality_metrics_processed'] = 0
-
         return results
 
     def sync_application_repositories_with_progress(self, application_id: int, sync_type: str = 'incremental') -> Dict:
@@ -161,40 +133,9 @@ class GitSyncService:
             # Clean up all cloned repositories
             self.git_service.cleanup_all_repositories()
 
-        # Auto-group developers after successful sync
-        if results['repositories_synced'] > 0:
-            try:
-                logger.info("Starting automatic developer grouping...")
-                from .developer_grouping_service import DeveloperGroupingService
-                grouping_service = DeveloperGroupingService()
-                grouping_result = grouping_service.auto_group_developers()
-                if grouping_result['success']:
-                    logger.info(f"Developer grouping completed: {grouping_result['groups_created']} groups processed")
-                    results['developer_groups_processed'] = grouping_result['groups_created']
-                else:
-                    logger.warning(f"Developer grouping failed: {grouping_result.get('error', 'Unknown error')}")
-                    results['developer_groups_processed'] = 0
-            except Exception as e:
-                logger.error(f"Error during developer grouping: {e}")
-                results['developer_groups_processed'] = 0
-        else:
-            results['developer_groups_processed'] = 0
-
-        # Batch quality metrics analysis after developer grouping
-        try:
-            logger.info("Starting batch commit quality analysis...")
-            from .quality_service import QualityAnalysisService
-            quality_service = QualityAnalysisService()
-            processed = quality_service.analyze_commits_for_application(application_id)
-            logger.info(f"Batch quality analysis completed: {processed} commits processed")
-            results['quality_metrics_processed'] = processed
-        except Exception as e:
-            logger.error(f"Error during batch quality analysis: {e}")
-            results['quality_metrics_processed'] = 0
-
         return results
     
-    def sync_repository(self, repo_full_name: str, repo_url: str, application_id: int, 
+    def sync_repository(self, repo_full_name: str, repo_url: str, application_id: int = None, 
                        sync_type: str = 'incremental') -> Dict:
         """
         Sync commits for a specific repository using Git local operations
@@ -202,7 +143,7 @@ class GitSyncService:
         Args:
             repo_full_name: Repository name in format "owner/repo"
             repo_url: Git repository URL
-            application_id: Application ID
+            application_id: Application ID (optional for repository-based indexing)
             sync_type: 'full' or 'incremental'
             
         Returns:
@@ -219,8 +160,16 @@ class GitSyncService:
         
         try:
             # Clone repository
-            logger.info(f"Cloning repository {repo_full_name}")
-            self.git_service.clone_repository(repo_url, repo_full_name)
+            print(f"DEBUG: About to clone repository {repo_full_name} from {repo_url}")
+            logger.info(f"Cloning repository {repo_full_name} from {repo_url}")
+            try:
+                repo_path = self.git_service.clone_repository(repo_url, repo_full_name)
+                print(f"DEBUG: Successfully cloned {repo_full_name} to {repo_path}")
+                logger.info(f"Successfully cloned {repo_full_name} to {repo_path}")
+            except Exception as clone_error:
+                print(f"DEBUG: Failed to clone {repo_full_name}: {clone_error}")
+                logger.error(f"Failed to clone {repo_full_name}: {clone_error}")
+                raise
             
             # Get or create repository stats
             repo_stats = RepositoryStats.objects(repository_full_name=repo_full_name).first()
@@ -292,14 +241,14 @@ class GitSyncService:
             raise
     
     def _process_commits(self, commits_data: List[Dict], repo_full_name: str, 
-                        application_id: int) -> Dict:
+                        application_id: int = None) -> Dict:
         """
         Process and store commits in MongoDB
         
         Args:
             commits_data: List of commit dictionaries from Git
             repo_full_name: Repository name
-            application_id: Application ID
+            application_id: Application ID (optional for repository-based indexing)
             
         Returns:
             Dictionary with processing results
@@ -356,9 +305,14 @@ class GitSyncService:
                     results['commits_updated'] += 1
                 else:
                     # Create new commit
-                    commit = Commit(**parsed_data)
-                    commit.save()
-                    results['commits_new'] += 1
+                    try:
+                        commit = Commit(**parsed_data)
+                        commit.save()
+                        results['commits_new'] += 1
+                    except NotUniqueError:
+                        logger.warning(f"Commit {sha} déjà présent, ignoré.")
+                        results['commits_skipped'] += 1
+                        continue
                 
                 results['commits_processed'] += 1
                 
@@ -369,14 +323,14 @@ class GitSyncService:
         
         return results
     
-    def _parse_commit_data(self, commit_data: Dict, repo_full_name: str, application_id: int) -> Dict:
+    def _parse_commit_data(self, commit_data: Dict, repo_full_name: str, application_id: int = None) -> Dict:
         """
         Parse commit data into MongoDB document format
         
         Args:
             commit_data: Raw commit data from Git
             repo_full_name: Repository name
-            application_id: Application ID
+            application_id: Application ID (optional for repository-based indexing)
             
         Returns:
             Dictionary ready for MongoDB storage
@@ -457,3 +411,46 @@ class GitSyncService:
     def cleanup(self):
         """Clean up all cloned repositories"""
         self.git_service.cleanup_all_repositories() 
+
+def create_missing_aliases_for_application(application_id: int):
+    """Create missing aliases for all unique authors in an application"""
+    logger.info(f"Creating missing aliases for application {application_id}...")
+    
+    # Get all unique authors from commits
+    client = MongoClient('localhost', 27017)
+    db = client['gitpulse']
+    
+    # Extract unique authors from commits
+    unique_authors = set()
+    for commit in db.commits.find({'application_id': application_id}):
+        author_key = f"{commit.get('author_name', '')}|{commit.get('author_email', '')}"
+        unique_authors.add(author_key)
+    
+    logger.info(f"Found {len(unique_authors)} unique authors")
+    
+    # Create missing aliases
+    created_count = 0
+    for author_key in unique_authors:
+        name, email = author_key.split('|', 1)
+        
+        # Check if alias already exists
+        existing_alias = DeveloperAlias.objects(
+            name=name,
+            email=email
+        ).first()
+        
+        if not existing_alias:
+            # Create new alias
+            alias = DeveloperAlias(
+                name=name,
+                email=email,
+                first_seen=datetime.utcnow(),  # Will be updated with actual dates later
+                last_seen=datetime.utcnow(),
+                commit_count=1
+            )
+            alias.save()
+            created_count += 1
+            logger.info(f"Created alias: {name} ({email})")
+    
+    logger.info(f"Created {created_count} new aliases")
+    return created_count 

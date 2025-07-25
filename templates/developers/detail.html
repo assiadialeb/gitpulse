@@ -23,18 +23,18 @@
                 </div>
             </div>
             <p class="text-gray-600">{{ developer.email }}</p>
-            {% if is_group %}
-                <p class="text-sm text-gray-500">{{ identities|length }} identities in this group</p>
+            {% if developer.is_developer %}
+                <p class="text-sm text-gray-500">{{ developer.aliases|length }} aliases for this developer</p>
                 {% if developer.github_id %}
                     <p class="text-sm text-blue-600">GitHub ID: {{ developer.github_id }}</p>
                 {% endif %}
                 <p class="text-sm text-gray-400">
-                    {% for identity in identities %}
-                        {{ identity.email }}{% if not forloop.last %}, {% endif %}
+                    {% for alias in developer.aliases %}
+                        {{ alias.email }}{% if not forloop.last %}, {% endif %}
                     {% endfor %}
                 </p>
             {% else %}
-                <p class="text-sm text-gray-500">Individual Developer</p>
+                <p class="text-sm text-gray-500">Individual Alias</p>
             {% endif %}
         </div>
         <a href="{% url 'developers:list' %}" class="btn btn-outline">
@@ -246,14 +246,9 @@
                         datasets: [{
                             data: {{ commit_type_values|safe }},
                             backgroundColor: [
-                                '#4caf50', // fix
-                                '#2196f3', // feature
-                                '#ffeb3b', // docs
-                                '#ff9800', // refactor
-                                '#9c27b0', // test
-                                '#00bcd4', // style
-                                '#607d8b', // chore
-                                '#bdbdbd', // other
+                                {% for item in commit_type_legend %}
+                                    '{{ item.color }}'{% if not forloop.last %},{% endif %}
+                                {% endfor %}
                             ],
                             borderWidth: 1
                         }]
@@ -269,6 +264,54 @@
                         }
                     });
                 </script>
+                <!-- Feature-to-Fix Ratio Block -->
+                <div class="mt-6 p-4 rounded-xl shadow-sm bg-light-gray">
+                    <div class="flex items-center mb-2">
+                        <span class="text-lg font-semibold text-dark-gray mr-2">Feature-to-Fix Ratio</span>
+                        <span class="text-sm text-medium-gray">(Feature / Fix &gt; 1)</span>
+                    </div>
+                    <div class="flex items-center mb-1">
+                        <span class="text-2xl font-bold mr-3 {% if commit_type_distribution.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {{ commit_type_distribution.feature_fix_ratio }}
+                        </span>
+                        <span class="ml-2 text-lg font-semibold {% if commit_type_distribution.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {% if commit_type_distribution.feature_fix_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                        </span>
+                    </div>
+                    <div class="text-sm text-dark-gray mt-1">{{ commit_type_distribution.feature_fix_message }}</div>
+                </div>
+                <!-- Test Coverage Ratio Block -->
+                <div class="mt-4 p-4 rounded-xl shadow-sm bg-light-gray">
+                    <div class="flex items-center mb-2">
+                        <span class="text-lg font-semibold text-dark-gray mr-2">Test Coverage Ratio</span>
+                        <span class="text-sm text-medium-gray">(Test / Feature ≥ 0.3)</span>
+                    </div>
+                    <div class="flex items-center mb-1">
+                        <span class="text-2xl font-bold mr-3 {% if commit_type_distribution.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {{ commit_type_distribution.test_feature_ratio }}
+                        </span>
+                        <span class="ml-2 text-lg font-semibold {% if commit_type_distribution.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {% if commit_type_distribution.test_feature_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                        </span>
+                    </div>
+                    <div class="text-sm text-dark-gray mt-1">{{ commit_type_distribution.test_feature_message }}</div>
+                </div>
+                <!-- Focus Ratio Block -->
+                <div class="mt-4 p-4 rounded-xl shadow-sm bg-light-gray">
+                    <div class="flex items-center mb-2">
+                        <span class="text-lg font-semibold text-dark-gray mr-2">Focus Ratio</span>
+                        <span class="text-sm text-medium-gray">(Chore + Docs &lt; 30%)</span>
+                    </div>
+                    <div class="flex items-center mb-1">
+                        <span class="text-2xl font-bold mr-3 {% if commit_type_distribution.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {{ commit_type_distribution.chore_docs_ratio|floatformat:2 }}
+                        </span>
+                        <span class="ml-2 text-lg font-semibold {% if commit_type_distribution.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                            {% if commit_type_distribution.chore_docs_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                        </span>
+                    </div>
+                    <div class="text-sm text-dark-gray mt-1">{{ commit_type_distribution.chore_docs_message }}</div>
+                </div>
                 {% else %}
                 <div class="text-center py-8">
                     <p class="text-gray-500">No commit type data available</p>
@@ -291,7 +334,6 @@
             {% else %}
             <div class="text-center py-8">
                 <p class="text-gray-500">No quality metrics data available by month</p>
-                <p class="text-sm text-gray-400 mt-2">Debug: quality_metrics_by_month = {{ quality_metrics_by_month }}</p>
             </div>
             {% endif %}
         </div>
@@ -300,7 +342,7 @@
     <!-- Activity Bubble Chart -->
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h2 class="card-title">🕐 Activity Heatmap (Last 120 Days)</h2>
+            <h2 class="card-title">🕐 Activity Heatmap (Last 365 Days)</h2>
             
             {% if chart_data %}
             <!-- Repository Legend -->
@@ -319,7 +361,7 @@
             </p>
             {% else %}
             <div class="text-center py-8">
-                <p class="text-gray-500">No activity data available for the last 120 days</p>
+                <p class="text-gray-500">No activity data available for the last 365 days</p>
             </div>
             {% endif %}
         </div>
@@ -432,7 +474,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         reverse: true,
                         min: 0,
-                        max: 120
+                        max: 365
                     },
                     y: {
                         type: 'linear',

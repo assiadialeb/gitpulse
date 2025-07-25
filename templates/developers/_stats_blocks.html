@@ -1,0 +1,337 @@
+<!-- Stats Summary -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Left Column: Stats and Commit Quality -->
+    <div class="flex flex-col h-full">
+        <!-- Stats -->
+        <div class="stats shadow-xl h-32 mb-6">
+            <div class="stat">
+                <div class="stat-title text-xs">Total Commits</div>
+                <div class="stat-value text-primary text-lg">{{ developer.commit_count }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-title text-xs">Commit Frequency</div>
+                <div class="stat-value text-lg {% if commit_frequency.avg_commits_per_day >= 1 %}text-success{% elif commit_frequency.avg_commits_per_day >= 0.3 %}text-info{% else %}text-gray-500{% endif %}">
+                    {% if commit_frequency.avg_commits_per_day is not None %}
+                        {{ commit_frequency.avg_commits_per_day }}/day
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </div>
+            </div>
+            <div class="stat">
+                <div class="stat-title text-xs">First Commit</div>
+                <div class="stat-value text-success text-lg">
+                    {% if first_commit %}
+                        {{ first_commit.authored_date|date:"M d, Y" }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </div>
+            </div>
+            <div class="stat">
+                <div class="stat-title text-xs">Last Commit</div>
+                <div class="stat-value text-info text-lg">
+                    {% if last_commit %}
+                        {{ last_commit.authored_date|date:"M d, Y" }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <!-- Commit Quality -->
+        <div class="card bg-base-100 shadow-xl flex-1">
+            <div class="card-body">
+                <h2 class="card-title text-xl">📝 Commit Quality</h2>
+                {% if commit_quality.total_commits > 0 %}
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600">Explicit Messages</span>
+                        <span class="font-bold text-green-600">{{ commit_quality.explicit_ratio }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-green-500 h-2 rounded-full" style="width: {{ commit_quality.explicit_ratio }}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600">Generic Messages</span>
+                        <span class="font-bold text-red-500">{{ commit_quality.generic_ratio }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-red-500 h-2 rounded-full" style="width: {{ commit_quality.generic_ratio }}%"></div>
+                    </div>
+                    <div class="mt-4 p-4 bg-gray-50 rounded-xl">
+                        <p class="text-sm text-gray-600">Total commits analyzed: {{ commit_quality.total_commits }}</p>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-8">
+                    <p class="text-gray-500">No commits available for quality analysis</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <!-- Right Column: Polar Area Chart (spans full height) -->
+    <div class="card bg-base-100 shadow-xl h-full">
+        <div class="card-body">
+            <h3 class="card-title text-lg">Net Lines Added by Repository</h3>
+            {% if polar_chart_data %}
+            <div class="relative flex-1" style="height: 400px;">
+                <canvas id="polarChart"></canvas>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-gray-500">No repository data available</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<!-- Quality Metrics and Commit Type Distribution on same row -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Quality Metrics Table -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-xl">📊 Quality Metrics</h2>
+            {% if quality_metrics.total_commits > 0 %}
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Total Commits Analyzed</td>
+                            <td>{{ quality_metrics.total_commits }}</td>
+                            <td>-</td>
+                        </tr>
+                        <tr>
+                            <td>Real Code Commits</td>
+                            <td>{{ quality_metrics.real_code_commits }}</td>
+                            <td>{{ quality_metrics.real_code_ratio }}%</td>
+                        </tr>
+                        <tr>
+                            <td>Suspicious Commits</td>
+                            <td>{{ quality_metrics.suspicious_commits }}</td>
+                            <td>{{ quality_metrics.suspicious_ratio }}%</td>
+                        </tr>
+                        <tr>
+                            <td>Documentation Only</td>
+                            <td>{{ quality_metrics.doc_only_commits }}</td>
+                            <td>{{ quality_metrics.doc_only_ratio }}%</td>
+                        </tr>
+                        <tr>
+                            <td>Configuration Only</td>
+                            <td>{{ quality_metrics.config_only_commits }}</td>
+                            <td>{{ quality_metrics.config_only_ratio }}%</td>
+                        </tr>
+                        <tr>
+                            <td>Micro Commits (≤2 changes)</td>
+                            <td>{{ quality_metrics.micro_commits }}</td>
+                            <td>{{ quality_metrics.micro_commits_ratio }}%</td>
+                        </tr>
+                        <tr>
+                            <td>No Ticket Reference</td>
+                            <td>{{ quality_metrics.no_ticket_commits }}</td>
+                            <td>{{ quality_metrics.no_ticket_ratio }}%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Quality Scores -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="stat bg-base-200 rounded-lg">
+                    <div class="stat-title">Code Quality Score</div>
+                    <div class="stat-value text-lg {% if quality_metrics.avg_code_quality >= 70 %}text-success{% elif quality_metrics.avg_code_quality >= 50 %}text-warning{% else %}text-error{% endif %}">
+                        {{ quality_metrics.avg_code_quality }}/100
+                    </div>
+                </div>
+                <div class="stat bg-base-200 rounded-lg">
+                    <div class="stat-title">Impact Score</div>
+                    <div class="stat-value text-lg {% if quality_metrics.avg_impact >= 70 %}text-success{% elif quality_metrics.avg_impact >= 50 %}text-warning{% else %}text-error{% endif %}">
+                        {{ quality_metrics.avg_impact }}/100
+                    </div>
+                </div>
+                <div class="stat bg-base-200 rounded-lg">
+                    <div class="stat-title">Complexity Score</div>
+                    <div class="stat-value text-lg {% if quality_metrics.avg_complexity >= 70 %}text-success{% elif quality_metrics.avg_complexity >= 50 %}text-warning{% else %}text-error{% endif %}">
+                        {{ quality_metrics.avg_complexity }}/100
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-gray-500">No quality metrics available. Run the quality analysis first.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <!-- Commit Type Distribution Doughnut Chart -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-xl">🍩 Commit Type Distribution</h2>
+            {% if commit_type_distribution.total > 0 %}
+            <div class="flex items-start space-x-6">
+                <div class="relative flex-1" style="height: 350px;">
+                    <canvas id="commitTypeDoughnut"></canvas>
+                </div>
+                <div class="flex flex-col space-y-3 min-w-0">
+                    {% for item in commit_type_legend %}
+                        <div class="flex items-center space-x-2">
+                            <span class="inline-block w-4 h-4 rounded-full flex-shrink-0" style="background-color: {{ item.color }};"></span>
+                            <span class="text-sm text-gray-700 font-medium truncate">{{ item.label|title }} ({{ item.count }})</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+                const commitTypeData = {
+                    labels: {{ commit_type_labels|safe }},
+                    datasets: [{
+                        data: {{ commit_type_values|safe }},
+                        backgroundColor: [
+                            {% for item in commit_type_legend %}
+                                '{{ item.color }}'{% if not forloop.last %},{% endif %}
+                            {% endfor %}
+                        ]
+                    }]
+                };
+                const ctx = document.getElementById('commitTypeDoughnut');
+                if (ctx) {
+                    new Chart(ctx, {
+                        type: 'doughnut',
+                        data: commitTypeData,
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        usePointStyle: true,
+                                        padding: 15
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            </script>
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-gray-500">No commit type data available</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<!-- Quality Metrics by Month Chart -->
+<div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+        <h2 class="card-title text-xl">📈 Quality Metrics by Month</h2>
+        <p class="text-sm text-gray-600 mb-4">All metrics over time</p>
+        {% if quality_metrics_by_month.labels %}
+        <div class="relative" style="height: 400px;">
+            <canvas id="qualityMetricsChart"></canvas>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            const qualityMetricsData = {{ quality_metrics_by_month|safe }};
+            const ctx = document.getElementById('qualityMetricsChart');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: qualityMetricsData,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 15
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        </script>
+        {% else %}
+        <div class="text-center py-8">
+            <p class="text-gray-500">No quality metrics data available by month</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+<!-- Activity Bubble Chart -->
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h2 class="card-title">🕐 Activity Heatmap (Last 365 Days)</h2>
+        {% if chart_data %}
+        <!-- Repository Legend -->
+        <div class="mb-4 p-4 bg-gray-50 rounded-xl">
+            <h4 class="text-sm font-semibold text-gray-700 mb-3">Repositories:</h4>
+            <div class="flex flex-wrap gap-3" id="repository-legend">
+                <!-- Legend will be populated by JavaScript -->
+            </div>
+        </div>
+        <div class="relative" style="height: 500px;">
+            <canvas id="activityChart"></canvas>
+        </div>
+        <p class="text-sm text-gray-500 text-center mt-4">
+            X-axis: Days ago, Y-axis: Hour of day (0-23), Bubble size: Volume of changes
+        </p>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            const chartData = {{ chart_data|safe }};
+            const ctx = document.getElementById('activityChart');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'bubble',
+                    data: {
+                        datasets: chartData
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const repo = context.dataset.label;
+                                        const commits = context.raw.commit_count;
+                                        const changes = context.raw.changes;
+                                        return `${repo}: ${commits} commits (${changes} changes)`;
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        </script>
+        {% else %}
+        <div class="text-center py-8">
+            <p class="text-gray-500">No activity data available for the last 365 days</p>
+        </div>
+        {% endif %}
+    </div>
+</div> 

@@ -1,9 +1,54 @@
 """
 MongoDB models for analytics data
 """
-from datetime import datetime
-from mongoengine import Document, EmbeddedDocument, fields
+from datetime import datetime, timezone
+from django.utils import timezone as django_timezone
+from django.conf import settings
+import mongoengine.fields as fields
+from mongoengine import Document, EmbeddedDocument
 from typing import List, Optional
+
+
+class IndexingState(Document):
+    """MongoDB document for tracking indexing state per repository and entity type"""
+    # Repository information
+    repository_id = fields.IntField(required=True)  # Repository Django model ID
+    repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
+    entity_type = fields.StringField(required=True)  # 'deployments', 'pull_requests', 'releases', etc.
+    
+    # Indexing state
+    last_indexed_at = fields.DateTimeField(null=True)  # Last date/time indexed for this entity
+    last_run_at = fields.DateTimeField(default=django_timezone.now)  # When the task was last executed
+    status = fields.StringField(choices=['pending', 'running', 'completed', 'error'], default='pending')
+    
+    # Statistics
+    total_indexed = fields.IntField(default=0)  # Total number of items indexed
+    batch_size_days = fields.IntField(default=30)  # Days per batch for this entity
+    
+    # Error handling
+    error_message = fields.StringField(null=True)
+    retry_count = fields.IntField(default=0)
+    max_retries = fields.IntField(default=3)
+    
+    # Metadata
+    created_at = fields.DateTimeField(default=django_timezone.now)
+    updated_at = fields.DateTimeField(default=django_timezone.now)
+    
+    # MongoDB settings
+    meta = {
+        'collection': 'indexing_states',
+        'indexes': [
+            'repository_id',
+            'entity_type',
+            'status',
+            'last_run_at',
+            ('repository_id', 'entity_type'),  # Unique combination
+            ('status', 'last_run_at'),
+        ]
+    }
+    
+    def __str__(self):
+        return f"{self.repository_full_name} - {self.entity_type} - {self.status}"
 
 
 class FileChange(EmbeddedDocument):
@@ -16,17 +61,17 @@ class FileChange(EmbeddedDocument):
     patch = fields.StringField()  # Optional patch content
 
 
-class DeveloperGroup(Document):
+class Developer(Document):
     """MongoDB document for grouping developers with multiple usernames/emails"""
     # Primary identifier
     primary_name = fields.StringField(required=True)
     primary_email = fields.StringField(required=True)
     github_id = fields.StringField()  # GitHub user ID if available
     
-    # Application context (None for global groups)
+    # Application context (None for global developers)
     application_id = fields.IntField(required=False, null=True)
     
-    # Group metadata
+    # Developer metadata
     created_at = fields.DateTimeField(default=datetime.utcnow)
     updated_at = fields.DateTimeField(default=datetime.utcnow)
     is_auto_grouped = fields.BooleanField(default=True)  # True if auto-detected, False if manual
@@ -36,7 +81,7 @@ class DeveloperGroup(Document):
     
     # MongoDB settings
     meta = {
-        'collection': 'developer_groups',
+        'collection': 'developers',
         'indexes': [
             'application_id',
             'primary_email',
@@ -52,8 +97,8 @@ class DeveloperGroup(Document):
 
 class DeveloperAlias(Document):
     """MongoDB document for storing developer aliases/identities"""
-    # Link to developer group
-    group = fields.ReferenceField(DeveloperGroup, required=True)
+    # Link to developer (optional - can be None if not grouped yet)
+    developer = fields.ReferenceField(Developer, required=False)
     
     # Identity information
     name = fields.StringField(required=True)
@@ -68,7 +113,7 @@ class DeveloperAlias(Document):
     meta = {
         'collection': 'developer_aliases',
         'indexes': [
-            'group',
+            'developer',
             'email',
             'name',
             ('email', 'name'),
@@ -86,7 +131,7 @@ class Commit(Document):
     
     # Repository information
     repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
-    application_id = fields.IntField(required=True)  # Link to Django Application
+    application_id = fields.IntField(required=False, null=True)  # Link to Django Application (optional for repository-based indexing)
     
     # Commit metadata
     message = fields.StringField(required=True)
@@ -95,7 +140,7 @@ class Commit(Document):
     committer_name = fields.StringField(required=True)
     committer_email = fields.StringField(required=True)
     
-    # Timestamps
+    # Timestamps (timezone-aware)
     authored_date = fields.DateTimeField(required=True)
     committed_date = fields.DateTimeField(required=True)
     
@@ -107,6 +152,11 @@ class Commit(Document):
     
     # Commit classification
     commit_type = fields.StringField(choices=['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other'], default='other')
+
+    # PR metadata (nouveaux champs)
+    pull_request_number = fields.IntField(null=True)
+    pull_request_url = fields.StringField(null=True)
+    pull_request_merged_at = fields.DateTimeField(null=True)
     
     # Metadata
     parent_shas = fields.ListField(fields.StringField(max_length=40))
@@ -130,17 +180,42 @@ class Commit(Document):
         ]
     }
     
+    def get_authored_date_in_timezone(self):
+        """Get authored_date converted to the configured timezone"""
+        authored_date = getattr(self, 'authored_date', None)
+        if authored_date:
+            # If naive, assume UTC (since we store everything in UTC)
+            if authored_date.tzinfo is None:
+                authored_date = authored_date.replace(tzinfo=timezone.utc)
+            # Convert to configured timezone
+            return django_timezone.localtime(authored_date)
+        return authored_date
+    
+    def get_committed_date_in_timezone(self):
+        """Get committed_date converted to the configured timezone"""
+        committed_date = getattr(self, 'committed_date', None)
+        if committed_date:
+            # If naive, assume UTC (since we store everything in UTC)
+            if committed_date.tzinfo is None:
+                committed_date = committed_date.replace(tzinfo=timezone.utc)
+            # Convert to configured timezone
+            return django_timezone.localtime(committed_date)
+        return committed_date
+    
     def __str__(self):
-        sha_short = self.sha[:8] if self.sha else 'unknown'
-        message_short = self.message[:50] if self.message else 'No message'
-        return f"{self.repository_full_name}:{sha_short} - {message_short}"
+        sha = getattr(self, 'sha', None)
+        message = getattr(self, 'message', None)
+        repository_full_name = getattr(self, 'repository_full_name', 'unknown')
+        sha_short = sha[:8] if sha else 'unknown'
+        message_short = message[:50] if message else 'No message'
+        return f"{repository_full_name}:{sha_short} - {message_short}"
 
 
 class SyncLog(Document):
     """MongoDB document for tracking synchronization logs"""
     # Repository information
     repository_full_name = fields.StringField(required=True)
-    application_id = fields.IntField(required=True)
+    application_id = fields.IntField(required=False, null=True)
     
     # Sync metadata
     sync_type = fields.StringField(choices=['full', 'incremental'], required=True)
@@ -189,7 +264,7 @@ class RepositoryStats(Document):
     """MongoDB document for caching repository statistics"""
     # Repository information
     repository_full_name = fields.StringField(required=True, unique=True)
-    application_id = fields.IntField(required=True)
+    application_id = fields.IntField(required=False, null=True)
     
     # Last sync info
     last_sync_at = fields.DateTimeField()
@@ -272,8 +347,10 @@ class RateLimitReset(Document):
     def is_ready_to_restart(self):
         """Check if enough time has passed to restart the task"""
         current_time = datetime.utcnow()
-        reset_time = self.rate_limit_reset_time
-        return current_time >= reset_time
+        reset_time = getattr(self, 'rate_limit_reset_time', None)
+        if reset_time:
+            return current_time >= reset_time
+        return False
     
     @property
     def time_until_reset(self):
@@ -281,5 +358,117 @@ class RateLimitReset(Document):
         if self.is_ready_to_restart:
             return 0
         current_time = datetime.utcnow()
-        reset_time = self.rate_limit_reset_time
-        return int((reset_time - current_time).total_seconds()) 
+        reset_time = getattr(self, 'rate_limit_reset_time', None)
+        if reset_time:
+            return int((reset_time - current_time).total_seconds())
+        return 0 
+
+
+class Deployment(Document):
+    """MongoDB document for storing GitHub deployments"""
+    deployment_id = fields.StringField(required=True, unique=True)
+    application_id = fields.IntField(required=False, null=True)
+    repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
+    environment = fields.StringField()
+    creator = fields.StringField()
+    created_at = fields.DateTimeField()
+    updated_at = fields.DateTimeField()
+    statuses = fields.ListField(fields.DictField())  # List of deployment statuses
+    payload = fields.DictField()  # Raw deployment payload (optional)
+
+    meta = {
+        'collection': 'deployments',
+        'indexes': [
+            'deployment_id',
+            'application_id',
+            'repository_full_name',
+            ('application_id', 'repository_full_name'),
+            'environment',
+            'created_at',
+        ]
+    }
+
+    def __str__(self):
+        return f"{self.repository_full_name} - {self.environment} - {self.deployment_id}" 
+
+
+class Release(Document):
+    """MongoDB document for storing GitHub releases"""
+    release_id = fields.StringField(required=True, unique=True)
+    application_id = fields.IntField(required=False, null=True)
+    repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
+    tag_name = fields.StringField()
+    name = fields.StringField()
+    author = fields.StringField()
+    published_at = fields.DateTimeField()
+    draft = fields.BooleanField(default=False)
+    prerelease = fields.BooleanField(default=False)
+    body = fields.StringField()
+    html_url = fields.StringField()
+    assets = fields.ListField(fields.DictField())
+    payload = fields.DictField()  # Raw release payload (optionnel)
+
+    meta = {
+        'collection': 'releases',
+        'indexes': [
+            'release_id',
+            'application_id',
+            'repository_full_name',
+            ('application_id', 'repository_full_name'),
+            'tag_name',
+            'published_at',
+        ]
+    }
+
+    def __str__(self):
+        return f"{self.repository_full_name} - {self.tag_name} - {self.release_id}" 
+
+
+class PullRequest(Document):
+    """MongoDB document for storing GitHub Pull Requests"""
+    application_id = fields.IntField(required=False, null=True)
+    repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
+    number = fields.IntField(required=True)
+    title = fields.StringField()
+    author = fields.StringField()
+    created_at = fields.DateTimeField()
+    updated_at = fields.DateTimeField()
+    closed_at = fields.DateTimeField()
+    merged_at = fields.DateTimeField()
+    state = fields.StringField()  # open/closed
+    url = fields.StringField()
+    labels = fields.ListField(fields.StringField())
+    
+    # Nouveaux champs pour les métriques détaillées
+    merged_by = fields.StringField()  # Qui a fait le merge
+    requested_reviewers = fields.ListField(fields.StringField())  # Reviewers demandés
+    assignees = fields.ListField(fields.StringField())  # Assignés
+    review_comments_count = fields.IntField(default=0)  # Nombre de commentaires de review
+    comments_count = fields.IntField(default=0)  # Nombre total de commentaires
+    commits_count = fields.IntField(default=0)  # Nombre de commits
+    additions_count = fields.IntField(default=0)  # Lignes ajoutées
+    deletions_count = fields.IntField(default=0)  # Lignes supprimées
+    changed_files_count = fields.IntField(default=0)  # Nombre de fichiers modifiés
+    
+    payload = fields.DictField()  # Raw PR payload (optionnel)
+
+    meta = {
+        'collection': 'pull_requests',
+        'indexes': [
+            'application_id',
+            'repository_full_name',
+            'number',
+            'author',
+            'state',
+            'merged_at',
+            'merged_by',
+            ('application_id', 'repository_full_name'),
+            ('application_id', 'number'),
+            ('repository_full_name', 'number'),
+            # Index unique pour éviter les doublons
+            ('application_id', 'repository_full_name', 'number'),
+        ]
+    }
+
+    def __str__(self):
+        return f"{self.repository_full_name}#{self.number} - {self.title}" 

@@ -39,6 +39,7 @@
                     </div>
                     <h3 class="text-xl font-bold text-dark-gray">{{ application.name }}</h3>
                 </div>
+                {% if request.user.is_superuser %}
                 <div class="dropdown dropdown-end">
                     <div tabindex="0" role="button" class="btn btn-ghost btn-sm rounded-xl">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -60,6 +61,7 @@
                         </a></li>
                     </ul>
                 </div>
+                {% endif %}
             </div>
             
             <div class="flex-grow mb-4">
