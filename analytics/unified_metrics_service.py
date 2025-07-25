@@ -613,6 +613,22 @@ class UnifiedMetricsService:
             'max_commits': max_commits
         }
     
+    def get_commit_change_stats(self) -> Dict:
+        commits = list(self.commits)
+        print(f"[DEBUG] nb_commits pour commit_change_stats: {len(commits)}")
+        for c in commits[:5]:
+            print(f"[DEBUG] commit: sha={getattr(c, 'sha', None)}, total_changes={getattr(c, 'total_changes', None)}, files_changed={getattr(c, 'files_changed', None)}")
+        if not commits:
+            return {'avg_total_changes': 0, 'avg_files_changed': 0, 'nb_commits': 0}
+        avg_total_changes = sum(getattr(c, 'total_changes', 0) or 0 for c in commits) / len(commits)
+        avg_files_changed = sum(len(getattr(c, 'files_changed', []) or []) for c in commits) / len(commits)
+        print(f'[DEBUG] avg_total_changes={avg_total_changes}, avg_files_changed={avg_files_changed}')
+        return {
+            'avg_total_changes': round(avg_total_changes, 2),
+            'avg_files_changed': round(avg_files_changed, 2),
+            'nb_commits': len(commits)
+        }
+    
     # Comprehensive metrics getter
     def get_all_metrics(self) -> Dict:
         """Get all metrics for the entity"""
@@ -648,4 +664,6 @@ class UnifiedMetricsService:
                 'pr_health_metrics': self.get_pr_health_metrics(),
             })
         
+        # Ajout des stats de changements de commit
+        metrics['commit_change_stats'] = self.get_commit_change_stats()
         return metrics 

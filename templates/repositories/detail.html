@@ -142,14 +142,28 @@ calendar-range calendar-month::part(footer) {
             <!-- Total Commits -->
             <div class="bg-white p-6 rounded-xl shadow-lg">
                 <div class="flex items-center">
-                    <div class="p-3 bg-primary-green bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
+                            <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
                         </svg>
                     </div>
                     <div>
                         <p class="text-medium-gray text-sm">Total Commits</p>
-                        <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_commits|default:"0" }}</p>
+                        <p class="text-2xl font-bold text-blue-500">{{ overall_stats.total_commits|default:"0" }}</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Total Developers -->
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <div class="flex items-center">
+                    <div class="p-3 bg-purple-500 bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-medium-gray text-sm">Total Developers</p>
+                        <p class="text-2xl font-bold text-purple-500">{{ overall_stats.total_authors|default:"0" }}</p>
                     </div>
                 </div>
             </div>
@@ -164,20 +178,6 @@ calendar-range calendar-month::part(footer) {
                     <div>
                         <p class="text-medium-gray text-sm">Total Releases</p>
                         <p class="text-2xl font-bold text-dark-gray">{{ total_releases|default:"0" }}</p>
-                    </div>
-                </div>
-            </div>
-            <!-- Total Developers -->
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <div class="flex items-center">
-                    <div class="p-3 bg-primary-blue bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-primary-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Total Developers</p>
-                        <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_authors|default:"0" }}</p>
                     </div>
                 </div>
             </div>
@@ -198,24 +198,39 @@ calendar-range calendar-month::part(footer) {
         </div>
 
         <!-- Second Row: Commit Frequency, Release Frequency, PR Cycle Time -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <!-- Commit Frequency -->
             <div class="bg-white p-6 rounded-xl shadow-lg">
                 <div class="flex items-start">
                     <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        <svg class="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
+                            <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
                         </svg>
                     </div>
                     <div>
                         <p class="text-medium-gray text-sm">Commit Frequency</p>
-                        <p class="text-2xl font-bold {% if commit_frequency and commit_frequency.avg_commits_per_day >= 1 %}text-green-600{% elif commit_frequency and commit_frequency.avg_commits_per_day >= 0.3 %}text-blue-600{% else %}text-gray-500{% endif %}">
+                        <p class="text-2xl font-bold text-blue-500">
                             {% if commit_frequency and commit_frequency.avg_commits_per_day is not None %}
                                 {{ commit_frequency.avg_commits_per_day }}/day
                             {% else %}
                                 N/A
                             {% endif %}
                         </p>
+                    </div>
+                </div>
+            </div>
+            <!-- Commit Change Stats (nouveau bloc) -->
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <div class="flex items-start">
+                    <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
+                            <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-medium-gray text-sm mb-1">Commit Change Stats</p>
+                        <div class="text-medium-gray text-xs mb-1">Avg. Lines Changed: <span class="text-dark-gray font-semibold text-sm">{{ commit_change_stats.avg_total_changes }}</span></div>
+                        <div class="text-medium-gray text-xs">Avg. Files Changed: <span class="text-dark-gray font-semibold text-sm">{{ commit_change_stats.avg_files_changed }}</span></div>
                     </div>
                 </div>
             </div>

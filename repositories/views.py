@@ -114,6 +114,7 @@ def repository_detail(request, repo_id):
         commit_types_counts = commit_types.get('counts', {}) if isinstance(commit_types, dict) else {}
         commit_type_labels = json.dumps(list(commit_types_counts.keys()))
         commit_type_values = json.dumps(list(commit_types_counts.values()))
+        print("[DEBUG] After commit_type_labels")
         
         # Doughnut colors for commit types
         doughnut_colors = {
@@ -126,17 +127,30 @@ def repository_detail(request, repo_id):
             'chore': '#607d8b',
             'other': '#bdbdbd',
         }
+        print("[DEBUG] After doughnut_colors")
         
         # Legend data for commit types
         legend_data = []
         for label, count in commit_types_counts.items():
             color = doughnut_colors.get(label, '#bdbdbd')
             legend_data.append({'label': label, 'count': count, 'color': color})
+        print("[DEBUG] After legend_data")
         
         # Hourly activity data
         hourly_data = activity_heatmap.get('hourly_data', {})
+        print("[DEBUG] Before json.dumps")
         activity_heatmap_data = json.dumps([int(hourly_data.get(str(hour), 0)) for hour in range(24)])
+        print("[DEBUG] After json.dumps")
         
+        print("[DEBUG] About to convert commit_change_stats")
+        # Ajout stats changements commit (calcul et conversion explicite)
+        commit_change_stats = all_metrics['commit_change_stats']
+        avg_total_changes = round(float(commit_change_stats.get('avg_total_changes', 0)), 2)
+        avg_files_changed = round(float(commit_change_stats.get('avg_files_changed', 0)), 2)
+        nb_commits = int(commit_change_stats.get('nb_commits', 0))
+        print(f"[DEBUG] Converted values: avg_total_changes={avg_total_changes}, avg_files_changed={avg_files_changed}, nb_commits={nb_commits}")
+        
+        print("[DEBUG] About to create context")
         context = {
             'repository': repository,
             'overall_stats': overall_stats,
@@ -159,7 +173,14 @@ def repository_detail(request, repo_id):
             'commit_type_legend': legend_data,
             'doughnut_colors': doughnut_colors,
             'activity_heatmap_data': activity_heatmap_data,
+            # Ajout stats changements commit (valeurs converties)
+            'commit_change_stats': {
+                'avg_total_changes': avg_total_changes,
+                'avg_files_changed': avg_files_changed,
+                'nb_commits': nb_commits,
+            },
         }
+        print(f"[DEBUG] Context commit_change_stats: {context['commit_change_stats']}")
         
     except Exception as e:
         # If metrics calculation fails, provide empty data and log the error

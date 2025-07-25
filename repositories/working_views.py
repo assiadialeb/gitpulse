@@ -1,5 +1,4 @@
 import os
-print(f"[DEBUG] {os.path.abspath(__file__)} loaded (working_views.py)")
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
@@ -12,7 +11,6 @@ from django.utils import timezone
 
 @login_required
 def working_repository_detail(request, repo_id):
-    print(f"[DEBUG] working_repository_detail called with repo_id={repo_id}, start={request.GET.get('start')}, end={request.GET.get('end')}")
     start_str = request.GET.get('start')
     end_str = request.GET.get('end')
     if start_str and end_str:
@@ -104,6 +102,12 @@ def working_repository_detail(request, repo_id):
         bubble_chart = metrics_service.get_bubble_chart_data(days=30)
         bubble_chart_data = json.dumps(bubble_chart.get('datasets', []))
         
+        # Ajout stats changements commit (calcul et conversion explicite)
+        commit_change_stats = all_metrics['commit_change_stats']
+        avg_total_changes = round(float(commit_change_stats.get('avg_total_changes', 0)), 2)
+        avg_files_changed = round(float(commit_change_stats.get('avg_files_changed', 0)), 2)
+        nb_commits = int(commit_change_stats.get('nb_commits', 0))
+        
         # Build context
         context = {
             'repository': repository,
@@ -126,6 +130,11 @@ def working_repository_detail(request, repo_id):
             'doughnut_colors': doughnut_colors,
             'activity_heatmap_data': activity_heatmap_data,
             'bubble_chart_data': bubble_chart_data,
+            'commit_change_stats': {
+                'avg_total_changes': avg_total_changes,
+                'avg_files_changed': avg_files_changed,
+                'nb_commits': nb_commits,
+            },
         }
         
     except Exception as e:
