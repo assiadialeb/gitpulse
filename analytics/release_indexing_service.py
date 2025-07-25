@@ -231,14 +231,14 @@ class ReleaseIndexingService:
     
     @staticmethod
     def index_releases_for_repository(repository_id: int, user_id: int, 
-                                    batch_size_days: int = 90) -> Dict:
+                                    batch_size_days: int = 365) -> Dict:
         """
         Index releases for a specific repository using intelligent indexing
         
         Args:
             repository_id: Repository ID
             user_id: User ID (owner of the repository)
-            batch_size_days: Number of days per batch (default: 90 for releases)
+            batch_size_days: Number of days per batch (default: 365 for releases)
             
         Returns:
             Dictionary with indexing results

@@ -295,14 +295,14 @@ class PullRequestIndexingService:
     
     @staticmethod
     def index_pullrequests_for_repository(repository_id: int, user_id: int, 
-                                        batch_size_days: int = 30) -> Dict:
+                                        batch_size_days: int = 365) -> Dict:
         """
         Index pull requests for a specific repository using intelligent indexing
         
         Args:
             repository_id: Repository ID
             user_id: User ID (owner of the repository)
-            batch_size_days: Number of days per batch (default: 30 for PRs)
+            batch_size_days: Number of days per batch (default: 365 for PRs)
             
         Returns:
             Dictionary with indexing results

@@ -1248,10 +1248,6 @@ def daily_indexing_all_repos_task():
 def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
     """
     Django-Q task for intelligent deployment indexing
-    
-    Args:
-        repository_id: Repository ID to index (integer)
-        args: Alternative way to pass arguments (for corrupted tasks)
     """
     # Handle corrupted tasks that pass args as kwargs
     if repository_id is None and args is not None:
