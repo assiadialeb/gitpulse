@@ -20,8 +20,21 @@ def repository_list(request):
     # Get search query
     search_query = request.GET.get('search', '')
     
-    # Filter repositories
-    repositories = Repository.objects.filter(owner=request.user)
+    # Get sort parameters
+    sort_by = request.GET.get('sort', 'full_name')
+    order = request.GET.get('order', 'asc')
+    
+    # Validate sort fields
+    allowed_sort_fields = ['name', 'full_name', 'language', 'stars', 'forks', 'is_indexed', 'created_at']
+    if sort_by not in allowed_sort_fields:
+        sort_by = 'full_name'
+    
+    # Build order_by
+    if order == 'desc':
+        sort_by = f'-{sort_by}'
+    
+    # Filter repositories and sort
+    repositories = Repository.objects.filter(owner=request.user).order_by(sort_by)
     
     if search_query:
         repositories = repositories.filter(
@@ -31,7 +44,7 @@ def repository_list(request):
         )
     
     # Pagination
-    paginator = Paginator(repositories, 12)
+    paginator = Paginator(repositories, 50)  # Increased page size for better UX
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
@@ -40,9 +53,39 @@ def repository_list(request):
     indexed_repos = repositories.filter(is_indexed=True).count()
     total_commits = repositories.aggregate(total=Sum('commit_count'))['total'] or 0
     
+    # If AJAX request, return JSON
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        repos_data = []
+        for repo in page_obj:
+            repos_data.append({
+                'id': repo.id,
+                'name': repo.name,
+                'full_name': repo.full_name,
+                'description': repo.description or '',
+                'language': repo.language or '',
+                'stars': repo.stars,
+                'forks': repo.forks,
+                'is_indexed': repo.is_indexed,
+                'private': repo.private,
+                'fork': repo.fork,
+                'html_url': repo.html_url,
+                'commit_count': repo.commit_count,
+            })
+        
+        return JsonResponse({
+            'repositories': repos_data,
+            'total_pages': paginator.num_pages,
+            'current_page': page_obj.number,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+            'total_count': total_repos,
+        })
+    
     context = {
         'page_obj': page_obj,
         'search_query': search_query,
+        'sort_by': sort_by.replace('-', '') if sort_by.startswith('-') else sort_by,
+        'order': order,
         'total_repos': total_repos,
         'indexed_repos': indexed_repos,
         'total_commits': total_commits,
