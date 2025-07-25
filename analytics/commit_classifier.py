@@ -3,7 +3,8 @@ Commit classification service
 """
 import re
 import requests
-from typing import Tuple
+from typing import Tuple, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def classify_commit(message: str) -> str:
@@ -84,6 +85,98 @@ def classify_commit_with_ollama_fallback(message: str) -> str:
         return classify_commit_ollama(message)
     
     return simple_result
+
+
+def classify_commits_ollama_parallel(messages: List[str], max_workers: int = 3) -> List[str]:
+    """
+    Classify multiple commit messages in parallel using Ollama
+    
+    Args:
+        messages: List of commit messages to classify
+        max_workers: Number of parallel threads (default: 3)
+        
+    Returns:
+        List of categories in the same order as input messages
+    """
+    if not messages:
+        return []
+    
+    # If only one message, use single classification
+    if len(messages) == 1:
+        return [classify_commit_ollama(messages[0])]
+    
+    def classify_with_index(indexed_message):
+        """Helper function to classify with index to preserve order"""
+        index, message = indexed_message
+        try:
+            return index, classify_commit_ollama(message)
+        except Exception as e:
+            # Fallback to simple classifier on error
+            return index, classify_commit(message)
+    
+    # Create indexed messages to preserve order
+    indexed_messages = list(enumerate(messages))
+    results = [None] * len(messages)
+    
+    # Use ThreadPoolExecutor for parallel processing
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_index = {
+            executor.submit(classify_with_index, indexed_msg): indexed_msg[0] 
+            for indexed_msg in indexed_messages
+        }
+        
+        # Collect results in original order
+        for future in as_completed(future_to_index):
+            try:
+                index, category = future.result()
+                results[index] = category
+            except Exception as e:
+                # Fallback for any remaining errors
+                index = future_to_index[future]
+                results[index] = classify_commit(messages[index])
+    
+    return results
+
+
+def classify_commits_with_ollama_fallback_batch(messages: List[str]) -> List[str]:
+    """
+    Classify multiple commit messages using simple classifier first, then Ollama in parallel for 'other' results
+    
+    Args:
+        messages: List of commit messages to classify
+        
+    Returns:
+        List of categories in the same order as input messages
+    """
+    if not messages:
+        return []
+    
+    # First pass: use simple classifier for all messages
+    simple_results = [classify_commit(message) for message in messages]
+    
+    # Find messages that need Ollama (simple classifier returned 'other')
+    ollama_needed_indices = []
+    ollama_needed_messages = []
+    
+    for i, (message, simple_result) in enumerate(zip(messages, simple_results)):
+        if simple_result == 'other':
+            ollama_needed_indices.append(i)
+            ollama_needed_messages.append(message)
+    
+    # If no messages need Ollama, return simple results
+    if not ollama_needed_messages:
+        return simple_results
+    
+    # Classify the 'other' messages in parallel with Ollama
+    ollama_results = classify_commits_ollama_parallel(ollama_needed_messages, max_workers=3)
+    
+    # Merge results: replace 'other' results with Ollama results
+    final_results = simple_results.copy()
+    for i, ollama_result in zip(ollama_needed_indices, ollama_results):
+        final_results[i] = ollama_result
+    
+    return final_results
 
 
 def classify_commit_ollama(message: str) -> str:
@@ -410,4 +503,76 @@ def classify_commit_with_files(message: str, files: list) -> str:
     if exts and all(e in chore_exts for e in exts):
         return 'chore'
     # Sinon, logique standard
-    return classify_commit_with_ollama_fallback(message) 
+    return classify_commit_with_ollama_fallback(message)
+
+
+def classify_commits_with_files_batch(commit_data_list: List[dict]) -> List[str]:
+    """
+    Classify multiple commits using both messages and files in parallel
+    
+    Args:
+        commit_data_list: List of dicts with 'message' and 'files' keys
+        
+    Returns:
+        List of categories in the same order as input
+    """
+    if not commit_data_list:
+        return []
+    
+    results = []
+    messages_for_ollama = []
+    ollama_indices = []
+    
+    # First pass: handle file-based classification and collect messages needing Ollama
+    for i, commit_data in enumerate(commit_data_list):
+        message = commit_data.get('message', '')
+        files = commit_data.get('files', [])
+        
+        if not files or not isinstance(files, list):
+            # No files info, will need message classification
+            simple_result = classify_commit(message)
+            if simple_result == 'other':
+                messages_for_ollama.append(message)
+                ollama_indices.append(i)
+                results.append(None)  # Placeholder
+            else:
+                results.append(simple_result)
+            continue
+        
+        # File-based classification
+        doc_exts = {'.md', '.rst', '.adoc', '.markdown', '.txt'}
+        chore_exts = {'.tf', '.tfvars', '.yml', '.yaml', '.json', '.env', '.ini', '.cfg', '.lock', '.dockerfile', '.gitignore', '.gitattributes', '.sh', '.bat', '.ps1'}
+        
+        def get_ext(f):
+            f = f.lower()
+            if f.startswith('dockerfile'):
+                return '.dockerfile'
+            return '.' + f.split('.')[-1] if '.' in f else ''
+
+        exts = set(get_ext(f) for f in files)
+        
+        # Si tous les fichiers sont de la doc
+        if exts and all(e in doc_exts for e in exts):
+            results.append('docs')
+        # Si tous les fichiers sont infra/config
+        elif exts and all(e in chore_exts for e in exts):
+            results.append('chore')
+        else:
+            # Need message classification
+            simple_result = classify_commit(message)
+            if simple_result == 'other':
+                messages_for_ollama.append(message)
+                ollama_indices.append(i)
+                results.append(None)  # Placeholder
+            else:
+                results.append(simple_result)
+    
+    # Second pass: classify messages needing Ollama in parallel
+    if messages_for_ollama:
+        ollama_results = classify_commits_ollama_parallel(messages_for_ollama, max_workers=3)
+        
+        # Fill in the Ollama results
+        for idx, ollama_result in zip(ollama_indices, ollama_results):
+            results[idx] = ollama_result
+    
+    return results 
