@@ -20,6 +20,7 @@ from .commit_indexing_service import CommitIndexingService
 from .pullrequest_indexing_service import PullRequestIndexingService
 from .release_indexing_service import ReleaseIndexingService
 from django.utils import timezone
+from analytics.models import IndexingState
 
 logger = logging.getLogger(__name__)
 
@@ -1245,119 +1246,100 @@ def daily_indexing_all_repos_task():
     return results
 
 
-def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
+def index_deployments_intelligent_task(repository_id):
     """
-    Django-Q task for intelligent deployment indexing
+    Indexe les déploiements GitHub pour un repository donné, en reprenant là où on s'est arrêté.
+    Gère l'état d'indexation (date du dernier déploiement indexé) et les rate limits GitHub.
     """
-    # Handle corrupted tasks that pass args as kwargs
-    if repository_id is None and args is not None:
-        if isinstance(args, list) and len(args) > 0:
-            repository_id = args[0]
-    
-    if repository_id is None:
-        raise ValueError("repository_id is required")
-    
-    # Handle corrupted tasks that pass lists instead of integers
-    if isinstance(repository_id, list):
-        if len(repository_id) > 0:
-            repository_id = repository_id[0]  # Take first element
-            if isinstance(repository_id, list) and len(repository_id) > 0:
-                repository_id = repository_id[0]  # Handle nested lists
-        else:
-            raise ValueError("repository_id is an empty list")
-    
-    # Ensure repository_id is an integer
+    from datetime import timedelta
+    from django.utils import timezone
+    from repositories.models import Repository
+    from analytics.deployment_indexing_service import DeploymentIndexingService
+    from analytics.models import IndexingState
+    import requests
+    import logging
+    logger = logging.getLogger(__name__)
+
     try:
-        repository_id = int(repository_id)
-    except (ValueError, TypeError):
-        raise ValueError(f"repository_id must be an integer, got {type(repository_id)}: {repository_id}")
-    logger.info(f"Starting intelligent deployment indexing for repository {repository_id}")
-    
-    try:
-        from repositories.models import Repository
         repository = Repository.objects.get(id=repository_id)
         user_id = repository.owner.id
-        
-        # Intelligent rate limit check before proceeding
-        from .github_token_service import GitHubTokenService
-        import requests
-        
-        # Get token for rate limit check
+        now = timezone.now()
+        entity_type = 'deployments'
+
+        # Récupérer ou créer l'état d'indexation
+        state = IndexingState.objects(repository_id=repository_id, entity_type=entity_type).first()
+        if state and state.last_indexed_at:
+            since = state.last_indexed_at
+        else:
+            # Si pas d'état, on commence il y a 2 ans (ou plus si tu veux)
+            since = now - timedelta(days=730)
+        until = now
+
+        # Récupérer un token GitHub
+        from analytics.github_token_service import GitHubTokenService
         github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
         if not github_token:
             github_token = GitHubTokenService._get_user_token(user_id)
             if not github_token:
                 github_token = GitHubTokenService._get_oauth_app_token()
-        
-        if github_token:
-            # Check rate limit
-            headers = {'Authorization': f'token {github_token}'}
-            try:
-                rate_response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
-                
-                if rate_response.status_code == 200:
-                    rate_data = rate_response.json()
-                    remaining = rate_data['resources']['core']['remaining']
-                    
-                    # If rate limited, schedule for later
-                    if remaining < 30:  # Deployments need moderate requests
-                        logger.warning(f"GitHub API rate limit low ({remaining} remaining), scheduling deployment indexing for later")
-                        
-                        # Schedule next run after rate limit reset
-                        import datetime
-                        reset_time = datetime.datetime.fromtimestamp(rate_data['resources']['core']['reset'])
-                        next_run = reset_time + timedelta(minutes=7)  # 7 minutes after reset
-                        
-                        from django_q.models import Schedule
-                        Schedule.objects.create(
-                            func='analytics.tasks.index_deployments_intelligent_task',
-                            args=[repository_id],
-                            next_run=next_run,
-                            schedule_type=Schedule.ONCE,
-                            name=f'deployment_indexing_repo_{repository_id}_retry'
-                        )
-                        
-                        return {
-                            'status': 'rate_limited',
-                            'repository_id': repository_id,
-                            'repository_full_name': repository.full_name,
-                            'remaining_requests': remaining,
-                            'scheduled_for': next_run.isoformat(),
-                            'message': f'Scheduled for retry at {next_run}'
-                        }
-                        
-            except Exception as e:
-                logger.warning(f"Could not check rate limit: {e}, proceeding with indexing")
-        
-        batch_size_days = 30
-        
-        # Run intelligent indexing
-        result = DeploymentIndexingService.index_deployments_for_repository(
-            repository_id=repository_id,
-            user_id=user_id,
-            batch_size_days=batch_size_days
+        if not github_token:
+            logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
+            return {'status': 'skipped', 'reason': 'No GitHub token available', 'repository_id': repository_id}
+
+        # Vérifier la rate limit
+        headers = {'Authorization': f'token {github_token}'}
+        try:
+            rate_response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
+            if rate_response.status_code == 200:
+                rate_data = rate_response.json()
+                remaining = rate_data['resources']['core']['remaining']
+                reset_time = rate_data['resources']['core']['reset']
+                if remaining < 20:
+                    import datetime
+                    next_run = datetime.datetime.fromtimestamp(reset_time, tz=timezone.utc) + timedelta(minutes=5)
+                    from django_q.models import Schedule
+                    Schedule.objects.create(
+                        func='analytics.tasks.index_deployments_intelligent_task',
+                        args=[repository_id],
+                        next_run=next_run,
+                        schedule_type=Schedule.ONCE,
+                        name=f'deployment_indexing_repo_{repository_id}_retry'
+                    )
+                    logger.warning(f"Rate limit reached, replanified for {next_run}")
+                    return {'status': 'rate_limited', 'scheduled_for': next_run.isoformat()}
+        except Exception as e:
+            logger.warning(f"Could not check rate limit: {e}, proceeding anyway")
+
+        # Extraire owner et repo depuis full_name
+        owner, repo = repository.full_name.split('/', 1)
+
+        # Indexer les déploiements
+        deployments = DeploymentIndexingService.fetch_deployments_from_github(
+            owner=owner,
+            repo=repo,
+            token=github_token,
+            since=since,
+            until=until
         )
-        
-        # If there's more to index, schedule the next batch
-        if result.get('has_more', False) and result.get('status') == 'success':
-            logger.info(f"Scheduling next deployment indexing batch for repository {repository_id}")
-            # Schedule next run in 2 minutes to allow for API rate limiting
-            next_run = timezone.now() + timedelta(minutes=2)
-            
-            from django_q.models import Schedule
-            Schedule.objects.create(
-                func='analytics.tasks.index_deployments_intelligent_task',
-                args=[repository_id],
-                next_run=next_run,
-                schedule_type=Schedule.ONCE,
-                name=f'deployment_indexing_repo_{repository_id}'
-            )
-        
-        logger.info(f"Deployment indexing completed for repository {repository_id}: {result}")
-        return result
-        
+        processed = DeploymentIndexingService.process_deployments(deployments)
+
+        # Mettre à jour l'état d'indexation
+        if not state:
+            state = IndexingState(repository_id=repository_id, entity_type=entity_type)
+        state.last_indexed_at = until
+        state.status = 'completed'
+        state.save()
+
+        logger.info(f"Indexed {processed} deployments for {repository.full_name} from {since} to {until}")
+        return {
+            'status': 'success',
+            'processed': processed,
+            'repository_id': repository_id,
+            'repository_full_name': repository.full_name,
+            'date_range': {'since': since.isoformat(), 'until': until.isoformat()}
+        }
     except Exception as e:
-        logger.error(f"Deployment indexing task failed for repository {repository_id}: {e}")
+        logger.error(f"Deployment indexing failed for repository {repository_id}: {e}")
         raise
 
 
@@ -1375,7 +1357,7 @@ def index_all_deployments_task():
         
         for repo in indexed_repos:
             try:
-                # Start deployment indexing for this repository
+                # Start deployment indexing for this repository using v2
                 task_id = async_task(
                     'analytics.tasks.index_deployments_intelligent_task',
                     repo.id  # Pass as positional argument

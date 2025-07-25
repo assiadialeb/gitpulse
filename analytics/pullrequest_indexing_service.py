@@ -294,60 +294,87 @@ class PullRequestIndexingService:
         return processed
     
     @staticmethod
-    def index_pullrequests_for_repository(repository_id: int, user_id: int, 
-                                        batch_size_days: int = 365) -> Dict:
+    def index_pullrequests_for_repository(repository_id: int, user_id: int, batch_size_days: int = 365) -> Dict:
         """
-        Index pull requests for a specific repository using intelligent indexing
-        
-        Args:
-            repository_id: Repository ID
-            user_id: User ID (owner of the repository)
-            batch_size_days: Number of days per batch (default: 365 for PRs)
-            
-        Returns:
-            Dictionary with indexing results
+        Index pull requests for a specific repository, simple et robuste.
         """
         try:
             from .github_token_service import GitHubTokenService
             from repositories.models import Repository
-            
-            # Get repository info
+            from analytics.models import IndexingState
+            from datetime import timedelta
+            from django.utils import timezone
+            import requests
+            logger = logging.getLogger(__name__)
+
             repository = Repository.objects.get(id=repository_id)
-            
-            # Get GitHub token (simplified approach)
+            now = timezone.now()
+            entity_type = 'pull_requests'
+            state = IndexingState.objects(repository_id=repository_id, entity_type=entity_type).first()
+            if state and state.last_indexed_at:
+                since = state.last_indexed_at
+            else:
+                since = now - timedelta(days=730)
+            until = now
+
             github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
-            
             if not github_token:
-                # Fallback to any available token
                 github_token = GitHubTokenService._get_user_token(user_id)
                 if not github_token:
                     github_token = GitHubTokenService._get_oauth_app_token()
-            
             if not github_token:
                 logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
-                return {
-                    'status': 'skipped',
-                    'reason': 'No GitHub token available',
-                    'repository_id': repository_id,
-                    'repository_full_name': repository.full_name
-                }
-            
-            # Initialize intelligent indexing service
-            indexing_service = IntelligentIndexingService(
-                repository_id=repository_id,
-                entity_type='pull_requests',
-                github_token=github_token
+                return {'status': 'skipped', 'reason': 'No GitHub token available', 'repository_id': repository_id}
+
+            # Vérifier la rate limit
+            headers = {'Authorization': f'token {github_token}'}
+            try:
+                rate_response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
+                if rate_response.status_code == 200:
+                    rate_data = rate_response.json()
+                    remaining = rate_data['resources']['core']['remaining']
+                    reset_time = rate_data['resources']['core']['reset']
+                    if remaining < 20:
+                        import datetime
+                        next_run = datetime.datetime.fromtimestamp(reset_time, tz=timezone.utc) + timedelta(minutes=5)
+                        from django_q.models import Schedule
+                        Schedule.objects.create(
+                            func='analytics.tasks.index_pullrequests_intelligent_task',
+                            args=[repository_id],
+                            next_run=next_run,
+                            schedule_type=Schedule.ONCE,
+                            name=f'pullrequest_indexing_repo_{repository_id}_retry'
+                        )
+                        logger.warning(f"Rate limit reached, replanified for {next_run}")
+                        return {'status': 'rate_limited', 'scheduled_for': next_run.isoformat()}
+            except Exception as e:
+                logger.warning(f"Could not check rate limit: {e}, proceeding anyway")
+
+            # Extraire owner et repo depuis full_name
+            owner, repo = repository.full_name.split('/', 1)
+            pull_requests = PullRequestIndexingService.fetch_pullrequests_from_github(
+                owner=owner,
+                repo=repo,
+                token=github_token,
+                since=since,
+                until=until
             )
-            
-            # Run indexing batch
-            result = indexing_service.index_batch(
-                fetch_function=PullRequestIndexingService.fetch_pullrequests_from_github,
-                process_function=PullRequestIndexingService.process_pullrequests,
-                batch_size_days=batch_size_days
-            )
-            
-            return result
-            
+            processed = PullRequestIndexingService.process_pullrequests(pull_requests)
+
+            if not state:
+                state = IndexingState(repository_id=repository_id, entity_type=entity_type)
+            state.last_indexed_at = until
+            state.status = 'completed'
+            state.save()
+
+            logger.info(f"Indexed {processed} pull requests for {repository.full_name} from {since} to {until}")
+            return {
+                'status': 'success',
+                'processed': processed,
+                'repository_id': repository_id,
+                'repository_full_name': repository.full_name,
+                'date_range': {'since': since.isoformat(), 'until': until.isoformat()}
+            }
         except Exception as e:
             logger.error(f"Error indexing pull requests for repository {repository_id}: {e}")
             raise 
