@@ -1382,7 +1382,7 @@ def index_all_deployments_task():
                 # Start deployment indexing for this repository
                 task_id = async_task(
                     'analytics.tasks.index_deployments_intelligent_task',
-                    repository_id=repo.id
+                    repo.id  # Pass as positional argument
                 )
                 results.append({
                     'repo_id': repo.id,
@@ -1450,27 +1450,50 @@ def index_commits_intelligent_task(repository_id):
             from .git_sync_service import GitSyncService
             sync_service = GitSyncService(user_id)
             
-            # Use FULL sync to get ALL commits in one go (no artificial batching)
-            result = sync_service.sync_repository(
-                repository.full_name,
-                repository.clone_url,
-                None,  # No application_id needed for repository-based indexing
-                'full'  # FULL sync - get ALL commits, no date restrictions
-            )
+            # Check if we should skip (simple time-based check instead of complex state)
+            from .models import Commit
+            from django.utils import timezone
+            from datetime import timedelta
             
-            # Convert GitSyncService result format to match expected format
-            result = {
-                'status': 'success',
-                'repository_id': repository_id,
-                'repository_full_name': repository.full_name,
-                'indexing_service': 'git_local',
-                'commits_processed': result.get('commits_new', 0) + result.get('commits_updated', 0),
-                'commits_new': result.get('commits_new', 0),
-                'commits_updated': result.get('commits_updated', 0),
-                'has_more': False,  # Git local processes ALL commits at once - no batching needed
-                'backfill_complete': True,  # Full backfill completed in one shot
-                'errors': result.get('errors', [])
-            }
+            # Simple check: if we have recent commits, skip (unless forced)
+            recent_commits = Commit.objects.filter(
+                repository_full_name=repository.full_name,
+                synced_at__gte=timezone.now() - timedelta(hours=1)
+            ).limit(1)
+            
+            if recent_commits.count() > 0:
+                logger.info(f"Skipping git_local indexing for {repository.full_name} - recently synced")
+                result = {
+                    'status': 'skipped',
+                    'reason': 'Recently synced (within 1 hour)',
+                    'repository_id': repository_id,
+                    'repository_full_name': repository.full_name,
+                    'indexing_service': 'git_local',
+                    'has_more': False,
+                    'backfill_complete': True
+                }
+            else:
+                # Use FULL sync to get ALL commits in one go (no artificial batching)
+                result = sync_service.sync_repository(
+                    repository.full_name,
+                    repository.clone_url,
+                    None,  # No application_id needed for repository-based indexing
+                    'full'  # FULL sync - get ALL commits, no date restrictions
+                )
+                
+                # Convert GitSyncService result format to match expected format
+                result = {
+                    'status': 'success',
+                    'repository_id': repository_id,
+                    'repository_full_name': repository.full_name,
+                    'indexing_service': 'git_local',
+                    'commits_processed': result.get('commits_new', 0) + result.get('commits_updated', 0),
+                    'commits_new': result.get('commits_new', 0),
+                    'commits_updated': result.get('commits_updated', 0),
+                    'has_more': False,  # Git local processes ALL commits at once - no batching needed
+                    'backfill_complete': True,  # Full backfill completed in one shot
+                    'errors': result.get('errors', [])
+                }
         else:
             # Use GitHub API service for commits
             logger.info(f"Using GitHub API indexing service for commits in repository {repository.full_name}")
@@ -1498,12 +1521,176 @@ def index_commits_intelligent_task(repository_id):
                 name=f'commit_indexing_repo_{repository_id}'
             )
         
+        # Always mark repository as indexed after processing
+        print(f"DEBUG: Marking repository {repository.full_name} as indexed (intelligent task)")
+        repository.is_indexed = True
+        repository.save()
+        logger.info(f"Repository {repository.full_name} marked as indexed")
+        result['is_indexed_updated'] = True
+        
         logger.info(f"Commit indexing completed for repository {repository_id}: {result}")
         return result
         
     except Exception as e:
         logger.error(f"Commit indexing task failed for repository {repository_id}: {e}")
         raise
+
+
+def index_commits_git_local_task(repository_id):
+    """
+    Django-Q task for Git local commit indexing (no state management needed)
+    
+    Args:
+        repository_id: Repository ID to index
+    """
+    # Handle corrupted tasks that pass lists
+    if isinstance(repository_id, list):
+        repository_id = repository_id[0]
+        if isinstance(repository_id, list):
+            repository_id = repository_id[0]
+    
+    repository_id = int(repository_id)
+    
+    logger.info(f"Starting Git local commit indexing for repository {repository_id}")
+    
+    try:
+        print(f"DEBUG: Starting git_local task for repository {repository_id}")
+        from repositories.models import Repository
+        repository = Repository.objects.get(id=repository_id)
+        user_id = repository.owner.id
+        print(f"DEBUG: Repository: {repository.full_name}, User: {user_id}")
+        
+        # Simple time-based check to avoid too frequent syncing
+        from .models import Commit
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        recent_commits = Commit.objects.filter(
+            repository_full_name=repository.full_name,
+            synced_at__gte=timezone.now() - timedelta(minutes=30)  # 30 min cooldown
+        ).limit(1)
+        
+        print(f"DEBUG: Recent commits count: {recent_commits.count()}")
+        
+        if recent_commits.count() > 0:
+            print(f"DEBUG: Skipping due to recent sync, but marking as indexed")
+            logger.info(f"Skipping git_local indexing for {repository.full_name} - recently synced")
+            
+            # Even if skipped, mark as indexed
+            repository.is_indexed = True
+            repository.save()
+            logger.info(f"Repository {repository.full_name} marked as indexed (skipped)")
+            
+            return {
+                'status': 'skipped',
+                'reason': 'Recently synced (within 5 minutes)',
+                'repository_id': repository_id,
+                'repository_full_name': repository.full_name,
+                'indexing_service': 'git_local',
+                'is_indexed_updated': True
+            }
+        
+        # Use Git local service for FULL backfill
+        print(f"DEBUG: About to start GitSyncService for {repository.full_name}")
+        logger.info(f"Using Git local indexing service for FULL BACKFILL of repository {repository.full_name}")
+        from .git_sync_service import GitSyncService
+        sync_service = GitSyncService(user_id)
+        print(f"DEBUG: GitSyncService created")
+        
+        # Use FULL sync to get ALL commits in one go
+        try:
+            result = sync_service.sync_repository(
+                repository.full_name,
+                repository.clone_url,
+                None,  # No application_id needed for repository-based indexing
+                'full'  # FULL sync - get ALL commits, no date restrictions
+            )
+        except Exception as sync_error:
+            # Handle specific sync errors gracefully
+            error_msg = str(sync_error).lower()
+            
+            if 'repository not found' in error_msg or 'private' in error_msg:
+                logger.warning(f"Repository {repository.full_name} is private or not found - skipping")
+                return {
+                    'status': 'skipped',
+                    'reason': 'Repository not found or private',
+                    'repository_id': repository_id,
+                    'repository_full_name': repository.full_name,
+                    'indexing_service': 'git_local',
+                    'error': str(sync_error)
+                }
+            elif 'authentication failed' in error_msg:
+                logger.warning(f"Authentication failed for {repository.full_name} - skipping")
+                return {
+                    'status': 'skipped',
+                    'reason': 'Authentication failed',
+                    'repository_id': repository_id,
+                    'repository_full_name': repository.full_name,
+                    'indexing_service': 'git_local',
+                    'error': str(sync_error)
+                }
+            elif 'git pack corruption' in error_msg or 'tmp_pack' in error_msg:
+                logger.warning(f"Git pack corruption for {repository.full_name} (possibly LFS) - skipping")
+                return {
+                    'status': 'skipped',
+                    'reason': 'Git pack corruption (possibly LFS or large files)',
+                    'repository_id': repository_id,
+                    'repository_full_name': repository.full_name,
+                    'indexing_service': 'git_local',
+                    'error': str(sync_error)
+                }
+            else:
+                # Re-raise other errors
+                raise
+        
+        # Convert result format
+        final_result = {
+            'status': 'success',
+            'repository_id': repository_id,
+            'repository_full_name': repository.full_name,
+            'indexing_service': 'git_local',
+            'commits_processed': result.get('commits_new', 0) + result.get('commits_updated', 0),
+            'commits_new': result.get('commits_new', 0),
+            'commits_updated': result.get('commits_updated', 0),
+            'has_more': False,  # Git local processes ALL commits at once
+            'backfill_complete': True,  # Full backfill completed
+            'errors': result.get('errors', [])
+        }
+        
+        # Always mark repository as indexed after processing (success or not)
+        print(f"DEBUG: Marking repository {repository.full_name} as indexed")
+        repository.is_indexed = True
+        repository.save()
+        logger.info(f"Repository {repository.full_name} marked as indexed")
+        final_result['is_indexed_updated'] = True
+        
+        logger.info(f"Git local commit indexing completed for repository {repository_id}: {final_result}")
+        return final_result
+        
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Git local commit indexing task failed for repository {repository_id}: {error_msg}")
+        
+        # Return error result instead of raising (to avoid task retry loops)
+        if 'tmp_pack' in error_msg.lower() or 'lfs' in error_msg.lower():
+            return {
+                'status': 'error',
+                'error_type': 'git_lfs_or_large_files',
+                'error_message': f"Repository may contain LFS files or be too large for local cloning: {error_msg}",
+                'repository_id': repository_id,
+                'repository_full_name': getattr(repository, 'full_name', f'ID:{repository_id}'),
+                'indexing_service': 'git_local',
+                'suggestion': 'Consider using GitHub API indexing for this repository'
+            }
+        else:
+            return {
+                'status': 'error',
+                'error_type': 'general_error',
+                'error_message': error_msg,
+                'repository_id': repository_id,
+                'repository_full_name': getattr(repository, 'full_name', f'ID:{repository_id}'),
+                'indexing_service': 'git_local'
+            }
 
 
 def index_all_commits_task():
@@ -1520,11 +1707,19 @@ def index_all_commits_task():
         
         for repo in indexed_repos:
             try:
+                # Choose the right task based on INDEXING_SERVICE setting
+                from django.conf import settings
+                indexing_service = getattr(settings, 'INDEXING_SERVICE', 'github_api')
+                
+                if indexing_service == 'git_local':
+                    # Use dedicated git_local task (no state management)
+                    task_function = 'analytics.tasks.index_commits_git_local_task'
+                else:
+                    # Use intelligent task with state management for GitHub API
+                    task_function = 'analytics.tasks.index_commits_intelligent_task'
+                
                 # Start commit indexing for this repository
-                task_id = async_task(
-                    'analytics.tasks.index_commits_intelligent_task',
-                    repository_id=repo.id
-                )
+                task_id = async_task(task_function, repo.id)
                 results.append({
                     'repo_id': repo.id,
                     'repo_name': repo.full_name,
@@ -1697,7 +1892,7 @@ def index_all_pullrequests_task():
                 # Start pull request indexing for this repository
                 task_id = async_task(
                     'analytics.tasks.index_pullrequests_intelligent_task',
-                    repository_id=repo.id
+                    repo.id  # Pass as positional argument
                 )
                 results.append({
                     'repo_id': repo.id,
@@ -1871,7 +2066,7 @@ def index_all_releases_task():
                 # Start release indexing for this repository
                 task_id = async_task(
                     'analytics.tasks.index_releases_intelligent_task',
-                    repository_id=repo.id
+                    repo.id  # Pass as positional argument
                 )
                 results.append({
                     'repo_id': repo.id,

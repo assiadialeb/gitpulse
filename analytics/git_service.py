@@ -6,6 +6,8 @@ import subprocess
 import tempfile
 import shutil
 import logging
+import threading
+import time
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Tuple, Generator
 from pathlib import Path
@@ -22,6 +24,10 @@ class GitServiceError(Exception):
 class GitService:
     """Service for local Git operations to fetch commit data"""
     
+    # Class-level locks for repository operations
+    _clone_locks = {}  # Only for cloning operations
+    _locks_lock = threading.Lock()
+    
     def __init__(self, temp_dir: Optional[str] = None):
         """
         Initialize Git service
@@ -32,9 +38,17 @@ class GitService:
         self.temp_dir = temp_dir or tempfile.gettempdir()
         self.cloned_repos = {}  # Cache for cloned repositories
         
+    def _get_clone_lock(self, repo_full_name: str) -> threading.Lock:
+        """Get or create a lock specifically for cloning operations on a repository"""
+        with self._locks_lock:
+            clone_key = f"clone_{repo_full_name}"
+            if clone_key not in self._clone_locks:
+                self._clone_locks[clone_key] = threading.Lock()
+            return self._clone_locks[clone_key]
+    
     def clone_repository(self, repo_url: str, repo_full_name: str) -> str:
         """
-        Clone a repository to a temporary directory
+        Clone a repository to a temporary directory with concurrency protection
         
         Args:
             repo_url: Git repository URL (HTTPS or SSH)
@@ -46,70 +60,165 @@ class GitService:
         Raises:
             GitServiceError: If cloning fails
         """
-        try:
-            # Create unique directory for this repository
-            repo_dir = os.path.join(self.temp_dir, f"gitpulse_{repo_full_name.replace('/', '_')}")
+        # Get repository-specific lock to prevent concurrent clones
+        clone_lock = self._get_clone_lock(repo_full_name)
+        
+        with clone_lock:
+            logger.info(f"Acquired lock for cloning {repo_full_name}")
             
-            # Remove existing directory if it exists
-            if os.path.exists(repo_dir):
-                shutil.rmtree(repo_dir)
-            
-            # Clone repository
-            logger.info(f"Cloning repository {repo_full_name} to {repo_dir}")
-            
-            # Clone without LFS to avoid large file issues
-            env = os.environ.copy()
-            env['GIT_LFS_SKIP_SMUDGE'] = '1'  # Skip LFS file download
-            env['GIT_LFS_SKIP_PUSH'] = '1'    # Skip LFS push
-            
-            # First try: clone normally with LFS disabled
-            result = subprocess.run(
-                ['git', 'clone', '--quiet', repo_url, repo_dir],
-                capture_output=True,
-                text=True,
-                timeout=600,  # 10 minutes timeout (increased)
-                env=env
-            )
-            
-            # If clone succeeded but checkout failed due to LFS, try to fix it
-            if result.returncode != 0 and 'git-lfs' in result.stderr:
-                logger.warning(f"LFS issue detected for {repo_full_name}, attempting workaround...")
+            try:
+                # Create unique directory for this repository
+                repo_dir = os.path.join(self.temp_dir, f"gitpulse_{repo_full_name.replace('/', '_')}")
                 
-                # Remove the failed clone
+                # Check if already exists and is valid
+                if os.path.exists(repo_dir) and os.path.exists(os.path.join(repo_dir, '.git')):
+                    logger.info(f"Repository {repo_full_name} already cloned at {repo_dir}")
+                    return repo_dir
+                
+                # Remove existing directory if it exists but is invalid
                 if os.path.exists(repo_dir):
+                    logger.info(f"Removing invalid clone directory for {repo_full_name}")
                     shutil.rmtree(repo_dir)
+            
+                # Clone repository
+                logger.info(f"Cloning repository {repo_full_name} to {repo_dir}")
                 
-                # Clone with LFS completely disabled
-                result = subprocess.run([
-                    'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
-                    '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
-                    'clone', '--quiet', repo_url, repo_dir
-                ], capture_output=True, text=True, timeout=300, env=env)
-            
-            if result.returncode != 0:
-                raise GitServiceError(f"Failed to clone repository: {result.stderr}")
+                # Clone without LFS to avoid large file issues
+                env = os.environ.copy()
+                env['GIT_LFS_SKIP_SMUDGE'] = '1'  # Skip LFS file download
+                env['GIT_LFS_SKIP_PUSH'] = '1'    # Skip LFS push
+                
+                # First try: clone normally with LFS disabled
+                result = subprocess.run(
+                    ['git', 'clone', '--quiet', repo_url, repo_dir],
+                    capture_output=True,
+                    text=True,
+                    timeout=600,  # 10 minutes timeout (increased)
+                    env=env
+                )
+                
+                # Check if first clone succeeded
+                if result.returncode == 0:
+                    strategy_used = 1  # Normal clone succeeded
+                else:
+                    # First clone failed, try alternative strategies
+                    logger.warning(f"Initial clone failed for {repo_full_name}: {result.stderr}")
+                    
+                    # Remove the failed clone
+                    if os.path.exists(repo_dir):
+                        shutil.rmtree(repo_dir)
+                    
+                    # Clone with multiple strategies for robustness
+                    clone_strategies = [
+                        # Strategy 1: Shallow clone without LFS (fastest, most reliable)
+                        [
+                            'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
+                            '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
+                            'clone', '--depth=1', '--no-single-branch', '--quiet', repo_url, repo_dir
+                        ],
+                        # Strategy 2: Full clone without LFS (if shallow fails)
+                        [
+                            'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
+                            '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
+                            'clone', '--quiet', repo_url, repo_dir
+                        ],
+                        # Strategy 3: Bare clone (minimal, no working directory)
+                        [
+                            'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
+                            '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
+                            'clone', '--bare', '--quiet', repo_url, repo_dir
+                        ]
+                    ]
+                    
+                    result = None
+                    strategy_used = None
+                    
+                    for i, strategy in enumerate(clone_strategies, 1):
+                        logger.info(f"Trying clone strategy {i} for {repo_full_name}")
+                        
+                        # Clean up any partial clone
+                        if os.path.exists(repo_dir):
+                            shutil.rmtree(repo_dir)
+                        
+                        result = subprocess.run(
+                            strategy, 
+                            capture_output=True, 
+                            text=True, 
+                            timeout=600,  # Increased timeout
+                            env=env
+                        )
+                        
+                        if result.returncode == 0:
+                            strategy_used = i
+                            logger.info(f"Clone strategy {i} succeeded for {repo_full_name}")
+                            break
+                        else:
+                            logger.warning(f"Clone strategy {i} failed for {repo_full_name}: {result.stderr}")
+                    
+                    if not strategy_used:
+                        # All strategies failed
+                        error_msg = result.stderr.lower()
+                        
+                        # Detect common error types for better error messages
+                        if 'repository not found' in error_msg or 'not found' in error_msg:
+                            raise GitServiceError(f"Repository not found or private: {repo_full_name}")
+                        elif 'permission denied' in error_msg or 'authentication failed' in error_msg:
+                            raise GitServiceError(f"Authentication failed for repository: {repo_full_name}")
+                        elif 'tmp_pack' in error_msg or 'pack' in error_msg:
+                            # Try one more time with minimal clone for pack errors
+                            logger.warning(f"Pack error detected for {repo_full_name}, trying minimal clone...")
+                            
+                            # Clean up failed attempt
+                            if os.path.exists(repo_dir):
+                                shutil.rmtree(repo_dir)
+                            
+                            # Wait to avoid resource conflicts
+                            time.sleep(3)
+                            
+                            # Try minimal clone (depth=1, single branch)
+                            minimal_result = subprocess.run([
+                                'git', 'clone', '--depth=1', '--single-branch', '--quiet', repo_url, repo_dir
+                            ], capture_output=True, text=True, timeout=180, env=env)
+                            
+                            if minimal_result.returncode == 0:
+                                logger.info(f"Successfully cloned {repo_full_name} with minimal clone after pack error")
+                                strategy_used = 4  # Mark as successful
+                            else:
+                                raise GitServiceError(f"Git pack corruption (minimal clone failed): {repo_full_name} - {minimal_result.stderr}")
+                        elif 'timeout' in error_msg or 'timed out' in error_msg:
+                            raise GitServiceError(f"Network timeout while cloning: {repo_full_name}")
+                        else:
+                            raise GitServiceError(f"All clone strategies failed for {repo_full_name}. Last error: {result.stderr}")
 
-            # Fetch all branches and prune deleted ones
-            fetch_result = subprocess.run(
-                ['git', 'fetch', '--all', '--prune'],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=120
-            )
-            if fetch_result.returncode != 0:
-                raise GitServiceError(f"Failed to fetch all branches: {fetch_result.stderr}")
-            
-            # Store in cache
-            self.cloned_repos[repo_full_name] = repo_dir
-            
-            logger.info(f"Successfully cloned {repo_full_name}")
-            return repo_dir
-            
-        except subprocess.TimeoutExpired:
-            raise GitServiceError(f"Timeout while cloning repository {repo_full_name}")
-        except Exception as e:
-            raise GitServiceError(f"Error cloning repository {repo_full_name}: {str(e)}")
+                # Only fetch additional branches if not a bare clone
+                if strategy_used and strategy_used != 3:  # Not bare clone
+                    # Fetch all branches and prune deleted ones (with error handling)
+                    try:
+                        fetch_result = subprocess.run(
+                            ['git', 'fetch', '--all', '--prune'],
+                            cwd=repo_dir,
+                            capture_output=True,
+                            text=True,
+                            timeout=300  # Increased timeout
+                        )
+                        if fetch_result.returncode != 0:
+                            logger.warning(f"Failed to fetch all branches for {repo_full_name}: {fetch_result.stderr}")
+                            # Don't fail the entire clone for fetch issues
+                    except subprocess.TimeoutExpired:
+                        logger.warning(f"Fetch timeout for {repo_full_name}, continuing with available branches")
+                else:
+                    logger.info(f"Bare clone used for {repo_full_name}, skipping branch fetch")
+                
+                # Store in cache
+                self.cloned_repos[repo_full_name] = repo_dir
+                
+                logger.info(f"Successfully cloned {repo_full_name}")
+                return repo_dir
+                
+            except subprocess.TimeoutExpired:
+                raise GitServiceError(f"Timeout while cloning repository {repo_full_name}")
+            except Exception as e:
+                raise GitServiceError(f"Error cloning repository {repo_full_name}: {str(e)}")
     
     def get_repo_path(self, repo_full_name: str) -> str:
         """
@@ -121,10 +230,20 @@ class GitService:
         Returns:
             Path to repository directory
         """
-        if repo_full_name not in self.cloned_repos:
-            raise GitServiceError(f"Repository {repo_full_name} not cloned. Call clone_repository first.")
+        # Check cache first
+        if repo_full_name in self.cloned_repos:
+            repo_dir = self.cloned_repos[repo_full_name]
+            if os.path.exists(repo_dir):
+                return repo_dir
         
-        return self.cloned_repos[repo_full_name]
+        # Check if repository exists on disk (even if not in cache)
+        repo_dir = os.path.join(self.temp_dir, f"gitpulse_{repo_full_name.replace('/', '_')}")
+        if os.path.exists(repo_dir) and os.path.exists(os.path.join(repo_dir, '.git')):
+            # Add to cache for future use
+            self.cloned_repos[repo_full_name] = repo_dir
+            return repo_dir
+        
+        raise GitServiceError(f"Repository {repo_full_name} not cloned. Call clone_repository first.")
     
     def fetch_commits(self, repo_full_name: str, since_date: Optional[datetime] = None, 
                      max_commits: Optional[int] = None) -> List[Dict]:

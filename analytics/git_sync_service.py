@@ -160,8 +160,16 @@ class GitSyncService:
         
         try:
             # Clone repository
-            logger.info(f"Cloning repository {repo_full_name}")
-            self.git_service.clone_repository(repo_url, repo_full_name)
+            print(f"DEBUG: About to clone repository {repo_full_name} from {repo_url}")
+            logger.info(f"Cloning repository {repo_full_name} from {repo_url}")
+            try:
+                repo_path = self.git_service.clone_repository(repo_url, repo_full_name)
+                print(f"DEBUG: Successfully cloned {repo_full_name} to {repo_path}")
+                logger.info(f"Successfully cloned {repo_full_name} to {repo_path}")
+            except Exception as clone_error:
+                print(f"DEBUG: Failed to clone {repo_full_name}: {clone_error}")
+                logger.error(f"Failed to clone {repo_full_name}: {clone_error}")
+                raise
             
             # Get or create repository stats
             repo_stats = RepositoryStats.objects(repository_full_name=repo_full_name).first()
