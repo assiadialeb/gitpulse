@@ -9,7 +9,7 @@ from .forms import CustomUserCreationForm, CustomAuthenticationForm, UserProfile
 from .models import UserProfile
 from .services import GitHubUserService
 # from models import GitHubUser  # Supprimé car inutilisé et cause une erreur linter
-from analytics.models import Commit, PullRequest, DeveloperAlias, Developer, Release  # mongoengine
+from analytics.models import Commit, PullRequest, DeveloperAlias, Developer, Release, Deployment  # mongoengine
 import applications.models  # pour accès Django ORM
 from django.utils import timezone
 from collections import defaultdict
@@ -282,6 +282,7 @@ def dashboard_view(request):
     total_commits = Commit.objects().count()  # mongoengine
     total_pull_requests = PullRequest.objects().count()  # mongoengine
     total_releases = Release.objects().count()  # mongoengine
+    total_deployments = Deployment.objects().count()  # mongoengine
 
     # Commits du mois (30 derniers jours)
     cutoff_date = timezone.now() - timezone.timedelta(days=30)
@@ -309,12 +310,22 @@ def dashboard_view(request):
         repo_stats[key] += 1
     top_repositories = [{'repo': repo, 'commits': count} for repo, count in sorted(repo_stats.items(), key=lambda x: -x[1])[:5]]
 
+    # Top repositories by deployments (ce mois)
+    deployment_repo_stats = defaultdict(int)
+    recent_deployments = Deployment.objects.filter(created_at__gte=cutoff_date)
+    for dep in recent_deployments:
+        key = dep.repository_full_name.strip()
+        deployment_repo_stats[key] += 1
+    top_deployment_repositories = [{'repo': repo, 'deployments': count} for repo, count in sorted(deployment_repo_stats.items(), key=lambda x: -x[1])[:5]]
+
     context = {
         'total_repositories': total_repositories,
         'total_commits': total_commits,
         'total_pull_requests': total_pull_requests,
         'total_releases': total_releases,
+        'total_deployments': total_deployments,
         'top_developers': top_developers,
         'top_repositories': top_repositories,
+        'top_deployment_repositories': top_deployment_repositories,
     }
     return render(request, 'users/dashboard.html', context)
