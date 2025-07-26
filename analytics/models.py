@@ -2,7 +2,6 @@
 MongoDB models for analytics data
 """
 from datetime import datetime, timezone
-from django.utils import timezone as django_timezone
 from django.conf import settings
 import mongoengine.fields as fields
 from mongoengine import Document, EmbeddedDocument
@@ -18,7 +17,7 @@ class IndexingState(Document):
     
     # Indexing state
     last_indexed_at = fields.DateTimeField(null=True)  # Last date/time indexed for this entity
-    last_run_at = fields.DateTimeField(default=django_timezone.now)  # When the task was last executed
+    last_run_at = fields.DateTimeField(default=datetime.utcnow)  # When the task was last executed
     status = fields.StringField(choices=['pending', 'running', 'completed', 'error'], default='pending')
     
     # Statistics
@@ -31,8 +30,8 @@ class IndexingState(Document):
     max_retries = fields.IntField(default=3)
     
     # Metadata
-    created_at = fields.DateTimeField(default=django_timezone.now)
-    updated_at = fields.DateTimeField(default=django_timezone.now)
+    created_at = fields.DateTimeField(default=datetime.utcnow)
+    updated_at = fields.DateTimeField(default=datetime.utcnow)
     
     # MongoDB settings
     meta = {
@@ -188,7 +187,7 @@ class Commit(Document):
             if authored_date.tzinfo is None:
                 authored_date = authored_date.replace(tzinfo=timezone.utc)
             # Convert to configured timezone
-            return django_timezone.localtime(authored_date)
+            return datetime.localtime(authored_date)
         return authored_date
     
     def get_committed_date_in_timezone(self):
@@ -199,7 +198,7 @@ class Commit(Document):
             if committed_date.tzinfo is None:
                 committed_date = committed_date.replace(tzinfo=timezone.utc)
             # Convert to configured timezone
-            return django_timezone.localtime(committed_date)
+            return datetime.localtime(committed_date)
         return committed_date
     
     def __str__(self):

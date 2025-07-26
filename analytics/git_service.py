@@ -46,13 +46,14 @@ class GitService:
                 self._clone_locks[clone_key] = threading.Lock()
             return self._clone_locks[clone_key]
     
-    def clone_repository(self, repo_url: str, repo_full_name: str) -> str:
+    def clone_repository(self, repo_url: str, repo_full_name: str, github_token: str = None) -> str:
         """
         Clone a repository to a temporary directory with concurrency protection
         
         Args:
             repo_url: Git repository URL (HTTPS or SSH)
             repo_full_name: Repository name in format "owner/repo"
+            github_token: GitHub token for authentication (optional)
             
         Returns:
             Path to cloned repository
@@ -88,9 +89,18 @@ class GitService:
                 env['GIT_LFS_SKIP_SMUDGE'] = '1'  # Skip LFS file download
                 env['GIT_LFS_SKIP_PUSH'] = '1'    # Skip LFS push
                 
+                # Prepare clone URL with authentication if token provided
+                clone_url = repo_url
+                if github_token and repo_url.startswith('https://'):
+                    # Inject token into HTTPS URL
+                    if 'github.com' in repo_url:
+                        # Format: https://token@github.com/owner/repo.git
+                        clone_url = repo_url.replace('https://', f'https://{github_token}@')
+                        logger.info(f"Using authenticated clone URL for {repo_full_name}")
+                
                 # First try: clone normally with LFS disabled
                 result = subprocess.run(
-                    ['git', 'clone', '--quiet', repo_url, repo_dir],
+                    ['git', 'clone', '--quiet', clone_url, repo_dir],
                     capture_output=True,
                     text=True,
                     timeout=600,  # 10 minutes timeout (increased)
@@ -114,19 +124,19 @@ class GitService:
                         [
                             'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
                             '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
-                            'clone', '--depth=1', '--no-single-branch', '--quiet', repo_url, repo_dir
+                            'clone', '--depth=1', '--no-single-branch', '--quiet', clone_url, repo_dir
                         ],
                         # Strategy 2: Full clone without LFS (if shallow fails)
                         [
                             'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
                             '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
-                            'clone', '--quiet', repo_url, repo_dir
+                            'clone', '--quiet', clone_url, repo_dir
                         ],
                         # Strategy 3: Bare clone (minimal, no working directory)
                         [
                             'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
                             '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
-                            'clone', '--bare', '--quiet', repo_url, repo_dir
+                            'clone', '--bare', '--quiet', clone_url, repo_dir
                         ]
                     ]
                     

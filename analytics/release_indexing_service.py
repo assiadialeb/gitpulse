@@ -73,7 +73,7 @@ class ReleaseIndexingService:
                             published_at = datetime.fromisoformat(published_at_str.replace('Z', '+00:00'))
                             
                             # Ensure all dates are timezone-aware for comparison
-                            from django.utils import timezone
+                            from datetime import timezone
                             if since.tzinfo is None:
                                 since = timezone.make_aware(since)
                             if until.tzinfo is None:
@@ -100,7 +100,7 @@ class ReleaseIndexingService:
                                     created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
                                     
                                     # Check created_at for drafts
-                                    from django.utils import timezone
+                                    from datetime import timezone
                                     if since.tzinfo is None:
                                         since = timezone.make_aware(since)
                                     if until.tzinfo is None:
@@ -239,7 +239,7 @@ class ReleaseIndexingService:
             from repositories.models import Repository
             from analytics.models import IndexingState
             from datetime import timedelta
-            from django.utils import timezone
+            from datetime import timezone
             import requests
             logger = logging.getLogger(__name__)
 

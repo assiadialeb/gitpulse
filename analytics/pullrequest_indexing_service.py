@@ -4,7 +4,7 @@ Fetches and processes GitHub Pull Requests using the Intelligent Indexing Servic
 """
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
 
@@ -76,7 +76,6 @@ class PullRequestIndexingService:
                             created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
                             
                             # Ensure all dates are timezone-aware for comparison
-                            from django.utils import timezone
                             if since.tzinfo is None:
                                 since = timezone.make_aware(since)
                             if until.tzinfo is None:

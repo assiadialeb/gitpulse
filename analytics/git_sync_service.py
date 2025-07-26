@@ -26,6 +26,13 @@ class GitSyncService:
         """Initialize sync service for a specific user"""
         self.user_id = user_id
         self.git_service = GitService()
+        # Get GitHub token for authentication
+        from .github_token_service import GitHubTokenService
+        self.github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+        if not self.github_token:
+            self.github_token = GitHubTokenService._get_user_token(user_id)
+        if not self.github_token:
+            self.github_token = GitHubTokenService._get_oauth_app_token()
     
     def sync_application_repositories(self, application_id: int, sync_type: str = 'incremental') -> Dict:
         """
@@ -163,7 +170,7 @@ class GitSyncService:
             print(f"DEBUG: About to clone repository {repo_full_name} from {repo_url}")
             logger.info(f"Cloning repository {repo_full_name} from {repo_url}")
             try:
-                repo_path = self.git_service.clone_repository(repo_url, repo_full_name)
+                repo_path = self.git_service.clone_repository(repo_url, repo_full_name, self.github_token)
                 print(f"DEBUG: Successfully cloned {repo_full_name} to {repo_path}")
                 logger.info(f"Successfully cloned {repo_full_name} to {repo_path}")
             except Exception as clone_error:
