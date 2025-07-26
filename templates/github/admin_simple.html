@@ -80,20 +80,26 @@
                     <!-- User Connection Status -->
                     <div>
                         <h3 class="font-semibold text-dark-gray mb-2">Your GitHub Connection:</h3>
-                        {% if github_connected %}
-                            <div class="alert alert-success">
-                                ✅ Connected as {{ github_username }}
-                            </div>
-                            <a href="{% provider_login_url 'github' %}" class="btn btn-outline btn-sm mt-2">
-                                🔄 Reconnect
-                            </a>
+                        {% if github_provider_exists %}
+                            {% if github_connected %}
+                                <div class="alert alert-success">
+                                    ✅ Connected as {{ github_username }}
+                                </div>
+                                <a href="{% provider_login_url 'github' %}" class="btn btn-outline btn-sm mt-2">
+                                    🔄 Reconnect
+                                </a>
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    ⚠️ Not connected to GitHub
+                                </div>
+                                <a href="{% provider_login_url 'github' %}" class="btn btn-primary btn-sm mt-2">
+                                    🔗 Connect GitHub Account
+                                </a>
+                            {% endif %}
                         {% else %}
-                            <div class="alert alert-warning">
-                                ⚠️ Not connected to GitHub
+                            <div class="alert alert-info">
+                                ℹ️ GitHub OAuth not configured yet
                             </div>
-                            <a href="{% provider_login_url 'github' %}" class="btn btn-primary btn-sm mt-2">
-                                🔗 Connect GitHub Account
-                            </a>
                         {% endif %}
                     </div>
                     

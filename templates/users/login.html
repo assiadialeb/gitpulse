@@ -81,6 +81,7 @@
                 </div>
             </form>
 
+            {% if github_provider_exists %}
             <div class="divider text-medium-gray my-8">or</div>
 
             <div class="text-center mb-6">
@@ -91,6 +92,7 @@
                     Sign in with GitHub
                 </a>
             </div>
+            {% endif %}
 
             <div class="text-center">
                 <p class="text-medium-gray mb-4">Don't have an account yet?</p>

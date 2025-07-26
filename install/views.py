@@ -104,6 +104,8 @@ def setup_scheduled_tasks():
                 minutes=0,
                 hours=hour,
                 repeats=-1,  # Repeat indefinitely
+                args=(),
+                kwargs={},
             )
             success_count += 1
             log_installation('INFO', f'Scheduled task: {task_name} at {hour:02d}:00')
