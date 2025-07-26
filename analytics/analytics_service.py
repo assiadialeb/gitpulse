@@ -15,6 +15,13 @@ from .models import PullRequest
 class AnalyticsService:
     """Service for calculating analytics from commit data"""
     
+    @staticmethod
+    def _ensure_timezone_aware(dt):
+        """Ensure a datetime is timezone-aware (UTC)"""
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+    
     def __init__(self, application_id: int):
         self.application_id = application_id
         self.commits = Commit.objects.filter(application_id=application_id)
@@ -452,11 +459,11 @@ class AnalyticsService:
         cutoff_30 = now - timedelta(days=30)
         cutoff_90 = now - timedelta(days=90)
         
-        commits_last_30_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_30)
-        commits_last_90_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_90)
+        commits_last_30_days = sum(1 for commit in commits_list if self._ensure_timezone_aware(commit.authored_date) >= cutoff_30)
+        commits_last_90_days = sum(1 for commit in commits_list if self._ensure_timezone_aware(commit.authored_date) >= cutoff_90)
         
         # Calculate days since last commit
-        days_since_last_commit = (now - last_commit.authored_date).days
+        days_since_last_commit = (now - self._ensure_timezone_aware(last_commit.authored_date)).days
         
         # Calculate activity consistency
         # Group commits by day to find active days
@@ -810,11 +817,11 @@ class AnalyticsService:
         cutoff_30 = now - timedelta(days=30)
         cutoff_90 = now - timedelta(days=90)
         
-        commits_last_30_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_30)
-        commits_last_90_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_90)
+        commits_last_30_days = sum(1 for commit in commits_list if self._ensure_timezone_aware(commit.authored_date) >= cutoff_30)
+        commits_last_90_days = sum(1 for commit in commits_list if self._ensure_timezone_aware(commit.authored_date) >= cutoff_90)
         
         # Calculate days since last commit
-        days_since_last_commit = (now - last_commit.authored_date).days
+        days_since_last_commit = (now - self._ensure_timezone_aware(last_commit.authored_date)).days
         
         # Calculate activity consistency
         # Group commits by day to find active days

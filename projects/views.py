@@ -54,13 +54,26 @@ def project_detail(request, project_id):
     # Import analytics models for additional stats
     from analytics.models import Commit, Release, PullRequest, Deployment
     
+    # Initialize metrics variables
+    lines_added = 0
+    
+    # Helper function to ensure timezone-aware datetimes
+    def ensure_timezone_aware(dt):
+        """Ensure a datetime is timezone-aware (UTC)"""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            from datetime import timezone as dt_timezone
+            return dt.replace(tzinfo=dt_timezone.utc)
+        return dt
+    
     # Calculate commits from MongoDB
     # Check if this is "All Time" (very old start date) or specific date range
     is_all_time = False
     if start_date and end_date:
         # Check if start date is very old (more than 5 years ago) - indicates "All Time"
-        from datetime import datetime, timedelta
-        current_year = datetime.now().year
+        from datetime import datetime, timedelta, timezone as dt_timezone
+        current_year = timezone.now().year
         start_year = start_dt.year
         if current_year - start_year > 5:
             is_all_time = True
@@ -70,27 +83,31 @@ def project_detail(request, project_id):
         recent_commits = Commit.objects.filter(
             repository_full_name__in=repo_full_names,
             authored_date__gte=start_dt,
-            authored_date__lt=end_dt
+            authored_date__lt=end_dt,
+            authored_date__ne=None
         )
         total_commits = recent_commits.count()
     elif is_all_time:
         # "All Time" - show all commits for the project
         total_commits = Commit.objects.filter(
-            repository_full_name__in=repo_full_names
+            repository_full_name__in=repo_full_names,
+            authored_date__ne=None
         ).count()
 
         # For recent activity calculations, still use the 30-day window
         recent_commits = Commit.objects.filter(
             repository_full_name__in=repo_full_names,
             authored_date__gte=start_dt,
-            authored_date__lt=end_dt
+            authored_date__lt=end_dt,
+            authored_date__ne=None
         )
     else:
         # No date parameters - use default date range (30 days)
         recent_commits = Commit.objects.filter(
             repository_full_name__in=repo_full_names,
             authored_date__gte=start_dt,
-            authored_date__lt=end_dt
+            authored_date__lt=end_dt,
+            authored_date__ne=None
         )
         total_commits = recent_commits.count()
 
@@ -110,35 +127,41 @@ def project_detail(request, project_id):
         total_releases = Release.objects.filter(
             repository_full_name__in=repo_full_names,
             published_at__gte=start_dt,
-            published_at__lt=end_dt
+            published_at__lt=end_dt,
+            published_at__ne=None
         ).count()
         
         total_deployments = Deployment.objects.filter(
             repository_full_name__in=repo_full_names,
             created_at__gte=start_dt,
-            created_at__lt=end_dt
+            created_at__lt=end_dt,
+            created_at__ne=None
         ).count()
     elif is_all_time:
         # "All Time" - show all metrics for the project
         total_releases = Release.objects.filter(
-            repository_full_name__in=repo_full_names
+            repository_full_name__in=repo_full_names,
+            published_at__ne=None
         ).count()
         
         total_deployments = Deployment.objects.filter(
-            repository_full_name__in=repo_full_names
+            repository_full_name__in=repo_full_names,
+            created_at__ne=None
         ).count()
     else:
         # No date parameters - use default date range (30 days)
         total_releases = Release.objects.filter(
             repository_full_name__in=repo_full_names,
             published_at__gte=start_dt,
-            published_at__lt=end_dt
+            published_at__lt=end_dt,
+            published_at__ne=None
         ).count()
         
         total_deployments = Deployment.objects.filter(
             repository_full_name__in=repo_full_names,
             created_at__gte=start_dt,
-            created_at__lt=end_dt
+            created_at__lt=end_dt,
+            created_at__ne=None
         ).count()
     
     # Calculate PR cycle time (filtered by date)
@@ -175,7 +198,8 @@ def project_detail(request, project_id):
     recent_releases = Release.objects.filter(
         repository_full_name__in=repo_full_names,
         published_at__gte=start_dt,
-        published_at__lt=end_dt
+        published_at__lt=end_dt,
+        published_at__ne=None
     )
     months_diff = days_diff / 30
     release_frequency = {
@@ -186,7 +210,8 @@ def project_detail(request, project_id):
     recent_deployments = Deployment.objects.filter(
         repository_full_name__in=repo_full_names,
         created_at__gte=start_dt,
-        created_at__lt=end_dt
+        created_at__lt=end_dt,
+        created_at__ne=None
     )
     weeks_diff = days_diff / 7
     deployment_frequency = {
@@ -207,11 +232,15 @@ def project_detail(request, project_id):
         # User specified date range - filter developers by recent commits
         unique_emails = set()
         for commit in recent_commits:
-            unique_emails.add(commit.author_email)
+            if commit.author_email:
+                unique_emails.add(commit.author_email)
         total_developers = len(unique_emails)
     elif is_all_time:
         # "All Time" - show all developers for the project
-        all_commits = Commit.objects.filter(repository_full_name__in=repo_full_names)
+        all_commits = Commit.objects.filter(
+            repository_full_name__in=repo_full_names,
+            author_email__ne=None
+        )
         unique_emails = set()
         for commit in all_commits:
             unique_emails.add(commit.author_email)
@@ -220,7 +249,8 @@ def project_detail(request, project_id):
         # No date parameters - use default date range (30 days)
         unique_emails = set()
         for commit in recent_commits:
-            unique_emails.add(commit.author_email)
+            if commit.author_email:
+                unique_emails.add(commit.author_email)
         total_developers = len(unique_emails)
     
     # Import UnifiedMetricsService for advanced metrics
@@ -244,8 +274,9 @@ def project_detail(request, project_id):
             repo_commits = Commit.objects.filter(
                 repository_full_name=repo.full_name,
                 authored_date__gte=start_dt,
-                authored_date__lt=end_dt
-            )
+                authored_date__lt=end_dt,
+                authored_date__ne=None
+            )  # Exclude commits with null dates
             all_project_commits.extend(list(repo_commits))
             
             # Aggregate metrics (but skip commit_frequency for now)
@@ -278,13 +309,13 @@ def project_detail(request, project_id):
         # Recalculate commit frequency metrics for the entire project
         if all_project_commits:
             # Sort commits by date
-            all_project_commits.sort(key=lambda x: x.authored_date)
+            all_project_commits.sort(key=lambda x: x.authored_date if x.authored_date else timezone.now())
             
             # Calculate frequency metrics for the entire project
             from datetime import datetime, timedelta
             import statistics
             
-            now = datetime.now(timezone.utc)
+            now = timezone.now()
             first_commit = all_project_commits[0]
             last_commit = all_project_commits[-1]
             
@@ -298,17 +329,18 @@ def project_detail(request, project_id):
             cutoff_30 = now - timedelta(days=30)
             cutoff_90 = now - timedelta(days=90)
             
-            commits_last_30_days = sum(1 for commit in all_project_commits if commit.authored_date >= cutoff_30)
-            commits_last_90_days = sum(1 for commit in all_project_commits if commit.authored_date >= cutoff_90)
+            commits_last_30_days = sum(1 for commit in all_project_commits if commit.authored_date and ensure_timezone_aware(commit.authored_date) >= cutoff_30)
+            commits_last_90_days = sum(1 for commit in all_project_commits if commit.authored_date and ensure_timezone_aware(commit.authored_date) >= cutoff_90)
             
             # Calculate days since last commit
-            days_since_last_commit = (now - last_commit.authored_date).days
+            days_since_last_commit = (now - ensure_timezone_aware(last_commit.authored_date)).days if last_commit.authored_date else 0
             
             # Calculate activity consistency
             # Group commits by day to find active days
             active_days = set()
             for commit in all_project_commits:
-                active_days.add(commit.authored_date.date())
+                if commit.authored_date:
+                    active_days.add(commit.authored_date.date())
             
             active_days_count = len(active_days)
             consistency_ratio = active_days_count / total_days if total_days > 0 else 0
@@ -316,8 +348,9 @@ def project_detail(request, project_id):
             # Calculate gaps between commits (for consistency)
             gaps = []
             for i in range(1, len(all_project_commits)):
-                gap = (all_project_commits[i].authored_date - all_project_commits[i-1].authored_date).days
-                gaps.append(gap)
+                if all_project_commits[i].authored_date and all_project_commits[i-1].authored_date:
+                    gap = (all_project_commits[i].authored_date - all_project_commits[i-1].authored_date).days
+                    gaps.append(gap)
             
             avg_gap = statistics.mean(gaps) if gaps else 0
             gap_std = statistics.stdev(gaps) if len(gaps) > 1 else 0
@@ -425,6 +458,8 @@ def project_detail(request, project_id):
         
         # Aggregate by developer groups
         for commit in all_commits:
+            if not commit.author_email:
+                continue
             email = commit.author_email.lower()
             net_lines = (commit.additions or 0) - (commit.deletions or 0)
             
@@ -633,13 +668,15 @@ def project_detail(request, project_id):
             repo_name = commit.repository_full_name.split('/')[-1] if '/' in commit.repository_full_name else commit.repository_full_name
             
             # Get local date and hour
-            local_date = commit.get_authored_date_in_timezone()
-            date = local_date.date()
-            hour = local_date.hour
-            
-            key = (date, hour)
-            repo_bubbles[repo_name][key]['commits'] += 1
-            repo_bubbles[repo_name][key]['changes'] += (commit.additions or 0) + (commit.deletions or 0)
+            if commit.authored_date:
+                local_date = commit.get_authored_date_in_timezone()
+                if local_date:
+                    date = local_date.date()
+                    hour = local_date.hour
+                    
+                    key = (date, hour)
+                    repo_bubbles[repo_name][key]['commits'] += 1
+                    repo_bubbles[repo_name][key]['changes'] += (commit.additions or 0) + (commit.deletions or 0)
         
         # Create datasets for Chart.js
         chart_datasets = []
@@ -683,6 +720,7 @@ def project_detail(request, project_id):
         commit_type_labels = json.dumps([])
         commit_type_values = json.dumps([])
         legend_data = []
+        doughnut_colors = {}
         activity_heatmap_data = json.dumps([0] * 24)
     
 

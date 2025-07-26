@@ -187,7 +187,8 @@ class Commit(Document):
             if authored_date.tzinfo is None:
                 authored_date = authored_date.replace(tzinfo=timezone.utc)
             # Convert to configured timezone
-            return datetime.localtime(authored_date)
+            from django.utils import timezone as django_timezone
+            return django_timezone.localtime(authored_date)
         return authored_date
     
     def get_committed_date_in_timezone(self):
@@ -198,7 +199,8 @@ class Commit(Document):
             if committed_date.tzinfo is None:
                 committed_date = committed_date.replace(tzinfo=timezone.utc)
             # Convert to configured timezone
-            return datetime.localtime(committed_date)
+            from django.utils import timezone as django_timezone
+            return django_timezone.localtime(committed_date)
         return committed_date
     
     def __str__(self):

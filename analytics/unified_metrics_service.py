@@ -4,7 +4,7 @@ Unified metrics service for calculating analytics across repositories, applicati
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Union
 from collections import defaultdict, Counter
-from django.utils import timezone
+from django.utils import timezone as django_timezone
 import re
 import statistics
 
@@ -21,6 +21,13 @@ class UnifiedMetricsService:
     - Application (A): aggregated repos metrics  
     - Developer (D): single developer metrics
     """
+    
+    @staticmethod
+    def _ensure_timezone_aware(dt):
+        """Ensure a datetime is timezone-aware (UTC)"""
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
     
     def __init__(self, entity_type: str, entity_id: Union[int, str], start_date=None, end_date=None):
         """
@@ -176,9 +183,9 @@ class UnifiedMetricsService:
         # Calculate recent activity
         cutoff_30 = now - timedelta(days=30)
         cutoff_90 = now - timedelta(days=90)
-        commits_last_30_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_30)
-        commits_last_90_days = sum(1 for commit in commits_list if commit.authored_date >= cutoff_90)
-        days_since_last_commit = (now - last_commit.authored_date).days
+        commits_last_30_days = sum(1 for commit in commits_list if self._ensure_timezone_aware(commit.authored_date) >= cutoff_30)
+        commits_last_90_days = sum(1 for commit in commits_list if self._ensure_timezone_aware(commit.authored_date) >= cutoff_90)
+        days_since_last_commit = (now - self._ensure_timezone_aware(last_commit.authored_date)).days
         
         # Calculate activity consistency
         active_days = set(commit.authored_date.date() for commit in commits_list)
@@ -213,7 +220,7 @@ class UnifiedMetricsService:
             total_releases = releases.count()
             days_span = (self.end_date - self.start_date).days + 1
         else:
-            cutoff = timezone.now() - timedelta(days=period_days)
+            cutoff = django_timezone.now() - timedelta(days=period_days)
             releases = self.releases.filter(published_at__gte=cutoff)
             total_releases = releases.count()
             days_span = period_days
@@ -259,7 +266,7 @@ class UnifiedMetricsService:
         if self.start_date and self.end_date:
             recent_commits = self.commits
         else:
-            cutoff_date = timezone.now() - timedelta(days=days)
+            cutoff_date = django_timezone.now() - timedelta(days=days)
             recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         if self.entity_type == 'developer':
             return {
@@ -273,7 +280,7 @@ class UnifiedMetricsService:
                 'total_developers': 1
             }
         
-        cutoff_date = timezone.now() - timedelta(days=days)
+        cutoff_date = django_timezone.now() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         if self.entity_type == 'application':
@@ -550,7 +557,7 @@ class UnifiedMetricsService:
         if self.start_date and self.end_date:
             recent_commits = self.commits
         else:
-            cutoff_date = timezone.now() - timedelta(days=days)
+            cutoff_date = django_timezone.now() - timedelta(days=days)
             recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         # Initialize hourly activity
@@ -576,7 +583,7 @@ class UnifiedMetricsService:
         Returns:
             Dictionary with bubble chart data
         """
-        cutoff_date = timezone.now() - timedelta(days=days)
+        cutoff_date = django_timezone.now() - timedelta(days=days)
         recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
         
         # Group commits by date and hour
@@ -605,7 +612,7 @@ class UnifiedMetricsService:
         
         max_commits = 0
         for (date, hour), data in bubble_data.items():
-            days_ago = (timezone.now().date() - date).days
+            days_ago = (django_timezone.now().date() - date).days
             dataset['data'].append({
                 'x': days_ago,
                 'y': hour,
@@ -655,7 +662,7 @@ class UnifiedMetricsService:
             return {'total_deployments': 0, 'deployments_per_week': 0, 'period_days': period_days}
         
         # Get deployments in the specified period
-        cutoff_date = timezone.now() - timedelta(days=period_days)
+        cutoff_date = django_timezone.now() - timedelta(days=period_days)
         recent_deployments = self.deployments.filter(created_at__gte=cutoff_date)
         
         total_deployments = recent_deployments.count()
