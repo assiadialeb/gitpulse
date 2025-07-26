@@ -29,5 +29,6 @@ urlpatterns = [
     path('analytics/', include('analytics.urls')),
     path('developers/', include('developers.urls')),
     path('repositories/', include('repositories.urls')),
+    path('install/', include('install.urls')),
     path('accounts/', include('allauth.urls')),
 ] + debug_toolbar_urls()

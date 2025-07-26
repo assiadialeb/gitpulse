@@ -22,21 +22,26 @@ def capture_github_token(sender, request, sociallogin, **kwargs):
                 from allauth.socialaccount.models import SocialApp
                 social_app = SocialApp.objects.filter(provider='github').first()
                 if social_app:
-                    social_token, created = SocialToken.objects.get_or_create(
-                        account=sociallogin.account,
-                        app=social_app,
-                        defaults={'token': access_token}
-                    )
-                    
-                    if not created:
-                        # Update existing token
-                        social_token.token = access_token
-                        social_token.save()
-                    
-                    logger.info(f"GitHub token captured for user {sociallogin.account.user.username}")
-                    
-                    # Also store in session for immediate use
-                    request.session['github_token'] = access_token
+                    try:
+                        social_token, created = SocialToken.objects.get_or_create(
+                            account=sociallogin.account,
+                            app=social_app,
+                            defaults={'token': access_token}
+                        )
+                        
+                        if not created:
+                            # Update existing token
+                            social_token.token = access_token
+                            social_token.save()
+                        
+                        logger.info(f"GitHub token captured for user {sociallogin.account.user.username}")
+                        
+                        # Also store in session for immediate use
+                        request.session['github_token'] = access_token
+                    except Exception as e:
+                        logger.error(f"Error storing GitHub token: {e}")
+                else:
+                    logger.warning("GitHub SocialApp not configured, skipping token storage")
                 
         except Exception as e:
             logger.error(f"Error capturing GitHub token: {e}")
@@ -48,4 +53,10 @@ def create_user_profile(sender, instance, created, **kwargs):
     """
     if created:
         from .models import UserProfile
-        UserProfile.objects.create(user=instance) 
+        try:
+            UserProfile.objects.get_or_create(user=instance)
+        except Exception as e:
+            # Log error but don't fail user creation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error creating user profile for {instance.username}: {e}") 

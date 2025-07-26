@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'analytics',
     'developers',
     'repositories',
+    'install',
     'django.contrib.sites',
     'allauth',
     'allauth.account',
@@ -107,11 +108,15 @@ mongoengine.connect(
     port=MONGODB_PORT,
 )
 
-# Keep SQLite for Django's built-in functionality (admin, auth, etc.)
+# PostgreSQL Configuration
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('POSTGRES_DB', default='gitpulse_new'),
+        'USER': config('POSTGRES_USER', default='gitpulse_user'),
+        'PASSWORD': config('POSTGRES_PASSWORD', default='gitpulse_password'),
+        'HOST': config('POSTGRES_HOST', default='localhost'),
+        'PORT': config('POSTGRES_PORT', default='5432'),
     }
 }
 
@@ -200,6 +205,11 @@ ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+
+# Social account settings to avoid confirmation page
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_REQUIRED = False
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
 
 SOCIALACCOUNT_PROVIDERS = {
     'github': {}

@@ -80,6 +80,9 @@ def admin_view(request):
     except Exception as e:
         print(f"User token check error: {e}")  # Debug
 
+    # Check if GitHub provider exists (for template safety)
+    github_provider_exists = SocialApp.objects.filter(provider='github').exists()
+    
     context = {
         'form': form,
         'oauth_secret': social_app.secret if social_app.secret else '',
@@ -88,6 +91,7 @@ def admin_view(request):
         'github_connected': user_github_connected,
         'github_username': user_github_username,
         'user_has_valid_token': user_has_valid_token,
+        'github_provider_exists': github_provider_exists,
     }
     return render(request, 'github/admin_simple.html', context)
 

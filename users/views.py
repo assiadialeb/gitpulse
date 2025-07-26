@@ -43,7 +43,14 @@ def login_view(request):
     else:
         form = CustomAuthenticationForm()
     
-    return render(request, 'users/login.html', {'form': form})
+    # Check if GitHub provider exists
+    from allauth.socialaccount.models import SocialApp
+    github_provider_exists = SocialApp.objects.filter(provider='github').exists()
+    
+    return render(request, 'users/login.html', {
+        'form': form,
+        'github_provider_exists': github_provider_exists
+    })
 
 
 def register_view(request):
@@ -269,9 +276,15 @@ def profile_view(request):
 
 
 def home_view(request):
-    """Home view - redirects to login if not authenticated"""
+    """Home view - redirects to installation if no users, otherwise to login"""
     if request.user.is_authenticated:
         return redirect('users:dashboard')
+    
+    # Check if installation is needed
+    from django.contrib.auth.models import User
+    if User.objects.count() == 0:
+        return redirect('install:install')
+    
     return redirect('users:login')
 
 
