@@ -284,7 +284,7 @@ def project_detail(request, project_id):
             from datetime import datetime, timedelta
             import statistics
             
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             first_commit = all_project_commits[0]
             last_commit = all_project_commits[-1]
             

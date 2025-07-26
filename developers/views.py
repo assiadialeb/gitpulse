@@ -10,7 +10,7 @@ from django.contrib.auth import authenticate
 import json
 import re
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from analytics.models import Developer, DeveloperAlias
 
@@ -392,7 +392,7 @@ def _calculate_quality_metrics_by_month(commits):
         }
     
     # Get commits from the last 12 months
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     months_data = {}
     
     for i in range(12):
@@ -536,7 +536,7 @@ def developer_detail(request, developer_id):
 
         # --- Correction: Activity Heatmap chart_data ---
         # Only keep commits from the last 365 days
-        now = datetime.utcnow().replace(tzinfo=None)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         cutoff = now - timedelta(days=365)
         commits_365d = [c for c in all_commits if c.authored_date and c.authored_date.replace(tzinfo=None) >= cutoff]
         # Group by repo, then by (days_ago, hour)

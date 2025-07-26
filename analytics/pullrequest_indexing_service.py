@@ -4,7 +4,8 @@ Fetches and processes GitHub Pull Requests using the Intelligent Indexing Servic
 """
 import logging
 import requests
-from datetime import datetime, timezone
+from datetime import datetime
+from django.utils import timezone
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
 

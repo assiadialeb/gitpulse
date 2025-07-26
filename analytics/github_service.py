@@ -214,7 +214,7 @@ class GitHubService:
             'parent_shas': [parent.get('sha') for parent in commit_data.get('parents', [])],
             'tree_sha': commit.get('tree', {}).get('sha'),
             'url': commit_data.get('html_url', ''),
-            'synced_at': datetime.utcnow(),
+            'synced_at': datetime.now(timezone.utc),
             # Champs PR
             'pull_request_number': pull_request_number,
             'pull_request_url': pull_request_url,

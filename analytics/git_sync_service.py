@@ -2,7 +2,7 @@
 Git-based synchronization service for fetching and storing commit data
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Tuple
 from django.db import transaction
 from mongoengine import Q
@@ -280,7 +280,7 @@ class GitSyncService:
                 if existing_commit:
                     # Skip if already synced recently
                     if existing_commit.synced_at and \
-                       (datetime.utcnow() - existing_commit.synced_at).days < 1:
+                       (datetime.now(timezone.utc) - existing_commit.synced_at).days < 1:
                         results['commits_skipped'] += 1
                         continue
                 
@@ -373,7 +373,7 @@ class GitSyncService:
             'parent_shas': [],  # Git local doesn't provide parent SHAs easily
             'tree_sha': '',  # Git local doesn't provide tree SHA easily
             'url': f"https://github.com/{repo_full_name}/commit/{commit_data.get('sha')}",
-            'synced_at': datetime.utcnow()
+            'synced_at': datetime.now(timezone.utc)
         }
         
         return parsed_data
@@ -393,7 +393,7 @@ class GitSyncService:
         latest_commit = commits_data[0]  # Commits are ordered newest first
         repo_stats.last_commit_sha = latest_commit['sha']
         repo_stats.last_commit_date = latest_commit['authored_date']
-        repo_stats.last_sync_at = datetime.utcnow()
+        repo_stats.last_sync_at = datetime.now(timezone.utc)
         
         # Update first commit info if not set
         if not repo_stats.first_commit_date:
@@ -451,8 +451,8 @@ def create_missing_aliases_for_application(application_id: int):
             alias = DeveloperAlias(
                 name=name,
                 email=email,
-                first_seen=datetime.utcnow(),  # Will be updated with actual dates later
-                last_seen=datetime.utcnow(),
+                            first_seen=datetime.now(timezone.utc),  # Will be updated with actual dates later
+            last_seen=datetime.now(timezone.utc),
                 commit_count=1
             )
             alias.save()

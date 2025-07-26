@@ -3,7 +3,7 @@ Synchronization service for fetching and storing commit data
 """
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Tuple
 from django.db import transaction
 from mongoengine import Q
@@ -310,7 +310,7 @@ class SyncService:
                 if existing_commit:
                     # Skip if already synced recently
                     if existing_commit.synced_at and \
-                       (datetime.utcnow() - existing_commit.synced_at).days < 1:
+                       (datetime.now(timezone.utc) - existing_commit.synced_at).days < 1:
                         results['commits_skipped'] += 1
                         continue
                 
@@ -381,7 +381,7 @@ class SyncService:
         repo_stats.total_commits = Commit.objects(repository_full_name=repo_stats.repository_full_name).count()
         
         # Update last sync time
-        repo_stats.last_sync_at = datetime.utcnow()
+        repo_stats.last_sync_at = datetime.now(timezone.utc)
         
         repo_stats.save()
     
@@ -396,7 +396,7 @@ class SyncService:
             Dictionary with retry results
         """
         # Find failed syncs within the last 24 hours
-        cutoff_time = datetime.utcnow() - timedelta(hours=24)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
         failed_syncs = SyncLog.objects(
             status='failed',
             started_at__gte=cutoff_time,

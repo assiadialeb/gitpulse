@@ -1,7 +1,7 @@
 """
 Analytics service for calculating developer metrics from commit data
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Tuple
 from collections import defaultdict, Counter
 import re
@@ -438,7 +438,7 @@ class AnalyticsService:
                 'total_days': 0
             }
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         first_commit = commits_list[0]
         last_commit = commits_list[-1]
         
@@ -622,7 +622,7 @@ class AnalyticsService:
         
         # Calculate activity over time (last 12 months)
         from datetime import datetime, timedelta
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         months_data = []
         
         for i in range(12):
@@ -796,7 +796,7 @@ class AnalyticsService:
                 'total_days': 0
             }
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         first_commit = commits_list[0]
         last_commit = commits_list[-1]
         

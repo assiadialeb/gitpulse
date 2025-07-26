@@ -1,7 +1,7 @@
 """
 Unified metrics service for calculating analytics across repositories, applications, and developers
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Union
 from collections import defaultdict, Counter
 from django.utils import timezone
@@ -165,7 +165,7 @@ class UnifiedMetricsService:
                 'total_days': 0
             }
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         first_commit = commits_list[0]
         last_commit = commits_list[-1]
         

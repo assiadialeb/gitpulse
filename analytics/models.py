@@ -17,7 +17,7 @@ class IndexingState(Document):
     
     # Indexing state
     last_indexed_at = fields.DateTimeField(null=True)  # Last date/time indexed for this entity
-    last_run_at = fields.DateTimeField(default=datetime.utcnow)  # When the task was last executed
+    last_run_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))  # When the task was last executed
     status = fields.StringField(choices=['pending', 'running', 'completed', 'error'], default='pending')
     
     # Statistics
@@ -30,8 +30,8 @@ class IndexingState(Document):
     max_retries = fields.IntField(default=3)
     
     # Metadata
-    created_at = fields.DateTimeField(default=datetime.utcnow)
-    updated_at = fields.DateTimeField(default=datetime.utcnow)
+    created_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
+    updated_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
     
     # MongoDB settings
     meta = {
@@ -71,8 +71,8 @@ class Developer(Document):
     application_id = fields.IntField(required=False, null=True)
     
     # Developer metadata
-    created_at = fields.DateTimeField(default=datetime.utcnow)
-    updated_at = fields.DateTimeField(default=datetime.utcnow)
+    created_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
+    updated_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
     is_auto_grouped = fields.BooleanField(default=True)  # True if auto-detected, False if manual
     
     # Grouping confidence score (0-100)
@@ -104,8 +104,8 @@ class DeveloperAlias(Document):
     email = fields.StringField(required=True)
     
     # Source information
-    first_seen = fields.DateTimeField(default=datetime.utcnow)
-    last_seen = fields.DateTimeField(default=datetime.utcnow)
+    first_seen = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
+    last_seen = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
     commit_count = fields.IntField(default=0)
     
     # MongoDB settings
@@ -163,7 +163,7 @@ class Commit(Document):
     url = fields.URLField()
     
     # Sync tracking
-    synced_at = fields.DateTimeField(default=datetime.utcnow)
+    synced_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
     
     # MongoDB settings
     meta = {
@@ -221,7 +221,7 @@ class SyncLog(Document):
     status = fields.StringField(choices=['running', 'completed', 'failed'], required=True)
     
     # Timestamps
-    started_at = fields.DateTimeField(required=True, default=datetime.utcnow)
+    started_at = fields.DateTimeField(required=True, default=lambda: datetime.now(timezone.utc))
     completed_at = fields.DateTimeField()
     
     # Results
@@ -317,7 +317,7 @@ class RateLimitReset(Document):
     status = fields.StringField(choices=['pending', 'scheduled', 'completed', 'failed', 'cancelled'], default='pending')
     
     # Timestamps
-    created_at = fields.DateTimeField(required=True, default=datetime.utcnow)
+    created_at = fields.DateTimeField(required=True, default=lambda: datetime.now(timezone.utc))
     scheduled_at = fields.DateTimeField()
     completed_at = fields.DateTimeField()
     

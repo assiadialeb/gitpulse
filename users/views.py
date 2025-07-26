@@ -163,7 +163,7 @@ def profile_view(request):
         if not polar_chart_data:
             polar_chart_data = []
         from datetime import datetime, timedelta
-        now = datetime.utcnow().replace(tzinfo=None)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         cutoff = now - timedelta(days=365)
         commits_365d = [c for c in all_commits if c.authored_date and c.authored_date.replace(tzinfo=None) >= cutoff]
         repo_bubbles = {}
