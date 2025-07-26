@@ -4,13 +4,38 @@ GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, an
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Option 1: Docker (Recommended)
 
+**Prerequisites**: Docker and Docker Compose
+
+1. **Clone and start**
+   ```bash
+   git clone <repository-url>
+   cd GitPulse
+   cp env.example .env
+   docker-compose up -d --build
+   ```
+
+2. **Initialize**
+   ```bash
+   docker-compose exec web python manage.py migrate
+   docker-compose exec web python manage.py createsuperuser
+   ```
+
+3. **Access the application**
+   - Open http://localhost:8000
+   - Login with your superuser credentials
+
+📖 **See [Docker Quick Start](docs/docker-quickstart.md) for detailed instructions**
+
+### Option 2: Local Installation
+
+**Prerequisites**:
 - Python 3.12+
-- MongoDB (optional, for future GitHub data storage)
+- PostgreSQL (recommended) or SQLite
+- MongoDB
+- Redis
 - Git
-
-### Installation
 
 1. **Clone the repository**
    ```bash
@@ -29,22 +54,28 @@ GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, an
    pip install -r requirements.txt
    ```
 
-4. **Run migrations**
+4. **Configure environment**
+   ```bash
+   cp env.example .env
+   # Edit .env with your database settings
+   ```
+
+5. **Run migrations**
    ```bash
    python manage.py migrate
    ```
 
-5. **Create superuser**
+6. **Create superuser**
    ```bash
    python manage.py createsuperuser
    ```
 
-6. **Start the server**
+7. **Start the server**
    ```bash
    python manage.py runserver
    ```
 
-7. **Access the application**
+8. **Access the application**
    - Open http://localhost:8000
    - Login with your superuser credentials
 

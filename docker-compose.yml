@@ -1,3 +1,5 @@
+# Pour Compose V2, tu peux ajouter en haut :
+# name: gitpulse
 version: '3.8'
 
 services:
@@ -9,20 +11,46 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./db.sqlite3:/app/db.sqlite3
     environment:
       - MONGODB_HOST=mongodb
       - MONGODB_PORT=27017
       - MONGODB_NAME=gitpulse
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=gitpulse
+      - POSTGRES_USER=gitpulse
+      - POSTGRES_PASSWORD=gitpulse_password
       - OLLAMA_HOST=ollama
       - OLLAMA_PORT=11434
     depends_on:
       - mongodb
-      - redis
+      - postgres
       - ollama
     command: ["./start.sh"]
+    restart: unless-stopped
+
+  # Django-Q Worker
+  worker:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - MONGODB_HOST=mongodb
+      - MONGODB_PORT=27017
+      - MONGODB_NAME=gitpulse
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=gitpulse
+      - POSTGRES_USER=gitpulse
+      - POSTGRES_PASSWORD=gitpulse_password
+      - OLLAMA_HOST=ollama
+      - OLLAMA_PORT=11434
+    depends_on:
+      - mongodb
+      - postgres
+      - ollama
+    command: ["./start-worker.sh"]
     restart: unless-stopped
 
   # MongoDB Database
@@ -41,15 +69,19 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # Redis Cache
-  redis:
-    image: redis:7.2-alpine
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
     ports:
-      - "6379:6379"
+      - "5432:5432"
     volumes:
-      - redis_data:/data
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=gitpulse
+      - POSTGRES_USER=gitpulse
+      - POSTGRES_PASSWORD=gitpulse_password
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U gitpulse -d gitpulse"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -75,14 +107,14 @@ services:
       sh -c "
         ollama serve &
         sleep 10 &&
-        ollama pull gemma3:1b &&
+        ollama pull gemma3:4b &&
         wait
       "
 
 volumes:
   mongodb_data:
     driver: local
-  redis_data:
+  postgres_data:
     driver: local
   ollama_data:
     driver: local 
