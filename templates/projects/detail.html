@@ -5,23 +5,7 @@
 
 {% block content %}
 {% csrf_token %}
-<style>
-/* Force white background for Cally calendar-range and all calendar-months containers, but NOT on days */
-calendar-range,
-calendar-range::part(container),
-calendar-range::part(month),
-calendar-range::part(header),
-calendar-range::part(footer),
-calendar-range calendar-month,
-calendar-range calendar-month::part(container),
-calendar-range calendar-month::part(month),
-calendar-range calendar-month::part(header),
-calendar-range calendar-month::part(footer) {
-  background: #fff !important;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 24px 0 rgb(0 0 0 / 0.08);
-}
-</style>
+
 <div class="container mx-auto px-4 py-8">
     <!-- Header -->
     <div class="mb-8">

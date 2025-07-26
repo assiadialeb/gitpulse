@@ -161,12 +161,27 @@ def project_detail(request, project_id):
         # Get all metrics for each repository and aggregate them
         all_metrics_aggregated = {}
         
+        # Collect all commits for the project to recalculate frequency metrics
+        all_project_commits = []
+        
         for repo in repositories:
             metrics_service = UnifiedMetricsService('repository', repo.id, start_date=start_dt, end_date=end_dt)
             repo_metrics = metrics_service.get_all_metrics()
             
-            # Aggregate metrics
+            # Collect commits for this repository
+            repo_commits = Commit.objects.filter(
+                repository_full_name=repo.full_name,
+                authored_date__gte=start_dt,
+                authored_date__lt=end_dt
+            )
+            all_project_commits.extend(list(repo_commits))
+            
+            # Aggregate metrics (but skip commit_frequency for now)
             for key, value in repo_metrics.items():
+                if key == 'commit_frequency':
+                    # Skip commit_frequency, we'll recalculate it for the entire project
+                    continue
+                    
                 if key not in all_metrics_aggregated:
                     all_metrics_aggregated[key] = value
                 elif isinstance(value, dict):
@@ -187,6 +202,114 @@ def project_detail(request, project_id):
                 elif isinstance(value, list):
                     # Extend lists
                     all_metrics_aggregated[key].extend(value)
+        
+        # Recalculate commit frequency metrics for the entire project
+        if all_project_commits:
+            # Sort commits by date
+            all_project_commits.sort(key=lambda x: x.authored_date)
+            
+            # Calculate frequency metrics for the entire project
+            from datetime import datetime, timedelta
+            import statistics
+            
+            now = datetime.utcnow()
+            first_commit = all_project_commits[0]
+            last_commit = all_project_commits[-1]
+            
+            # Calculate total time span
+            total_days = (last_commit.authored_date - first_commit.authored_date).days + 1
+            
+            # Calculate average commits per day
+            avg_commits_per_day = len(all_project_commits) / total_days if total_days > 0 else 0
+            
+            # Calculate recent activity (last 30 and 90 days)
+            cutoff_30 = now - timedelta(days=30)
+            cutoff_90 = now - timedelta(days=90)
+            
+            commits_last_30_days = sum(1 for commit in all_project_commits if commit.authored_date >= cutoff_30)
+            commits_last_90_days = sum(1 for commit in all_project_commits if commit.authored_date >= cutoff_90)
+            
+            # Calculate days since last commit
+            days_since_last_commit = (now - last_commit.authored_date).days
+            
+            # Calculate activity consistency
+            # Group commits by day to find active days
+            active_days = set()
+            for commit in all_project_commits:
+                active_days.add(commit.authored_date.date())
+            
+            active_days_count = len(active_days)
+            consistency_ratio = active_days_count / total_days if total_days > 0 else 0
+            
+            # Calculate gaps between commits (for consistency)
+            gaps = []
+            for i in range(1, len(all_project_commits)):
+                gap = (all_project_commits[i].authored_date - all_project_commits[i-1].authored_date).days
+                gaps.append(gap)
+            
+            avg_gap = statistics.mean(gaps) if gaps else 0
+            gap_std = statistics.stdev(gaps) if len(gaps) > 1 else 0
+            
+            # Calculate scores (0-100 scale)
+            
+            # Recent activity score (0-100)
+            # Based on commits in last 30 days vs 90 days
+            if commits_last_90_days > 0:
+                recent_activity_ratio = commits_last_30_days / commits_last_90_days
+                recent_activity_score = min(recent_activity_ratio * 100, 100)
+            else:
+                recent_activity_score = 0
+            
+            # Consistency score (0-100)
+            # Based on consistency ratio and gap standard deviation
+            consistency_score = min(consistency_ratio * 100, 100)
+            
+            # Overall frequency score (0-100)
+            # Weighted combination of different factors
+            weights = {
+                'avg_commits_per_day': 0.3,
+                'recent_activity': 0.4,
+                'consistency': 0.3
+            }
+            
+            # Normalize avg_commits_per_day (0-5 commits/day = 0-100 score)
+            normalized_avg = min(avg_commits_per_day * 20, 100)
+            
+            overall_frequency_score = (
+                normalized_avg * weights['avg_commits_per_day'] +
+                recent_activity_score * weights['recent_activity'] +
+                consistency_score * weights['consistency']
+            )
+            
+            # Create the aggregated commit frequency metrics
+            all_metrics_aggregated['commit_frequency'] = {
+                'avg_commits_per_day': round(avg_commits_per_day, 2),
+                'recent_activity_score': round(recent_activity_score, 1),
+                'consistency_score': round(consistency_score, 1),
+                'overall_frequency_score': round(overall_frequency_score, 1),
+                'commits_last_30_days': commits_last_30_days,
+                'commits_last_90_days': commits_last_90_days,
+                'days_since_last_commit': days_since_last_commit,
+                'active_days': active_days_count,
+                'total_days': total_days,
+                'avg_gap_between_commits': round(avg_gap, 1),
+                'gap_consistency': round(gap_std, 1)
+            }
+        else:
+            # No commits found, provide empty metrics
+            all_metrics_aggregated['commit_frequency'] = {
+                'avg_commits_per_day': 0,
+                'recent_activity_score': 0,
+                'consistency_score': 0,
+                'overall_frequency_score': 0,
+                'commits_last_30_days': 0,
+                'commits_last_90_days': 0,
+                'days_since_last_commit': None,
+                'active_days': 0,
+                'total_days': 0,
+                'avg_gap_between_commits': 0,
+                'gap_consistency': 0
+            }
         
         # Extract specific metrics for template
         developer_activity = all_metrics_aggregated.get('developer_activity_30d', {'developers': []})
@@ -236,10 +359,7 @@ def project_detail(request, project_id):
             release_frequency_advanced['releases_per_month'] = round(release_frequency_advanced.get('releases_per_month', 0), 1)
             release_frequency_advanced['releases_per_week'] = round(release_frequency_advanced.get('releases_per_week', 0), 1)
         
-        if commit_frequency_advanced:
-            commit_frequency_advanced['recent_activity_score'] = round(commit_frequency_advanced.get('recent_activity_score', 0), 1)
-            commit_frequency_advanced['consistency_score'] = round(commit_frequency_advanced.get('consistency_score', 0), 1)
-            commit_frequency_advanced['overall_frequency_score'] = round(commit_frequency_advanced.get('overall_frequency_score', 0), 1)
+        # No need to round commit_frequency_advanced scores as they're already calculated correctly
         
         if commit_quality:
             # Recalculate percentages correctly based on aggregated totals
@@ -256,38 +376,72 @@ def project_detail(request, project_id):
         
         # Round commit type ratios and recalculate statuses
         if commit_types:
-            commit_types['feature_fix_ratio'] = round(commit_types.get('feature_fix_ratio', 0), 2)
-            commit_types['test_feature_ratio'] = round(commit_types.get('test_feature_ratio', 0), 2)
-            commit_types['chore_docs_ratio'] = round(commit_types.get('chore_docs_ratio', 0), 2)
+            # Get the aggregated counts
+            counts = commit_types.get('counts', {})
+            total_commits = sum(counts.values())
             
-            # Recalculate statuses based on aggregated ratios
-            feature_fix_ratio = commit_types.get('feature_fix_ratio', 0)
-            test_feature_ratio = commit_types.get('test_feature_ratio', 0)
-            chore_docs_ratio = commit_types.get('chore_docs_ratio', 0)
-            
-            # Feature-to-Fix Ratio: feature/fix > 1 is good
-            commit_types['feature_fix_status'] = 'good' if feature_fix_ratio > 1 else 'poor'
-            commit_types['feature_fix_message'] = (
-                'The current feature-to-fix ratio indicates a healthy focus on building new capabilities, with fewer bug fixes. This suggests the codebase is relatively stable and development is moving forward.'
-                if feature_fix_ratio > 1 else
-                'A low feature-to-fix ratio may indicate a high maintenance burden or recurring issues. It can suggest technical debt or instability slowing down the delivery of new value.'
-            )
-            
-            # Test Coverage Ratio: test/feature >= 0.3 is good
-            commit_types['test_feature_status'] = 'good' if test_feature_ratio >= 0.3 else 'poor'
-            commit_types['test_feature_message'] = (
-                'The ratio of test to feature commits reflects a strong commitment to test coverage. This improves code reliability, eases refactoring, and supports long-term maintainability.'
-                if test_feature_ratio >= 0.3 else
-                'A low test-to-feature ratio can be a sign of insufficient test coverage. This increases the risk of regressions and may reduce confidence in the stability of new features.'
-            )
-            
-            # Focus Ratio: (chore + docs) / total < 0.3 is good
-            commit_types['chore_docs_status'] = 'good' if chore_docs_ratio < 0.3 else 'poor'
-            commit_types['chore_docs_message'] = (
-                'The project shows a clear focus on product-driven development, with a balanced investment in documentation and infrastructure work.'
-                if chore_docs_ratio < 0.3 else
-                'A high percentage of chore and documentation commits may indicate overhead or fragmented focus. This can reduce direct impact on feature delivery and product value.'
-            )
+            if total_commits > 0:
+                # Recalculate ratios from aggregated counts
+                feature_count = counts.get('feature', 0)
+                fix_count = counts.get('fix', 0)
+                test_count = counts.get('test', 0)
+                chore_count = counts.get('chore', 0)
+                docs_count = counts.get('docs', 0)
+                
+                # Feature-to-Fix Ratio: feature/fix > 1 is good
+                if fix_count > 0:
+                    feature_fix_ratio = feature_count / fix_count
+                else:
+                    feature_fix_ratio = feature_count if feature_count > 0 else 0
+                
+                # Test-to-Feature Ratio: test/feature >= 0.3 is good
+                if feature_count > 0:
+                    test_feature_ratio = test_count / feature_count
+                else:
+                    test_feature_ratio = 0
+                
+                # Chore+Docs Ratio: (chore + docs) / total < 0.3 is good
+                chore_docs_ratio = (chore_count + docs_count) / total_commits
+                
+                # Update the ratios
+                commit_types['feature_fix_ratio'] = round(feature_fix_ratio, 2)
+                commit_types['test_feature_ratio'] = round(test_feature_ratio, 2)
+                commit_types['chore_docs_ratio'] = round(chore_docs_ratio, 2)
+                
+                # Recalculate statuses based on correct ratios
+                commit_types['feature_fix_status'] = 'good' if feature_fix_ratio > 1 else 'poor'
+                commit_types['feature_fix_message'] = (
+                    'The current feature-to-fix ratio indicates a healthy focus on building new capabilities, with fewer bug fixes. This suggests the codebase is relatively stable and development is moving forward.'
+                    if feature_fix_ratio > 1 else
+                    'A low feature-to-fix ratio may indicate a high maintenance burden or recurring issues. It can suggest technical debt or instability slowing down the delivery of new value.'
+                )
+                
+                # Test Coverage Ratio: test/feature >= 0.3 is good
+                commit_types['test_feature_status'] = 'good' if test_feature_ratio >= 0.3 else 'poor'
+                commit_types['test_feature_message'] = (
+                    'The ratio of test to feature commits reflects a strong commitment to test coverage. This improves code reliability, eases refactoring, and supports long-term maintainability.'
+                    if test_feature_ratio >= 0.3 else
+                    'A low test-to-feature ratio can be a sign of insufficient test coverage. This increases the risk of regressions and may reduce confidence in the stability of new features.'
+                )
+                
+                # Focus Ratio: (chore + docs) / total < 0.3 is good
+                commit_types['chore_docs_status'] = 'good' if chore_docs_ratio < 0.3 else 'poor'
+                commit_types['chore_docs_message'] = (
+                    'The project shows a clear focus on product-driven development, with a balanced investment in documentation and infrastructure work.'
+                    if chore_docs_ratio < 0.3 else
+                    'A high percentage of chore and documentation commits may indicate overhead or fragmented focus. This can reduce direct impact on feature delivery and product value.'
+                )
+            else:
+                # No commits, set default values
+                commit_types['feature_fix_ratio'] = 0
+                commit_types['test_feature_ratio'] = 0
+                commit_types['chore_docs_ratio'] = 0
+                commit_types['feature_fix_status'] = 'poor'
+                commit_types['test_feature_status'] = 'poor'
+                commit_types['chore_docs_status'] = 'poor'
+                commit_types['feature_fix_message'] = 'No commits available for analysis.'
+                commit_types['test_feature_message'] = 'No commits available for analysis.'
+                commit_types['chore_docs_message'] = 'No commits available for analysis.'
         
         if pr_health_metrics:
             # Recalculate percentages correctly based on aggregated totals
