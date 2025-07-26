@@ -54,13 +54,46 @@ def project_detail(request, project_id):
     # Import analytics models for additional stats
     from analytics.models import Commit, Release, PullRequest, Deployment
     
-    # Calculate commits from MongoDB (filtered by date range)
-    recent_commits = Commit.objects.filter(
-        repository_full_name__in=repo_full_names,
-        authored_date__gte=start_dt,
-        authored_date__lt=end_dt
-    )
-    total_commits = recent_commits.count()
+    # Calculate commits from MongoDB
+    # Check if this is "All Time" (very old start date) or specific date range
+    is_all_time = False
+    if start_date and end_date:
+        # Check if start date is very old (more than 5 years ago) - indicates "All Time"
+        from datetime import datetime, timedelta
+        current_year = datetime.now().year
+        start_year = start_dt.year
+        if current_year - start_year > 5:
+            is_all_time = True
+    
+    if start_date and end_date and not is_all_time:
+        # User specified date range - filter commits
+        recent_commits = Commit.objects.filter(
+            repository_full_name__in=repo_full_names,
+            authored_date__gte=start_dt,
+            authored_date__lt=end_dt
+        )
+        total_commits = recent_commits.count()
+    elif is_all_time:
+        # "All Time" - show all commits for the project
+        total_commits = Commit.objects.filter(
+            repository_full_name__in=repo_full_names
+        ).count()
+
+        # For recent activity calculations, still use the 30-day window
+        recent_commits = Commit.objects.filter(
+            repository_full_name__in=repo_full_names,
+            authored_date__gte=start_dt,
+            authored_date__lt=end_dt
+        )
+    else:
+        # No date parameters - use default date range (30 days)
+        recent_commits = Commit.objects.filter(
+            repository_full_name__in=repo_full_names,
+            authored_date__gte=start_dt,
+            authored_date__lt=end_dt
+        )
+        total_commits = recent_commits.count()
+
     total_repositories = len(repositories)
     total_stars = sum(repo.stars for repo in repositories)
     total_forks = sum(repo.forks for repo in repositories)
@@ -71,18 +104,42 @@ def project_detail(request, project_id):
     # Import analytics models for additional stats
     from analytics.models import Commit, Release, PullRequest, Deployment
     
-    # Calculate additional metrics from MongoDB with date filtering
-    total_releases = Release.objects.filter(
-        repository_full_name__in=repo_full_names,
-        published_at__gte=start_dt,
-        published_at__lt=end_dt
-    ).count()
-    
-    total_deployments = Deployment.objects.filter(
-        repository_full_name__in=repo_full_names,
-        created_at__gte=start_dt,
-        created_at__lt=end_dt
-    ).count()
+    # Calculate additional metrics from MongoDB
+    if start_date and end_date and not is_all_time:
+        # User specified date range - filter metrics
+        total_releases = Release.objects.filter(
+            repository_full_name__in=repo_full_names,
+            published_at__gte=start_dt,
+            published_at__lt=end_dt
+        ).count()
+        
+        total_deployments = Deployment.objects.filter(
+            repository_full_name__in=repo_full_names,
+            created_at__gte=start_dt,
+            created_at__lt=end_dt
+        ).count()
+    elif is_all_time:
+        # "All Time" - show all metrics for the project
+        total_releases = Release.objects.filter(
+            repository_full_name__in=repo_full_names
+        ).count()
+        
+        total_deployments = Deployment.objects.filter(
+            repository_full_name__in=repo_full_names
+        ).count()
+    else:
+        # No date parameters - use default date range (30 days)
+        total_releases = Release.objects.filter(
+            repository_full_name__in=repo_full_names,
+            published_at__gte=start_dt,
+            published_at__lt=end_dt
+        ).count()
+        
+        total_deployments = Deployment.objects.filter(
+            repository_full_name__in=repo_full_names,
+            created_at__gte=start_dt,
+            created_at__lt=end_dt
+        ).count()
     
     # Calculate PR cycle time (filtered by date)
     prs = PullRequest.objects.filter(
@@ -145,11 +202,26 @@ def project_detail(request, project_id):
         'avg_files_changed': round(total_files / total_commits, 1) if total_commits > 0 else 0
     }
     
-    # Calculate total developers (unique emails) in date range
-    unique_emails = set()
-    for commit in recent_commits:
-        unique_emails.add(commit.author_email)
-    total_developers = len(unique_emails)
+    # Calculate total developers
+    if start_date and end_date and not is_all_time:
+        # User specified date range - filter developers by recent commits
+        unique_emails = set()
+        for commit in recent_commits:
+            unique_emails.add(commit.author_email)
+        total_developers = len(unique_emails)
+    elif is_all_time:
+        # "All Time" - show all developers for the project
+        all_commits = Commit.objects.filter(repository_full_name__in=repo_full_names)
+        unique_emails = set()
+        for commit in all_commits:
+            unique_emails.add(commit.author_email)
+        total_developers = len(unique_emails)
+    else:
+        # No date parameters - use default date range (30 days)
+        unique_emails = set()
+        for commit in recent_commits:
+            unique_emails.add(commit.author_email)
+        total_developers = len(unique_emails)
     
     # Import UnifiedMetricsService for advanced metrics
     from analytics.unified_metrics_service import UnifiedMetricsService
@@ -321,27 +393,81 @@ def project_detail(request, project_id):
         activity_heatmap = all_metrics_aggregated.get('commit_activity_by_hour', {})
         lines_added = all_metrics_aggregated.get('lines_added', 0)
         
-        # Calculate global top contributors from all commits
+        # Calculate global top contributors from all commits using developer grouping
         contributor_stats = {}
         
+        # Import developer grouping service
+        from analytics.developer_grouping_service import DeveloperGroupingService
+        
         # Get all commits from all repositories in the date range
-        for commit in recent_commits:
-            email = commit.author_email
-            name = commit.author_name
+        all_commits = list(recent_commits)
+        
+        # Get grouped developers for all repositories in this project
+        # Since we don't have application_id anymore, we'll group by repository
+        repo_full_names = [repo.full_name for repo in repositories]
+        
+        # Create mapping from email to developer group
+        email_to_developer = {}
+        
+        # Get all developers and their aliases
+        from analytics.models import Developer, DeveloperAlias
+        all_developers = Developer.objects.all()
+        
+        for developer in all_developers:
+            aliases = DeveloperAlias.objects.filter(developer=developer)
+            for alias in aliases:
+                email_to_developer[alias.email.lower()] = {
+                    'developer_id': str(developer.id),
+                    'primary_name': developer.primary_name,
+                    'primary_email': developer.primary_email,
+                    'confidence_score': developer.confidence_score
+                }
+        
+        # Aggregate by developer groups
+        for commit in all_commits:
+            email = commit.author_email.lower()
             net_lines = (commit.additions or 0) - (commit.deletions or 0)
             
-            if email in contributor_stats:
-                # Add net_lines to existing contributor
+            # Check if this email belongs to a developer group
+            developer_info = email_to_developer.get(email)
+            
+            if developer_info:
+                # Use developer group
+                key = developer_info['developer_id']
+                if key not in contributor_stats:
+                    contributor_stats[key] = {
+                        'name': developer_info['primary_name'],
+                        'email': developer_info['primary_email'],
+                        'developer_id': key,
+                        'confidence_score': developer_info['confidence_score'],
+                        'net_lines': 0,
+                        'commits': 0,
+                        'additions': 0,
+                        'deletions': 0
+                    }
+                
+                contributor_stats[key]['net_lines'] += net_lines
+                contributor_stats[key]['commits'] += 1
+                contributor_stats[key]['additions'] += (commit.additions or 0)
+                contributor_stats[key]['deletions'] += (commit.deletions or 0)
+            else:
+                # Fallback to individual email (ungrouped developer)
+                if email not in contributor_stats:
+                    contributor_stats[email] = {
+                        'name': commit.author_name,
+                        'email': commit.author_email,
+                        'developer_id': None,
+                        'confidence_score': 100,  # Individual developer
+                        'net_lines': 0,
+                        'commits': 0,
+                        'additions': 0,
+                        'deletions': 0
+                    }
+                
                 contributor_stats[email]['net_lines'] += net_lines
                 contributor_stats[email]['commits'] += 1
-            else:
-                # Add new contributor
-                contributor_stats[email] = {
-                    'name': name,
-                    'email': email,
-                    'net_lines': net_lines,
-                    'commits': 1
-                }
+                contributor_stats[email]['additions'] += (commit.additions or 0)
+                contributor_stats[email]['deletions'] += (commit.deletions or 0)
         
         # Sort by net_lines and take top 10
         top_contributors = sorted(
@@ -363,13 +489,13 @@ def project_detail(request, project_id):
         
         if commit_quality:
             # Recalculate percentages correctly based on aggregated totals
-            total_commits = commit_quality.get('total_commits', 0)
-            if total_commits > 0:
+            commit_quality_total = commit_quality.get('total_commits', 0)
+            if commit_quality_total > 0:
                 explicit_commits = commit_quality.get('explicit_commits', 0)
                 generic_commits = commit_quality.get('generic_commits', 0)
                 
-                commit_quality['explicit_ratio'] = round((explicit_commits / total_commits * 100), 1)
-                commit_quality['generic_ratio'] = round((generic_commits / total_commits * 100), 1)
+                commit_quality['explicit_ratio'] = round((explicit_commits / commit_quality_total * 100), 1)
+                commit_quality['generic_ratio'] = round((generic_commits / commit_quality_total * 100), 1)
             else:
                 commit_quality['explicit_ratio'] = 0
                 commit_quality['generic_ratio'] = 0
@@ -378,9 +504,9 @@ def project_detail(request, project_id):
         if commit_types:
             # Get the aggregated counts
             counts = commit_types.get('counts', {})
-            total_commits = sum(counts.values())
+            commit_types_total = sum(counts.values())
             
-            if total_commits > 0:
+            if commit_types_total > 0:
                 # Recalculate ratios from aggregated counts
                 feature_count = counts.get('feature', 0)
                 fix_count = counts.get('fix', 0)
@@ -401,7 +527,7 @@ def project_detail(request, project_id):
                     test_feature_ratio = 0
                 
                 # Chore+Docs Ratio: (chore + docs) / total < 0.3 is good
-                chore_docs_ratio = (chore_count + docs_count) / total_commits
+                chore_docs_ratio = (chore_count + docs_count) / commit_types_total
                 
                 # Update the ratios
                 commit_types['feature_fix_ratio'] = round(feature_fix_ratio, 2)
@@ -559,6 +685,7 @@ def project_detail(request, project_id):
         legend_data = []
         activity_heatmap_data = json.dumps([0] * 24)
     
+
     context = {
         'project': project,
         'total_commits': total_commits,
@@ -597,6 +724,10 @@ def project_detail(request, project_id):
         'commit_type_legend': legend_data,
         'doughnut_colors': doughnut_colors,
         'activity_heatmap_data': activity_heatmap_data,
+        
+        # Date range parameters for template
+        'start_date': start_date,
+        'end_date': end_date,
     }
     return render(request, 'projects/detail.html', context)
 

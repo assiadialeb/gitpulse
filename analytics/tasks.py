@@ -25,62 +25,7 @@ from analytics.models import IndexingState
 logger = logging.getLogger(__name__)
 
 
-def sync_application_task(application_id: int, user_id: int, sync_type: str = 'incremental'):
-    """
-    Django-Q task to sync all repositories for an application
-    
-    Args:
-        application_id: Application ID to sync
-        user_id: User ID who owns the application
-        sync_type: 'full' or 'incremental'
-    """
-    logger.info(f"Starting sync task for application {application_id}, user {user_id}")
-    
-    try:
-        sync_service = GitSyncService(user_id)
-        results = sync_service.sync_application_repositories(application_id, sync_type)
-        
-        logger.info(f"Sync completed for application {application_id}: {results}")
-        return results
-        
-    except Exception as e:
-        logger.error(f"Sync task failed for application {application_id}: {e}")
-        raise
-
-
-def sync_repository_task(repo_full_name: str, application_id: int, user_id: int, 
-                        sync_type: str = 'incremental'):
-    """
-    Django-Q task to sync a specific repository
-    
-    Args:
-        repo_full_name: Repository name in format "owner/repo"
-        application_id: Application ID
-        user_id: User ID who owns the application
-        sync_type: 'full' or 'incremental'
-    """
-    logger.info(f"Starting sync task for repository {repo_full_name}")
-    
-    try:
-        sync_service = GitSyncService(user_id)
-        # On a besoin de l'URL du repo pour GitSyncService, on la récupère via ApplicationRepository
-        
-        app_repo = ApplicationRepository.objects.get(github_repo_name=repo_full_name, application_id=application_id)
-        
-        # Check if github_repo_url exists, if not generate it
-        repo_url = getattr(app_repo, 'github_repo_url', None)
-        if not repo_url:
-            repo_url = f"https://github.com/{app_repo.github_repo_name}.git"
-            logger.warning(f"Missing github_repo_url for {app_repo.github_repo_name}, using generated URL: {repo_url}")
-        
-        results = sync_service.sync_repository(repo_full_name, repo_url, application_id, sync_type)
-        
-        logger.info(f"Sync completed for repository {repo_full_name}: {results}")
-        return results
-        
-    except Exception as e:
-        logger.error(f"Sync task failed for repository {repo_full_name}: {e}")
-        raise
+# Removed sync_application_task and sync_repository_task - they used the deprecated Application model
 
 
 def retry_failed_syncs_task():
@@ -134,39 +79,37 @@ def retry_failed_syncs_task():
 
 def daily_sync_task():
     """
-    Django-Q task to run daily incremental sync for all applications
+    Django-Q task to run daily incremental sync for all repositories
     """
     logger.info("Starting daily sync task")
     
     try:
-        # Get all applications that have repositories
-        applications_with_repos = Application.objects.filter(
-            applicationrepository__isnull=False
-        ).distinct()
+        # Get all repositories that need syncing
+        from repositories.models import Repository
+        repositories = Repository.objects.filter(is_indexing=True)
         
         total_results = {
-            'applications_processed': 0,
-            'total_repositories_synced': 0,
+            'repositories_processed': 0,
             'total_commits_new': 0,
             'total_api_calls': 0,
             'errors': []
         }
         
-        for application in applications_with_repos:
+        for repository in repositories:
             try:
-                # Schedule async task for each application
+                # Schedule async task for each repository
                 task_id = async_task(
-                    'analytics.tasks.sync_application_task',
-                    application.id, application.owner_id, 'incremental',
+                    'analytics.tasks.sync_repository_task',
+                    repository.full_name, None, repository.owner_id, 'incremental',
                     group=f'daily_sync_{datetime.now().strftime("%Y%m%d")}',
                     timeout=3600  # 1 hour timeout
                 )
                 
-                logger.info(f"Scheduled sync task {task_id} for application {application.id}")
-                total_results['applications_processed'] += 1
+                logger.info(f"Scheduled sync task {task_id} for repository {repository.full_name}")
+                total_results['repositories_processed'] += 1
                 
             except Exception as e:
-                error_msg = f"Failed to schedule sync for application {application.id}: {e}"
+                error_msg = f"Failed to schedule sync for repository {repository.full_name}: {e}"
                 logger.error(error_msg)
                 total_results['errors'].append(error_msg)
         
@@ -180,41 +123,40 @@ def daily_sync_task():
 
 def weekly_full_sync_task():
     """
-    Django-Q task to run weekly full sync for all applications
+    Django-Q task to run weekly full sync for all repositories
     """
     logger.info("Starting weekly full sync task")
     
     try:
-        # Get all applications that have repositories
-        applications_with_repos = Application.objects.filter(
-            applicationrepository__isnull=False
-        ).distinct()
+        # Get all repositories that need syncing
+        from repositories.models import Repository
+        repositories = Repository.objects.filter(is_indexing=True)
         
         total_results = {
-            'applications_processed': 0,
-            'applications_scheduled': 0,
+            'repositories_processed': 0,
+            'repositories_scheduled': 0,
             'errors': []
         }
         
-        for application in applications_with_repos:
+        for repository in repositories:
             try:
-                # Schedule async task for each application with delay to avoid rate limits
-                delay_minutes = total_results['applications_scheduled'] * 10  # 10 min delay between apps
+                # Schedule async task for each repository with delay to avoid rate limits
+                delay_minutes = total_results['repositories_scheduled'] * 10  # 10 min delay between repos
                 
                 task_id = async_task(
-                    'analytics.tasks.sync_application_task',
-                    application.id, application.owner_id, 'full',
+                    'analytics.tasks.sync_repository_task',
+                    repository.full_name, None, repository.owner_id, 'full',
                     group=f'weekly_sync_{datetime.now().strftime("%Y%m%d")}',
                     timeout=7200,  # 2 hour timeout for full sync
                     schedule=datetime.now() + timedelta(minutes=delay_minutes)
                 )
                 
-                logger.info(f"Scheduled full sync task {task_id} for application {application.id} with {delay_minutes}min delay")
-                total_results['applications_processed'] += 1
-                total_results['applications_scheduled'] += 1
+                logger.info(f"Scheduled full sync task {task_id} for repository {repository.full_name} with {delay_minutes}min delay")
+                total_results['repositories_processed'] += 1
+                total_results['repositories_scheduled'] += 1
                 
             except Exception as e:
-                error_msg = f"Failed to schedule full sync for application {application.id}: {e}"
+                error_msg = f"Failed to schedule full sync for repository {repository.full_name}: {e}"
                 logger.error(error_msg)
                 total_results['errors'].append(error_msg)
         
@@ -295,35 +237,7 @@ def schedule_sync_tasks():
         raise
 
 
-def manual_sync_application(application_id: int, sync_type: str = 'incremental'):
-    """
-    Manually trigger sync for an application (for testing or on-demand sync)
-    
-    Args:
-        application_id: Application ID to sync
-        sync_type: 'full' or 'incremental'
-        
-    Returns:
-        Task ID for tracking
-    """
-    try:
-        application = Application.objects.get(id=application_id)
-        
-        task_id = async_task(
-            'analytics.tasks.sync_application_task',
-            application_id, application.owner_id, sync_type,
-            group=f'manual_sync_{datetime.now().strftime("%Y%m%d_%H%M%S")}',
-            timeout=3600
-        )
-        
-        logger.info(f"Manually triggered sync task {task_id} for application {application_id}")
-        return task_id
-        
-    except Application.DoesNotExist:
-        raise ValueError(f"Application {application_id} not found")
-    except Exception as e:
-        logger.error(f"Failed to manually trigger sync for application {application_id}: {e}")
-        raise
+# Removed manual_sync_application - it used the deprecated Application model
 
 
 def manual_indexing_task(repository_id: int, user_id: int):
@@ -491,12 +405,7 @@ def daily_indexing_release():
         raise 
 
 
-def quality_analysis_task(application_id):
-    """
-    Tâche Q indépendante pour lancer l'analyse de qualité sur tous les commits d'une application.
-    """
-    from analytics.quality_service import QualityAnalysisService
-    return QualityAnalysisService().analyze_commits_for_application(application_id)
+# Removed quality_analysis_task - it used the deprecated Application model
 
 
 def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=None, max_execution_time=1800):
@@ -686,32 +595,29 @@ def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_r
     results = []
     repos_processed = 0
     
-    for app in Application.objects.all():
-        if repos_processed >= max_repos_per_run:
-            logger.info(f"Reached max repos limit ({max_repos_per_run}), stopping")
-            break
-            
-        if time.time() - start_time > max_execution_time:
-            logger.info(f"Reached max execution time ({max_execution_time}s), stopping")
-            break
-            
-        user_id = app.owner_id
-        access_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
-        if not access_token:
-            logger.warning(f"[App {app.id}] No GitHub token found for user {user_id}.")
-            results.append({'app': app.id, 'error': 'No GitHub token'})
-            continue
-            
-        gh = GitHubService(access_token)
-        
-        for repo in app.repositories.all():
+    # Get all repositories that need indexing
+    from repositories.models import Repository
+    repositories = Repository.objects.filter(is_indexed=True)
+    
+    for repository in repositories:
             if repos_processed >= max_repos_per_run:
+                logger.info(f"Reached max repos limit ({max_repos_per_run}), stopping")
                 break
                 
             if time.time() - start_time > max_execution_time:
+                logger.info(f"Reached max execution time ({max_execution_time}s), stopping")
                 break
                 
-            repo_name = repo.github_repo_name
+            user_id = repository.owner_id
+            access_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+            if not access_token:
+                logger.warning(f"[Repo {repository.full_name}] No GitHub token found for user {user_id}.")
+                results.append({'repo': repository.full_name, 'error': 'No GitHub token'})
+                continue
+                
+            gh = GitHubService(access_token)
+            
+            repo_name = repository.full_name
             repos_processed += 1
             
             try:
@@ -721,7 +627,7 @@ def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_r
                 
                 while page <= max_pages_per_repo and pages_processed < max_pages_per_repo:
                     if time.time() - start_time > max_execution_time:
-                        logger.info(f"[App {app.id}][Repo {repo_name}] Timeout reached, stopping at page {page}")
+                        logger.info(f"[Repo {repo_name}] Timeout reached, stopping at page {page}")
                         break
                         
                     url = f"https://api.github.com/repos/{repo_name}/pulls"
@@ -731,10 +637,10 @@ def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_r
                         prs, _ = gh._make_request(url, params)
                         pages_processed += 1
                         
-                        logger.info(f"[App {app.id}][Repo {repo_name}] Page {page}: {len(prs)} PRs fetched.")
+                        logger.info(f"[Repo {repo_name}] Page {page}: {len(prs)} PRs fetched.")
                         
                         if not prs or len(prs) == 0:
-                            logger.info(f"[App {app.id}][Repo {repo_name}] No more PRs, stopping pagination")
+                            logger.info(f"[Repo {repo_name}] No more PRs, stopping pagination")
                             break
                             
                         for pr in prs:
@@ -749,14 +655,14 @@ def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_r
                                     pr = detailed_pr
                                 
                                 obj = PullRequest.objects(
-                                    application_id=app.id, 
+                                    application_id=None, 
                                     repository_full_name=repo_name, 
                                     number=pr_number
                                 ).first()
                                 
                                 if not obj:
                                     obj = PullRequest(
-                                        application_id=app.id,
+                                        application_id=None,
                                         repository_full_name=repo_name,
                                         number=pr_number
                                     )
