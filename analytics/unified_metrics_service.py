@@ -314,13 +314,33 @@ class UnifiedMetricsService:
                     developer_stats[key]['additions'] += commit.additions
                     developer_stats[key]['deletions'] += commit.deletions
         else:
-            # Repository: group by author email
-            developer_stats = {}
-            # Prépare un mapping email -> Developer (si existe)
+            # Repository: For repositories, we want to show ALL developers who contributed
+            # but calculate their stats for the recent period only
+            
+            # First, get ALL commits to identify all developers who contributed
+            # We need to get commits without date filtering for this repository
+            from repositories.models import Repository
+            repository = Repository.objects.get(id=self.entity_id)
+            all_commits = Commit.objects.filter(repository_full_name=repository.full_name)
+            
+            # Create mapping from email to Developer
             email_to_developer = {}
             for alias in DeveloperAlias.objects():
                 if alias.developer:
                     email_to_developer[alias.email.lower()] = alias.developer
+            
+            # Identify all unique developers who contributed to this repository
+            all_developers = set()
+            for commit in all_commits:
+                email = commit.author_email.lower()
+                developer = email_to_developer.get(email)
+                if developer:
+                    all_developers.add(developer.primary_name)
+                else:
+                    all_developers.add(commit.author_name)
+            
+            # Now calculate stats for the recent period for all identified developers
+            developer_stats = {}
             for commit in recent_commits:
                 email = commit.author_email.lower()
                 developer = email_to_developer.get(email)
@@ -333,6 +353,9 @@ class UnifiedMetricsService:
                 developer_stats[key]['commits'] += 1
                 developer_stats[key]['additions'] += commit.additions
                 developer_stats[key]['deletions'] += commit.deletions
+            
+            # Only include developers who have commits in the recent period
+            # This creates a true "top" based on commits
         
         # Format response
         developers = []
