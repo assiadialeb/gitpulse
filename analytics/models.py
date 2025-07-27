@@ -169,7 +169,6 @@ class Commit(Document):
     meta = {
         'collection': 'commits',
         'indexes': [
-            'sha',
             'repository_full_name',
             'application_id',
             'author_email',

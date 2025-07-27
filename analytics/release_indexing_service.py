@@ -299,7 +299,7 @@ class ReleaseIndexingService:
             processed = ReleaseIndexingService.process_releases(releases)
 
             if not state:
-                state = IndexingState(repository_id=repository_id, entity_type=entity_type)
+                state = IndexingState(repository_id=repository_id, entity_type=entity_type, repository_full_name=repository.full_name)
             state.last_indexed_at = until
             state.status = 'completed'
             state.save()

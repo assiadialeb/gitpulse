@@ -70,7 +70,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Pull Request Indexing Status:'))
         self.stdout.write('-' * 80)
         
-        repositories = Repository.objects.filter(is_indexed=True)
+        repositories = Repository.objects.all()
         
         for repo in repositories:
             try:
@@ -124,8 +124,7 @@ class Command(BaseCommand):
         except Repository.DoesNotExist:
             raise CommandError(f'Repository with ID {repo_id} does not exist')
 
-        if not repository.is_indexed:
-            raise CommandError(f'Repository {repository.full_name} is not indexed')
+        # Repository indexing check removed - all repositories can be indexed
 
         self.stdout.write(f'Starting pull request indexing for {repository.full_name}...')
 
@@ -158,7 +157,7 @@ class Command(BaseCommand):
             try:
                 task_id = async_task(
                     'analytics.tasks.index_pullrequests_intelligent_task',
-                    repo_id
+                    repo_id,
                     options['batch_size']
                 )
                 self.stdout.write(
@@ -169,13 +168,13 @@ class Command(BaseCommand):
 
     def _index_all_repositories(self, options):
         """Index pull requests for all repositories"""
-        repositories = Repository.objects.filter(is_indexed=True)
+        repositories = Repository.objects.all()
         
         if not repositories.exists():
-            self.stdout.write(self.style.WARNING('No indexed repositories found'))
+            self.stdout.write(self.style.WARNING('No repositories found'))
             return
 
-        self.stdout.write(f'Found {repositories.count()} indexed repositories')
+        self.stdout.write(f'Found {repositories.count()} repositories')
 
         if options['sync']:
             # Run synchronously for all repositories

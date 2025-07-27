@@ -70,7 +70,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Deployment Indexing Status:'))
         self.stdout.write('-' * 80)
         
-        repositories = Repository.objects.filter(is_indexed=True)
+        repositories = Repository.objects.all()
         
         for repo in repositories:
             try:
@@ -168,7 +168,7 @@ class Command(BaseCommand):
 
     def _index_all_repositories(self, options):
         """Index deployments for all repositories"""
-        repositories = Repository.objects.filter(is_indexed=True)
+        repositories = Repository.objects.all()
         
         if not repositories.exists():
             self.stdout.write(self.style.WARNING('No indexed repositories found'))

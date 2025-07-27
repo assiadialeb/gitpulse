@@ -108,20 +108,35 @@ def repository_detail(request, repo_id):
     from django.utils import timezone
     start_str = request.GET.get('start')
     end_str = request.GET.get('end')
+    
+    # Check if this is "All Time" (very old start date) or specific date range
+    is_all_time = False
     if start_str and end_str:
         try:
             start_date = datetime.strptime(start_str, "%Y-%m-%d")
             end_date = datetime.strptime(end_str, "%Y-%m-%d")
+            
+            # Check if start date is very old (before 2010) - indicates "All Time"
+            # This covers all reasonable commit dates (Git was created in 2005)
+            if start_date.year < 2010:
+                is_all_time = True
         except Exception:
             start_date = timezone.now() - timedelta(days=29)
             end_date = timezone.now()
     else:
         end_date = timezone.now()
         start_date = end_date - timedelta(days=29)
-    print(f"[DEBUG] repository_detail: start_date={start_date}, end_date={end_date}")
+    
+    print(f"[DEBUG] repository_detail: start_date={start_date}, end_date={end_date}, is_all_time={is_all_time}")
+    
     # Utilise la plage pour filtrer les stats
     try:
-        metrics_service = UnifiedMetricsService('repository', repo_id, start_date=start_date, end_date=end_date)
+        if is_all_time:
+            # "All Time" - don't pass date filters to UnifiedMetricsService
+            metrics_service = UnifiedMetricsService('repository', repo_id)
+        else:
+            # Specific date range - pass date filters
+            metrics_service = UnifiedMetricsService('repository', repo_id, start_date=start_date, end_date=end_date)
         
         # Get all metrics using the unified service
         all_metrics = metrics_service.get_all_metrics()
