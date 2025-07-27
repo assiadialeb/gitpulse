@@ -3,7 +3,7 @@ Tests for analytics functionality
 """
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from django.utils import timezone
 
 
@@ -45,8 +45,8 @@ class DeveloperGroupingTestCase(TestCase):
             author_email='patrick.qian@company.com',
             committer_name='Patrick Qian',
             committer_email='patrick.qian@company.com',
-            authored_date=datetime.now(timezone.utc) - timedelta(days=1),
-            committed_date=datetime.now(timezone.utc) - timedelta(days=1),
+            authored_date=datetime.now(dt_timezone.utc) - timedelta(days=1),
+            committed_date=datetime.now(dt_timezone.utc) - timedelta(days=1),
             additions=100,
             deletions=10
         )
@@ -60,8 +60,8 @@ class DeveloperGroupingTestCase(TestCase):
             author_email='patrick.qian@different.com',
             committer_name='patrick.qian',
             committer_email='patrick.qian@different.com',
-            authored_date=datetime.now(timezone.utc) - timedelta(days=2),
-            committed_date=datetime.now(timezone.utc) - timedelta(days=2),
+            authored_date=datetime.now(dt_timezone.utc) - timedelta(days=2),
+            committed_date=datetime.now(dt_timezone.utc) - timedelta(days=2),
             additions=50,
             deletions=5
         )
@@ -76,8 +76,8 @@ class DeveloperGroupingTestCase(TestCase):
             author_email='krishna.adhikari@company.com',
             committer_name='Krishna Prasad ADHIKARI',
             committer_email='krishna.adhikari@company.com',
-            authored_date=datetime.now(timezone.utc) - timedelta(days=3),
-            committed_date=datetime.now(timezone.utc) - timedelta(days=3),
+            authored_date=datetime.now(dt_timezone.utc) - timedelta(days=3),
+            committed_date=datetime.now(dt_timezone.utc) - timedelta(days=3),
             additions=200,
             deletions=20
         )
@@ -91,8 +91,8 @@ class DeveloperGroupingTestCase(TestCase):
             author_email='krishna.adhikari@different.com',
             committer_name='krishna',
             committer_email='krishna.adhikari@different.com',
-            authored_date=datetime.now(timezone.utc) - timedelta(days=4),
-            committed_date=datetime.now(timezone.utc) - timedelta(days=4),
+            authored_date=datetime.now(dt_timezone.utc) - timedelta(days=4),
+            committed_date=datetime.now(dt_timezone.utc) - timedelta(days=4),
             additions=75,
             deletions=8
         )
@@ -107,8 +107,8 @@ class DeveloperGroupingTestCase(TestCase):
             author_email='52410095+pbench@users.noreply.github.com',
             committer_name='pbench',
             committer_email='52410095+pbench@users.noreply.github.com',
-            authored_date=datetime.now(timezone.utc) - timedelta(days=5),
-            committed_date=datetime.now(timezone.utc) - timedelta(days=5),
+            authored_date=datetime.now(dt_timezone.utc) - timedelta(days=5),
+            committed_date=datetime.now(dt_timezone.utc) - timedelta(days=5),
             additions=150,
             deletions=15
         )

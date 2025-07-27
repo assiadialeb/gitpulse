@@ -53,7 +53,7 @@ class Repository(Document):
 
 class Commit(Document):
     """Git commit information"""
-    sha = StringField(required=True, unique=True)
+    sha = StringField(required=True)  # Not unique globally, composite with repository
     repository = ReferenceField(Repository, required=True)
     author = ReferenceField(GitHubUser, required=True)
     committer = ReferenceField(GitHubUser)
@@ -66,7 +66,12 @@ class Commit(Document):
     deletions = IntField(default=0)
     total = IntField(default=0)
     
-    meta = {'collection': 'commits'}
+    meta = {
+        'collection': 'commits',
+        'indexes': [
+            ('sha', 'repository'),  # Composite unique index
+        ]
+    }
 
 class PullRequest(Document):
     """GitHub pull request information"""

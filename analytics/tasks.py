@@ -423,7 +423,7 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=None, 
     from analytics.github_service import GitHubService
     from analytics.github_token_service import GitHubTokenService
     import dateutil.parser
-    from datetime import timezone, datetime
+    from datetime import timezone as dt_timezone, datetime
     import logging
     import time
 
@@ -584,7 +584,7 @@ def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_r
     from analytics.github_service import GitHubService
     from analytics.github_token_service import GitHubTokenService
     import dateutil.parser
-    from datetime import timezone, datetime
+    from datetime import timezone as dt_timezone, datetime
     import logging
     import time
 
@@ -1054,11 +1054,34 @@ def daily_indexing_all_repos_task():
     return results
 
 
-def index_deployments_intelligent_task(repository_id):
+def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
     """
     Indexe les déploiements GitHub pour un repository donné, en reprenant là où on s'est arrêté.
     Gère l'état d'indexation (date du dernier déploiement indexé) et les rate limits GitHub.
     """
+    # Handle corrupted tasks that pass args as kwargs
+    if repository_id is None and args is not None:
+        if isinstance(args, list) and len(args) > 0:
+            repository_id = args[0]
+    
+    if repository_id is None:
+        raise ValueError("repository_id is required")
+    
+    # Handle corrupted tasks that pass lists instead of integers
+    if isinstance(repository_id, list):
+        if len(repository_id) > 0:
+            repository_id = repository_id[0]  # Take first element
+            if isinstance(repository_id, list) and len(repository_id) > 0:
+                repository_id = repository_id[0]  # Handle nested lists
+        else:
+            raise ValueError("repository_id is an empty list")
+    
+    # Ensure repository_id is an integer
+    try:
+        repository_id = int(repository_id)
+    except (ValueError, TypeError):
+        raise ValueError(f"repository_id must be an integer, got {type(repository_id)}: {repository_id}")
+    
     from datetime import timedelta
     from django.utils import timezone
     from repositories.models import Repository

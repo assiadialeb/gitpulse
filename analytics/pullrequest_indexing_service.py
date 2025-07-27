@@ -4,7 +4,7 @@ Fetches and processes GitHub Pull Requests using the Intelligent Indexing Servic
 """
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
@@ -336,7 +336,7 @@ class PullRequestIndexingService:
                     reset_time = rate_data['resources']['core']['reset']
                     if remaining < 20:
                         import datetime
-                        next_run = datetime.datetime.fromtimestamp(reset_time, tz=timezone.utc) + timedelta(minutes=5)
+                        next_run = datetime.datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
                         from django_q.models import Schedule
                         Schedule.objects.create(
                             func='analytics.tasks.index_pullrequests_intelligent_task',

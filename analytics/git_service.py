@@ -8,7 +8,7 @@ import shutil
 import logging
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone as dt_timezone
 from typing import List, Dict, Optional, Tuple, Generator
 from pathlib import Path
 import json
@@ -313,8 +313,8 @@ class GitService:
                     'author_email': author_email,
                     'committer_name': committer_name,
                     'committer_email': committer_email,
-                    'authored_date': datetime.fromtimestamp(int(authored_timestamp), timezone.utc),
-                    'committed_date': datetime.fromtimestamp(int(committed_timestamp), timezone.utc),
+                    'authored_date': datetime.fromtimestamp(int(authored_timestamp), dt_timezone.utc),
+                    'committed_date': datetime.fromtimestamp(int(committed_timestamp), dt_timezone.utc),
                     'message': message
                 }
                 
@@ -454,8 +454,8 @@ class GitService:
                 'author_email': author_email,
                 'committer_name': committer_name,
                 'committer_email': committer_email,
-                'authored_date': datetime.fromtimestamp(int(authored_timestamp), timezone.utc),
-                'committed_date': datetime.fromtimestamp(int(committed_timestamp), timezone.utc),
+                'authored_date': datetime.fromtimestamp(int(authored_timestamp), dt_timezone.utc),
+                'committed_date': datetime.fromtimestamp(int(committed_timestamp), dt_timezone.utc),
                 'message': message,
                 'additions': additions,
                 'deletions': deletions,
@@ -519,11 +519,11 @@ class GitService:
             
             if first_result.returncode == 0 and first_result.stdout.strip():
                 first_timestamp = int(first_result.stdout.strip())
-                first_date = datetime.fromtimestamp(first_timestamp, timezone.utc)
+                first_date = datetime.fromtimestamp(first_timestamp, dt_timezone.utc)
             
             if last_result.returncode == 0 and last_result.stdout.strip():
                 last_timestamp = int(last_result.stdout.strip())
-                last_date = datetime.fromtimestamp(last_timestamp, timezone.utc)
+                last_date = datetime.fromtimestamp(last_timestamp, dt_timezone.utc)
             
             # Get total commit count
             count_cmd = ['git', 'rev-list', '--count', 'HEAD']

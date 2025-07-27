@@ -3,7 +3,7 @@ GitHub API service for fetching commit data
 """
 import requests
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone as dt_timezone
 from typing import List, Dict, Optional, Tuple
 from django.conf import settings
 import logging
@@ -55,7 +55,7 @@ class GitHubService:
             rate_limit_reset = int(response.headers.get('X-RateLimit-Reset', 0))
             
             if rate_limit_remaining < 5:  # More conservative threshold
-                reset_time = datetime.fromtimestamp(rate_limit_reset, timezone.utc)
+                reset_time = datetime.fromtimestamp(rate_limit_reset, dt_timezone.utc)
                 logger.warning(f"GitHub rate limit low: {rate_limit_remaining} requests remaining. Resets at {reset_time}")
                 
                 if rate_limit_remaining == 0:
@@ -214,7 +214,7 @@ class GitHubService:
             'parent_shas': [parent.get('sha') for parent in commit_data.get('parents', [])],
             'tree_sha': commit.get('tree', {}).get('sha'),
             'url': commit_data.get('html_url', ''),
-            'synced_at': datetime.now(timezone.utc),
+            'synced_at': datetime.now(dt_timezone.utc),
             # Champs PR
             'pull_request_number': pull_request_number,
             'pull_request_url': pull_request_url,

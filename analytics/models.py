@@ -1,7 +1,7 @@
 """
 MongoDB models for analytics data
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone as dt_timezone
 from django.conf import settings
 import mongoengine.fields as fields
 from mongoengine import Document, EmbeddedDocument
@@ -17,7 +17,7 @@ class IndexingState(Document):
     
     # Indexing state
     last_indexed_at = fields.DateTimeField(null=True)  # Last date/time indexed for this entity
-    last_run_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))  # When the task was last executed
+    last_run_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))  # When the task was last executed
     status = fields.StringField(choices=['pending', 'running', 'completed', 'error'], default='pending')
     
     # Statistics
@@ -30,8 +30,8 @@ class IndexingState(Document):
     max_retries = fields.IntField(default=3)
     
     # Metadata
-    created_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
-    updated_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
+    created_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    updated_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
     
     # MongoDB settings
     meta = {
@@ -71,8 +71,8 @@ class Developer(Document):
     application_id = fields.IntField(required=False, null=True)
     
     # Developer metadata
-    created_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
-    updated_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
+    created_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    updated_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
     is_auto_grouped = fields.BooleanField(default=True)  # True if auto-detected, False if manual
     
     # Grouping confidence score (0-100)
@@ -104,8 +104,8 @@ class DeveloperAlias(Document):
     email = fields.StringField(required=True)
     
     # Source information
-    first_seen = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
-    last_seen = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
+    first_seen = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    last_seen = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
     commit_count = fields.IntField(default=0)
     
     # MongoDB settings
@@ -125,8 +125,8 @@ class DeveloperAlias(Document):
 
 class Commit(Document):
     """MongoDB document for storing commit data"""
-    # Unique identifier
-    sha = fields.StringField(required=True, unique=True, max_length=40)
+    # Unique identifier (composite with repository)
+    sha = fields.StringField(required=True, max_length=40)
     
     # Repository information
     repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
@@ -163,7 +163,7 @@ class Commit(Document):
     url = fields.URLField()
     
     # Sync tracking
-    synced_at = fields.DateTimeField(default=lambda: datetime.now(timezone.utc))
+    synced_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
     
     # MongoDB settings
     meta = {
@@ -176,6 +176,8 @@ class Commit(Document):
             'authored_date',
             ('repository_full_name', 'authored_date'),
             ('application_id', 'authored_date'),
+            # Composite unique index: SHA + repository
+            ('sha', 'repository_full_name'),
         ]
     }
     
@@ -185,7 +187,7 @@ class Commit(Document):
         if authored_date:
             # If naive, assume UTC (since we store everything in UTC)
             if authored_date.tzinfo is None:
-                authored_date = authored_date.replace(tzinfo=timezone.utc)
+                authored_date = authored_date.replace(tzinfo=dt_timezone.utc)
             # Convert to configured timezone
             from django.utils import timezone as django_timezone
             return django_timezone.localtime(authored_date)
@@ -197,7 +199,7 @@ class Commit(Document):
         if committed_date:
             # If naive, assume UTC (since we store everything in UTC)
             if committed_date.tzinfo is None:
-                committed_date = committed_date.replace(tzinfo=timezone.utc)
+                committed_date = committed_date.replace(tzinfo=dt_timezone.utc)
             # Convert to configured timezone
             from django.utils import timezone as django_timezone
             return django_timezone.localtime(committed_date)
@@ -223,7 +225,7 @@ class SyncLog(Document):
     status = fields.StringField(choices=['running', 'completed', 'failed'], required=True)
     
     # Timestamps
-    started_at = fields.DateTimeField(required=True, default=lambda: datetime.now(timezone.utc))
+    started_at = fields.DateTimeField(required=True, default=lambda: datetime.now(dt_timezone.utc))
     completed_at = fields.DateTimeField()
     
     # Results
@@ -319,7 +321,7 @@ class RateLimitReset(Document):
     status = fields.StringField(choices=['pending', 'scheduled', 'completed', 'failed', 'cancelled'], default='pending')
     
     # Timestamps
-    created_at = fields.DateTimeField(required=True, default=lambda: datetime.now(timezone.utc))
+    created_at = fields.DateTimeField(required=True, default=lambda: datetime.now(dt_timezone.utc))
     scheduled_at = fields.DateTimeField()
     completed_at = fields.DateTimeField()
     

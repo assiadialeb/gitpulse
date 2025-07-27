@@ -1,7 +1,7 @@
 """
 Unified metrics service for calculating analytics across repositories, applications, and developers
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Dict, List, Optional, Union
 from collections import defaultdict, Counter
 from django.utils import timezone as django_timezone
@@ -26,7 +26,7 @@ class UnifiedMetricsService:
     def _ensure_timezone_aware(dt):
         """Ensure a datetime is timezone-aware (UTC)"""
         if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=dt_timezone.utc)
         return dt
     
     def __init__(self, entity_type: str, entity_id: Union[int, str], start_date=None, end_date=None):
@@ -172,7 +172,7 @@ class UnifiedMetricsService:
                 'total_days': 0
             }
         
-        now = datetime.now(timezone.utc)
+        now = datetime.now(dt_timezone.utc)
         first_commit = commits_list[0]
         last_commit = commits_list[-1]
         

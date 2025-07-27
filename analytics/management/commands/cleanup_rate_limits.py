@@ -3,7 +3,7 @@ Management command to clean up old rate limit resets and scheduled tasks
 """
 from django.core.management.base import BaseCommand
 from django_q.models import Schedule, Task
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from analytics.models import RateLimitReset
 
 
@@ -26,7 +26,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options['dry_run']
         older_than_hours = options['older_than']
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
+        cutoff_time = datetime.now(dt_timezone.utc) - timedelta(hours=older_than_hours)
 
         self.stdout.write(f"Cleaning up rate limit data older than {older_than_hours} hours...")
 
@@ -72,7 +72,7 @@ class Command(BaseCommand):
         self.stdout.write("\nCurrent status:")
         self.stdout.write(f"- Active rate limit resets: {RateLimitReset.objects.filter(status='pending').count()}")
         self.stdout.write(f"- Scheduled tasks: {Schedule.objects.count()}")
-        self.stdout.write(f"- Recent tasks (last hour): {Task.objects.filter(started__gte=datetime.now(timezone.utc) - timedelta(hours=1)).count()}")
+        self.stdout.write(f"- Recent tasks (last hour): {Task.objects.filter(started__gte=datetime.now(dt_timezone.utc) - timedelta(hours=1)).count()}")
 
         if not dry_run:
             self.stdout.write(self.style.SUCCESS("Cleanup completed successfully"))

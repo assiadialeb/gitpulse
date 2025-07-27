@@ -274,15 +274,20 @@ class GitSyncService:
                     results['commits_skipped'] += 1
                     continue
                 
-                # Check if commit already exists
-                existing_commit = Commit.objects(sha=sha).first()
+                # Check if commit already exists for this repository
+                existing_commit = Commit.objects(sha=sha, repository_full_name=repo_full_name).first()
                 
                 if existing_commit:
-                    # Skip if already synced recently
-                    if existing_commit.synced_at and \
-                       (datetime.now(timezone.utc) - existing_commit.synced_at).days < 1:
-                        results['commits_skipped'] += 1
-                        continue
+                    # Skip if already synced recently (within 1 day)
+                    if existing_commit.synced_at:
+                        # Ensure synced_at is timezone-aware for comparison
+                        synced_at = existing_commit.synced_at
+                        if synced_at.tzinfo is None:
+                            synced_at = synced_at.replace(tzinfo=dt_timezone.utc)
+                        
+                        if (datetime.now(dt_timezone.utc) - synced_at).days < 1:
+                            results['commits_skipped'] += 1
+                            continue
                 
                 # Get detailed commit data with file changes
                 try:
@@ -451,8 +456,8 @@ def create_missing_aliases_for_application(application_id: int):
             alias = DeveloperAlias(
                 name=name,
                 email=email,
-                            first_seen=datetime.now(timezone.utc),  # Will be updated with actual dates later
-            last_seen=datetime.now(timezone.utc),
+                            first_seen=datetime.now(dt_timezone.utc),  # Will be updated with actual dates later
+            last_seen=datetime.now(dt_timezone.utc),
                 commit_count=1
             )
             alias.save()

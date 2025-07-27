@@ -3,7 +3,7 @@ Quality analysis service for commits
 """
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone as dt_timezone
 from typing import Dict, Any
 from pymongo import MongoClient
 import pymongo
@@ -49,7 +49,7 @@ class QualityAnalysisService:
             'repository': commit.repository_full_name,
             'application_id': commit.application_id,
             'commit_date': commit.authored_date,
-            'analysis_date': datetime.now(timezone.utc),
+            'analysis_date': datetime.now(dt_timezone.utc),
             
             # Basic commit info
             'commit_type': commit_type,

@@ -130,7 +130,7 @@ Rate limit management service for handling GitHub API rate limits
 """
 import time
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Dict, Optional, Any
 from django_q.tasks import async_task, Schedule
 from django_q.models import Schedule as ScheduleModel
@@ -215,13 +215,13 @@ class RateLimitService:
                 # Extract seconds from "Retry after X seconds"
                 seconds_str = error_msg.split("Retry after")[1].split("seconds")[0].strip()
                 wait_seconds = float(seconds_str)  # Use float to handle decimal seconds
-                return datetime.now(timezone.utc) + timedelta(seconds=wait_seconds)
+                return datetime.now(dt_timezone.utc) + timedelta(seconds=wait_seconds)
             except (ValueError, IndexError):
                 pass
         
         # Default: wait 1 hour if we can't parse the time
         logger.warning(f"Could not parse reset time from error: {error_msg}. Using 1 hour default.")
-        return datetime.now(timezone.utc) + timedelta(hours=1)
+        return datetime.now(dt_timezone.utc) + timedelta(hours=1)
     
     @staticmethod
     def _schedule_restart(rate_limit_reset) -> bool:
@@ -247,7 +247,7 @@ class RateLimitService:
             task_name = RateLimitService._get_task_name(rate_limit_reset.pending_task_type)
             
             # Schedule the restart task
-            schedule_time = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+            schedule_time = datetime.now(dt_timezone.utc) + timedelta(seconds=delay_seconds)
             
             # Create Django-Q schedule
             schedule, created = ScheduleModel.objects.get_or_create(
@@ -268,7 +268,7 @@ class RateLimitService:
             
             # Update rate limit reset status
             rate_limit_reset.status = 'scheduled'
-            rate_limit_reset.scheduled_at = datetime.now(timezone.utc)
+            rate_limit_reset.scheduled_at = datetime.now(dt_timezone.utc)
             rate_limit_reset.save()
             
             logger.info(f"Scheduled restart for {rate_limit_reset.pending_task_type} task at {schedule_time}")
@@ -380,7 +380,7 @@ def restart_rate_limited_task(rate_limit_reset_id: str) -> Dict[str, Any]:
         if not rate_limit_reset.is_ready_to_restart:
             # Reschedule for later
             delay_seconds = rate_limit_reset.time_until_reset + 60
-            schedule_time = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+            schedule_time = datetime.now(dt_timezone.utc) + timedelta(seconds=delay_seconds)
             
             # Update schedule
             try:
@@ -431,7 +431,7 @@ def process_pending_rate_limit_restarts():
         # Find all pending rate limit resets that are ready to restart
         pending_resets = RateLimitReset.objects.filter(
             status='pending',
-            rate_limit_reset_time__lte=datetime.now(timezone.utc)
+            rate_limit_reset_time__lte=datetime.now(dt_timezone.utc)
         )
         
         results = {
@@ -475,7 +475,7 @@ def cleanup_old_rate_limit_resets():
         # Import here to avoid circular import
         from .models import RateLimitReset
         
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+        cutoff_date = datetime.now(dt_timezone.utc) - timedelta(days=7)
         
         # Find old rate limit resets
         old_resets = RateLimitReset.objects.filter(
