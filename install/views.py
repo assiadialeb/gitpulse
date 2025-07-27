@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django_q.tasks import schedule
 from django_q.models import Schedule
+from datetime import datetime, timedelta
 from .forms import SuperUserCreationForm, GitHubOAuthForm
 from .models import InstallationStep, InstallationLog
 from github.models import GitHubApp
@@ -83,12 +84,12 @@ def handle_installation(request):
 def setup_scheduled_tasks():
     """Setup the scheduled tasks for analytics"""
     tasks = [
-        ('analytics.tasks.quality_analysis_all_repos_task', 0),  # 00:00
-        ('analytics.tasks.group_developer_identities_task', 1),  # 01:00
-        ('analytics.tasks.index_all_commits_task', 2),          # 02:00
-        ('analytics.tasks.index_all_pullrequests_task', 3),     # 03:00
-        ('analytics.tasks.index_all_releases_task', 4),         # 04:00
-        ('analytics.tasks.index_all_deployments_task', 5),      # 05:00
+        ('analytics.tasks.daily_indexing_all_repos_task', 0),   # 00:00 - Daily indexing for all repos
+        ('analytics.tasks.group_developer_identities_task', 1), # 01:00 - Group developer identities
+        ('analytics.tasks.index_all_commits_task', 2),          # 02:00 - Index all commits
+        ('analytics.tasks.index_all_pullrequests_task', 3),     # 03:00 - Index all PRs
+        ('analytics.tasks.index_all_releases_task', 4),         # 04:00 - Index all releases
+        ('analytics.tasks.index_all_deployments_task', 5),      # 05:00 - Index all deployments
     ]
     
     success_count = 0
@@ -97,22 +98,65 @@ def setup_scheduled_tasks():
             # Delete existing schedule if it exists
             Schedule.objects.filter(func=task_name).delete()
             
-            # Create new schedule
-            schedule(
+            # Create new schedule using Schedule.objects.create() to avoid passing hours/minutes to functions
+            next_run = timezone.now().replace(hour=hour, minute=0, second=0, microsecond=0)
+            # If the time has already passed today, schedule for tomorrow
+            if next_run <= timezone.now():
+                next_run = next_run + timedelta(days=1)
+            
+            # Create descriptive name for the schedule
+            schedule_name = f"daily_{task_name.split('.')[-1].replace('_task', '')}_{hour:02d}h00"
+            
+            Schedule.objects.create(
+                name=schedule_name,
                 func=task_name,
-                schedule_type=Schedule.HOURLY,
-                minutes=0,
-                hours=hour,
+                schedule_type=Schedule.DAILY,
+                next_run=next_run,
                 repeats=-1,  # Repeat indefinitely
-                args=(),
-                kwargs={},
             )
             success_count += 1
-            log_installation('INFO', f'Scheduled task: {task_name} at {hour:02d}:00')
+            log_installation('INFO', f'Scheduled task: {schedule_name} ({task_name}) at {hour:02d}:00')
         except Exception as e:
             log_installation('ERROR', f'Failed to schedule {task_name}: {str(e)}')
     
-    return success_count == len(tasks)
+    # Setup rate limit monitoring tasks
+    try:
+        # Process pending rate limit restarts every 5 minutes
+        rate_limit_schedule, created = Schedule.objects.get_or_create(
+            name='process_pending_rate_limit_restarts',
+            defaults={
+                'func': 'analytics.services.process_pending_rate_limit_restarts',
+                'schedule_type': Schedule.MINUTES,
+                'minutes': 5,
+                'repeats': -1  # Infinite repeats
+            }
+        )
+        if created:
+            log_installation('INFO', 'Created rate limit monitoring task (every 5 minutes)')
+        else:
+            log_installation('INFO', 'Rate limit monitoring task already exists')
+        
+        # Clean up old rate limit resets daily at 2 AM
+        cleanup_schedule, cleanup_created = Schedule.objects.get_or_create(
+            name='cleanup_old_rate_limit_resets',
+            defaults={
+                'func': 'analytics.services.cleanup_old_rate_limit_resets',
+                'schedule_type': Schedule.DAILY,
+                'next_run': timezone.now().replace(hour=2, minute=0, second=0, microsecond=0),
+                'repeats': -1  # Infinite repeats
+            }
+        )
+        if cleanup_created:
+            log_installation('INFO', 'Created rate limit cleanup task (daily at 2 AM)')
+        else:
+            log_installation('INFO', 'Rate limit cleanup task already exists')
+        
+        success_count += 2  # Count both rate limit tasks as successful
+        
+    except Exception as e:
+        log_installation('ERROR', f'Failed to setup rate limit monitoring tasks: {str(e)}')
+    
+    return success_count == len(tasks) + 2  # +2 for rate limit tasks
 
 
 def log_installation(level, message):
