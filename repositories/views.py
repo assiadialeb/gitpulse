@@ -618,8 +618,7 @@ def index_repositories(request):
                 clone_url=repository_data['clone_url'],
                 ssh_url=repository_data['ssh_url'],
                 owner=request.user,
-                is_indexed=False,
-                is_indexing=False
+                is_indexed=False
             )
             added += 1
         return JsonResponse({'success': True, 'added': added, 'skipped': skipped})

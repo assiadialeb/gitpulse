@@ -86,7 +86,7 @@ def daily_sync_task():
     try:
         # Get all repositories that need syncing
         from repositories.models import Repository
-        repositories = Repository.objects.filter(is_indexing=True)
+        repositories = Repository.objects.all()
         
         total_results = {
             'repositories_processed': 0,
@@ -130,7 +130,7 @@ def weekly_full_sync_task():
     try:
         # Get all repositories that need syncing
         from repositories.models import Repository
-        repositories = Repository.objects.filter(is_indexing=True)
+        repositories = Repository.objects.all()
         
         total_results = {
             'repositories_processed': 0,
@@ -384,7 +384,7 @@ def daily_indexing_release():
     }
     try:
         from repositories.models import Repository
-        indexed_repositories = Repository.objects.filter(is_indexed=True)
+        indexed_repositories = Repository.objects.all()
         
         for repo in indexed_repositories:
             try:
@@ -435,8 +435,8 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=None, 
     total_repos_processed = 0
     total_prs_saved = 0
     
-    # Récupérer tous les repositories indexés
-    indexed_repositories = Repository.objects.filter(is_indexed=True)
+    # Récupérer tous les repositories
+    indexed_repositories = Repository.objects.all()
     
     total_repos = indexed_repositories.count()
     logger.info(f"Starting PR fetch task for {total_repos} repositories")
@@ -597,7 +597,7 @@ def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_r
     
     # Get all repositories that need indexing
     from repositories.models import Repository
-    repositories = Repository.objects.filter(is_indexed=True)
+    repositories = Repository.objects.all()
     
     for repository in repositories:
             if repos_processed >= max_repos_per_run:
@@ -1041,12 +1041,12 @@ def group_developer_identities_task(application_id=None):
 
 def daily_indexing_all_repos_task():
     """
-    Tâche planifiée unique : lance l'indexation pour tous les repositories indexés.
+    Tâche planifiée unique : lance l'indexation pour tous les repositories.
     """
     from repositories.models import Repository
     from django.utils import timezone
     results = []
-    indexed_repos = Repository.objects.filter(is_indexed=True)
+    indexed_repos = Repository.objects.all()
     for repo in indexed_repos:
         # Lancer l'indexation en asynchrone pour chaque repository
         task_id = async_task('analytics.tasks.background_indexing_task', repo.id, repo.owner_id, None)
