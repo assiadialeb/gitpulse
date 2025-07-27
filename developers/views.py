@@ -317,6 +317,33 @@ def _calculate_detailed_quality_metrics(commits):
         if not re.search(r'#[0-9]+', commit.message):
             no_ticket_commits += 1
         
+        # Detect suspicious patterns
+        is_suspicious = False
+        
+        # Micro commit (≤1 changes, not 0)
+        if commit.total_changes <= 1 and commit.total_changes > 0:
+            is_suspicious = True
+        
+        # No ticket reference (only if project uses ticket system)
+        # Commented out because most commits don't have ticket references
+        # if not re.search(r'#[0-9]+', commit.message):
+        #     is_suspicious = True
+        
+        # Only documentation (not suspicious if it's a real documentation commit)
+        if has_doc_only and commit.total_changes > 5:
+            is_suspicious = True
+        
+        # Only configuration (not suspicious if it's a real config change)
+        if has_config_only and commit.total_changes > 5:
+            is_suspicious = True
+        
+        # Formatting only (message contains format + small changes)
+        if re.search(r'format|style|indent|whitespace', commit.message.lower()) and commit.total_changes <= 5:
+            is_suspicious = True
+        
+        if is_suspicious:
+            suspicious_commits += 1
+        
         # Calculate quality scores (simplified)
         code_quality = 50  # Base score
         if has_code_files:
