@@ -4,7 +4,7 @@ Fetches and processes GitHub commits using the Intelligent Indexing Service
 """
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
 
@@ -178,6 +178,9 @@ class CommitIndexingService:
                         authored_date = datetime.fromisoformat(
                             author_info['date'].replace('Z', '+00:00')
                         )
+                        # Ensure timezone awareness
+                        if authored_date.tzinfo is None:
+                            authored_date = authored_date.replace(tzinfo=timezone.utc)
                     except ValueError:
                         logger.warning(f"Could not parse authored_date for commit {sha}")
                 
@@ -186,6 +189,9 @@ class CommitIndexingService:
                         committed_date = datetime.fromisoformat(
                             committer_info['date'].replace('Z', '+00:00')
                         )
+                        # Ensure timezone awareness
+                        if committed_date.tzinfo is None:
+                            committed_date = committed_date.replace(tzinfo=timezone.utc)
                     except ValueError:
                         logger.warning(f"Could not parse committed_date for commit {sha}")
                 
@@ -228,6 +234,9 @@ class CommitIndexingService:
                             pull_request_merged_at = datetime.fromisoformat(
                                 pr_info['merged_at'].replace('Z', '+00:00')
                             )
+                            # Ensure timezone awareness
+                            if pull_request_merged_at.tzinfo is None:
+                                pull_request_merged_at = pull_request_merged_at.replace(tzinfo=timezone.utc)
                         except ValueError:
                             logger.warning(f"Could not parse merged_at for PR {pull_request_number}")
                 

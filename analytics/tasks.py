@@ -2,7 +2,8 @@
 Django-Q tasks for automated synchronization
 """
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
+from django.utils import timezone
 from typing import Optional
 from django_q.tasks import async_task, schedule
 from django_q.models import Schedule
@@ -100,7 +101,7 @@ def daily_sync_task():
                 task_id = async_task(
                     'analytics.tasks.sync_repository_task',
                     repository.full_name, None, repository.owner_id, 'incremental',
-                    group=f'daily_sync_{datetime.now(timezone.utc).strftime("%Y%m%d")}',
+                    group=f'daily_sync_{datetime.now(dt_timezone.utc).strftime("%Y%m%d")}',
                     timeout=3600  # 1 hour timeout
                 )
                 
@@ -145,9 +146,9 @@ def weekly_full_sync_task():
                 task_id = async_task(
                     'analytics.tasks.sync_repository_task',
                     repository.full_name, None, repository.owner_id, 'full',
-                    group=f'weekly_sync_{datetime.now(timezone.utc).strftime("%Y%m%d")}',
+                    group=f'weekly_sync_{datetime.now(dt_timezone.utc).strftime("%Y%m%d")}',
                     timeout=7200,  # 2 hour timeout for full sync
-                    schedule=datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)
+                                          schedule=datetime.now(dt_timezone.utc) + timedelta(minutes=delay_minutes)
                 )
                 
                 logger.info(f"Scheduled full sync task {task_id} for repository {repository.full_name} with {delay_minutes}min delay")
@@ -184,7 +185,7 @@ def schedule_sync_tasks():
             defaults={
                 'func': 'analytics.tasks.daily_sync_task',
                 'schedule_type': Schedule.DAILY,
-                'next_run': datetime.now(timezone.utc).replace(hour=2, minute=0, second=0, microsecond=0),
+                'next_run': datetime.now(dt_timezone.utc).replace(hour=2, minute=0, second=0, microsecond=0),
                 'repeats': -1  # Infinite repeats
             }
         )
@@ -199,7 +200,7 @@ def schedule_sync_tasks():
             defaults={
                 'func': 'analytics.tasks.weekly_full_sync_task',
                 'schedule_type': Schedule.WEEKLY,
-                'next_run': datetime.now(timezone.utc).replace(hour=3, minute=0, second=0, microsecond=0),
+                'next_run': datetime.now(dt_timezone.utc).replace(hour=3, minute=0, second=0, microsecond=0),
                 'repeats': -1  # Infinite repeats
             }
         )
@@ -215,7 +216,7 @@ def schedule_sync_tasks():
                 'func': 'analytics.tasks.retry_failed_syncs_task',
                 'schedule_type': Schedule.HOURLY,
                 'minutes': 4 * 60,  # Every 4 hours
-                'next_run': datetime.now(timezone.utc) + timedelta(hours=1),  # Start in 1 hour
+                'next_run': datetime.now(dt_timezone.utc) + timedelta(hours=1),  # Start in 1 hour
                 'repeats': -1  # Infinite repeats
             }
         )
@@ -254,7 +255,7 @@ def manual_indexing_task(repository_id: int, user_id: int):
     
     try:
         # Utiliser la même logique que background_indexing_task mais en mode one-shot
-        return background_indexing_task(repository_id, user_id, task_id=f"manual_{repository_id}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}")
+        return background_indexing_task(repository_id, user_id, task_id=f"manual_{repository_id}_{datetime.now(dt_timezone.utc).strftime('%Y%m%d_%H%M%S')}")
         
     except Exception as e:
         logger.error(f"Manual indexing failed for repository {repository_id}: {e}")
@@ -306,7 +307,7 @@ def background_indexing_task(repository_id: int, user_id: int, task_id: Optional
             'api_calls': 0,
             'errors': [],
             'task_id': task_id,
-            'started_at': datetime.now(timezone.utc).isoformat()
+            'started_at': datetime.now(dt_timezone.utc).isoformat()
         }
         
         try:
@@ -358,7 +359,7 @@ def background_indexing_task(repository_id: int, user_id: int, task_id: Optional
         #     logger.error(f"Developer grouping failed: {e}")
         #     results['errors'].append(f"Developer grouping failed: {str(e)}")
         
-        results['completed_at'] = datetime.now(timezone.utc).isoformat()
+        results['completed_at'] = datetime.now(dt_timezone.utc).isoformat()
         logger.info(f"Background indexing completed for repository {repository_id}: {results}")
         return results
         
@@ -1103,7 +1104,8 @@ def index_deployments_intelligent_task(repository_id):
                 reset_time = rate_data['resources']['core']['reset']
                 if remaining < 20:
                     import datetime
-                    next_run = datetime.datetime.fromtimestamp(reset_time, tz=timezone.utc) + timedelta(minutes=5)
+                    from datetime import timezone as dt_timezone
+                    next_run = datetime.datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
                     from django_q.models import Schedule
                     Schedule.objects.create(
                         func='analytics.tasks.index_deployments_intelligent_task',
@@ -1132,7 +1134,11 @@ def index_deployments_intelligent_task(repository_id):
 
         # Mettre à jour l'état d'indexation
         if not state:
-            state = IndexingState(repository_id=repository_id, entity_type=entity_type)
+            state = IndexingState(
+                repository_id=repository_id, 
+                entity_type=entity_type,
+                repository_full_name=repository.full_name
+            )
         state.last_indexed_at = until
         state.status = 'completed'
         state.save()

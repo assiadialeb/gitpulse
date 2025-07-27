@@ -73,7 +73,7 @@ class ReleaseIndexingService:
                             published_at = datetime.fromisoformat(published_at_str.replace('Z', '+00:00'))
                             
                             # Ensure all dates are timezone-aware for comparison
-                            from datetime import timezone
+                            from django.utils import timezone
                             if since.tzinfo is None:
                                 since = timezone.make_aware(since)
                             if until.tzinfo is None:
@@ -239,7 +239,7 @@ class ReleaseIndexingService:
             from repositories.models import Repository
             from analytics.models import IndexingState
             from datetime import timedelta
-            from datetime import timezone
+            from django.utils import timezone
             import requests
             logger = logging.getLogger(__name__)
 
@@ -272,7 +272,8 @@ class ReleaseIndexingService:
                     reset_time = rate_data['resources']['core']['reset']
                     if remaining < 20:
                         import datetime
-                        next_run = datetime.datetime.fromtimestamp(reset_time, tz=timezone.utc) + timedelta(minutes=5)
+                        from datetime import timezone as dt_timezone
+                        next_run = datetime.datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
                         from django_q.models import Schedule
                         Schedule.objects.create(
                             func='analytics.tasks.index_releases_intelligent_task',

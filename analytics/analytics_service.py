@@ -1,7 +1,8 @@
 """
 Analytics service for calculating developer metrics from commit data
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
+from django.utils import timezone
 from typing import Dict, List, Tuple
 from collections import defaultdict, Counter
 import re
@@ -19,7 +20,7 @@ class AnalyticsService:
     def _ensure_timezone_aware(dt):
         """Ensure a datetime is timezone-aware (UTC)"""
         if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=dt_timezone.utc)
         return dt
     
     def __init__(self, application_id: int):
@@ -445,7 +446,7 @@ class AnalyticsService:
                 'total_days': 0
             }
         
-        now = datetime.now(timezone.utc)
+        now = datetime.now(dt_timezone.utc)
         first_commit = commits_list[0]
         last_commit = commits_list[-1]
         
@@ -629,7 +630,7 @@ class AnalyticsService:
         
         # Calculate activity over time (last 12 months)
         from datetime import datetime, timedelta
-        now = datetime.now(timezone.utc)
+        now = datetime.now(dt_timezone.utc)
         months_data = []
         
         for i in range(12):
@@ -803,7 +804,7 @@ class AnalyticsService:
                 'total_days': 0
             }
         
-        now = datetime.now(timezone.utc)
+        now = datetime.now(dt_timezone.utc)
         first_commit = commits_list[0]
         last_commit = commits_list[-1]
         

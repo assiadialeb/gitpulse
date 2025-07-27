@@ -2,7 +2,7 @@
 Git-based synchronization service for fetching and storing commit data
 """
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import List, Dict, Optional, Tuple
 from django.db import transaction
 from mongoengine import Q
@@ -373,7 +373,7 @@ class GitSyncService:
             'parent_shas': [],  # Git local doesn't provide parent SHAs easily
             'tree_sha': '',  # Git local doesn't provide tree SHA easily
             'url': f"https://github.com/{repo_full_name}/commit/{commit_data.get('sha')}",
-            'synced_at': datetime.now(timezone.utc)
+            'synced_at': datetime.now(dt_timezone.utc)
         }
         
         return parsed_data
@@ -393,7 +393,7 @@ class GitSyncService:
         latest_commit = commits_data[0]  # Commits are ordered newest first
         repo_stats.last_commit_sha = latest_commit['sha']
         repo_stats.last_commit_date = latest_commit['authored_date']
-        repo_stats.last_sync_at = datetime.now(timezone.utc)
+        repo_stats.last_sync_at = datetime.now(dt_timezone.utc)
         
         # Update first commit info if not set
         if not repo_stats.first_commit_date:
