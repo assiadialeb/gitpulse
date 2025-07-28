@@ -675,6 +675,81 @@ class DeveloperGroupingService:
         
         return all_developers
     
+    def get_all_developers_for_commits(self, commits) -> List[Dict]:
+        """
+        Get all developers (both grouped and ungrouped) for a given set of commits
+        
+        Args:
+            commits: QuerySet or list of commits to analyze
+            
+        Returns:
+            List of all developers with their activity in these commits
+        """
+        # Get unique emails from commits
+        commit_emails = set()
+        for commit in commits:
+            if commit.author_email:
+                commit_emails.add(commit.author_email.lower())
+        
+        # Get all developers and filter by emails that appear in these commits
+        developers = Developer.objects.all()
+        grouped_developers = []
+        grouped_emails = set()  # Track emails that are in developers
+        
+        for developer in developers:
+            aliases = DeveloperAlias.objects.filter(developer=developer)
+            
+            # Filter aliases to only include those that have commits in the given set
+            relevant_aliases = []
+            
+            for alias in aliases:
+                if alias.email.lower() in commit_emails:
+                    relevant_aliases.append(alias)
+                    grouped_emails.add(alias.email.lower())  # Track this email as grouped
+            
+            # Only include developers that have relevant aliases
+            if relevant_aliases:
+                grouped_developers.append({
+                    'developer_id': str(developer.id),
+                    'primary_name': developer.primary_name,
+                    'primary_email': developer.primary_email,
+                    'github_id': developer.github_id,
+                    'confidence_score': developer.confidence_score,
+                    'is_auto_grouped': developer.is_auto_grouped,
+                    'aliases': relevant_aliases
+                })
+        
+        # Find ungrouped developers (emails that are not in any developer)
+        ungrouped_emails = commit_emails - grouped_emails
+        
+        # Create individual developer entries for ungrouped developers
+        ungrouped_developers = []
+        for email in ungrouped_emails:
+            # Get commits for this email in the given set
+            email_commits = commits.filter(author_email=email)
+            if email_commits.count() > 0:
+                # Get the most common name for this email
+                name_counts = {}
+                for commit in email_commits:
+                    name = commit.author_name
+                    name_counts[name] = name_counts.get(name, 0) + 1
+                
+                # Use the most common name
+                most_common_name = max(name_counts.items(), key=lambda x: x[1])[0]
+                
+                ungrouped_developers.append({
+                    'developer_id': None,  # No developer
+                    'primary_name': most_common_name,
+                    'primary_email': email,
+                    'github_id': None,
+                    'confidence_score': 100,  # Individual developer
+                    'is_auto_grouped': False,
+                    'aliases': []
+                })
+        
+        # Return total count of grouped + ungrouped developers
+        return len(grouped_developers) + len(ungrouped_developers)
+    
     def manually_group_developers(self, developer_data: Dict) -> Dict:
         """
         Manually group developers based on user selection (global grouping)

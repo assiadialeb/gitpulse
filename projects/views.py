@@ -227,31 +227,31 @@ def project_detail(request, project_id):
         'avg_files_changed': round(total_files / total_commits, 1) if total_commits > 0 else 0
     }
     
-    # Calculate total developers
+    # Calculate total developers using grouped developers
+    from analytics.developer_grouping_service import DeveloperGroupingService
+    
+    # Get all commits for the project (filtered by date range if specified)
     if start_date and end_date and not is_all_time:
-        # User specified date range - filter developers by recent commits
-        unique_emails = set()
-        for commit in recent_commits:
-            if commit.author_email:
-                unique_emails.add(commit.author_email)
-        total_developers = len(unique_emails)
+        # User specified date range - filter commits by date
+        project_commits = Commit.objects.filter(
+            repository_full_name__in=repo_full_names,
+            authored_date__gte=start_dt,
+            authored_date__lt=end_dt,
+            author_email__ne=None
+        )
     elif is_all_time:
         # "All Time" - show all developers for the project
-        all_commits = Commit.objects.filter(
+        project_commits = Commit.objects.filter(
             repository_full_name__in=repo_full_names,
             author_email__ne=None
         )
-        unique_emails = set()
-        for commit in all_commits:
-            unique_emails.add(commit.author_email)
-        total_developers = len(unique_emails)
     else:
         # No date parameters - use default date range (30 days)
-        unique_emails = set()
-        for commit in recent_commits:
-            if commit.author_email:
-                unique_emails.add(commit.author_email)
-        total_developers = len(unique_emails)
+        project_commits = recent_commits
+    
+    # Use the utility method to get grouped developers count
+    grouping_service = DeveloperGroupingService()
+    total_developers = grouping_service.get_all_developers_for_commits(project_commits)
     
     # Import UnifiedMetricsService for advanced metrics
     from analytics.unified_metrics_service import UnifiedMetricsService
@@ -417,7 +417,6 @@ def project_detail(request, project_id):
             }
         
         # Extract specific metrics for template
-        developer_activity = all_metrics_aggregated.get('developer_activity_30d', {'developers': []})
         commit_frequency_advanced = all_metrics_aggregated.get('commit_frequency', {})
         release_frequency_advanced = all_metrics_aggregated.get('release_frequency', {})
         commit_quality = all_metrics_aggregated.get('commit_quality', {})
@@ -510,6 +509,26 @@ def project_detail(request, project_id):
             key=lambda x: x['net_lines'], 
             reverse=True
         )[:10]
+        
+        # Calculate developer activity for the project (aggregated from all repositories)
+        # Convert contributor_stats to developer_activity format
+        developer_activity = {
+            'developers': [],
+            'total_developers': len(contributor_stats)
+        }
+        
+        # Convert contributor_stats to developer_activity format
+        for developer_id, stats in contributor_stats.items():
+            developer_activity['developers'].append({
+                'name': stats['name'],
+                'commits': stats['commits'],
+                'additions': stats['additions'],
+                'deletions': stats['deletions'],
+                'net_lines': stats['net_lines']
+            })
+        
+        # Sort developers by commits (descending) for the activity display
+        developer_activity['developers'].sort(key=lambda x: x['commits'], reverse=True)
         
         # Calculate PR cycle time statistics
         pr_cycle_time = all_metrics_aggregated.get('pr_cycle_time', {})
@@ -723,6 +742,30 @@ def project_detail(request, project_id):
         doughnut_colors = {}
         activity_heatmap_data = json.dumps([0] * 24)
     
+    # Generate dynamic title for developer activity based on date filters
+    def get_developer_activity_title():
+        if start_date and end_date and not is_all_time:
+            # Custom date range
+            # Convert to datetime if they are strings
+            if isinstance(start_date, str):
+                from datetime import datetime
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            else:
+                start_dt = start_date
+                end_dt = end_date
+            
+            start_str = start_dt.strftime('%b %d, %Y')
+            end_str = end_dt.strftime('%b %d, %Y')
+            return f"Developer Activity ({start_str} - {end_str})"
+        elif is_all_time:
+            # All time
+            return "Developer Activity (All Time)"
+        else:
+            # Default 30 days
+            return "Developer Activity (Last 30 Days)"
+    
+    developer_activity_title = get_developer_activity_title()
 
     context = {
         'project': project,
@@ -746,6 +789,7 @@ def project_detail(request, project_id):
         
         # Advanced metrics
         'developer_activity': developer_activity,
+        'developer_activity_title': developer_activity_title,
         'commit_frequency_advanced': commit_frequency_advanced,
         'release_frequency_advanced': release_frequency_advanced,
         'commit_quality': commit_quality,

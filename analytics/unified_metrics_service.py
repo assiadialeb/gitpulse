@@ -136,10 +136,12 @@ class UnifiedMetricsService:
             grouping_service = DeveloperGroupingService(self.entity_id)
             return len(grouping_service.get_all_developers_for_application(self.entity_id))
         else:
-            # Repository: count unique authors
-            # Uniquement les auteurs présents dans la plage filtrée
-            unique_emails = set(commit.author_email for commit in self.commits)
-            return len(unique_emails)
+            # Repository: use grouped developers instead of simple email counting
+            from .developer_grouping_service import DeveloperGroupingService
+            
+            # Use the utility method to get grouped developers count
+            grouping_service = DeveloperGroupingService()
+            return grouping_service.get_all_developers_for_commits(self.commits)
     
     def get_lines_added(self) -> int:
         """Lines Added (DAR)"""

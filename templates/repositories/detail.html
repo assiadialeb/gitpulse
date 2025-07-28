@@ -392,7 +392,7 @@
 
         <!-- Developer Activity -->
         <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="text-xl font-semibold text-dark-gray mb-6">👥 Developer Activity (Last 30 Days)</h3>
+            <h3 class="text-xl font-semibold text-dark-gray mb-6">👥 {{ developer_activity_title|default:"Developer Activity (Last 30 Days)" }}</h3>
             {% if developer_activity.developers %}
             <div class="overflow-x-auto">
                 <table class="table table-zebra w-full">

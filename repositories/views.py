@@ -129,6 +129,31 @@ def repository_detail(request, repo_id):
     
     print(f"[DEBUG] repository_detail: start_date={start_date}, end_date={end_date}, is_all_time={is_all_time}")
     
+    # Generate dynamic title for developer activity based on date filters
+    def get_developer_activity_title():
+        if start_date and end_date and not is_all_time:
+            # Custom date range
+            # Convert to datetime if they are strings
+            if isinstance(start_date, str):
+                from datetime import datetime
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            else:
+                start_dt = start_date
+                end_dt = end_date
+            
+            start_str = start_dt.strftime('%b %d, %Y')
+            end_str = end_dt.strftime('%b %d, %Y')
+            return f"Developer Activity ({start_str} - {end_str})"
+        elif is_all_time:
+            # All time
+            return "Developer Activity (All Time)"
+        else:
+            # Default 30 days
+            return "Developer Activity (Last 30 Days)"
+    
+    developer_activity_title = get_developer_activity_title()
+    
     # Utilise la plage pour filtrer les stats
     try:
         if is_all_time:
@@ -213,6 +238,7 @@ def repository_detail(request, repo_id):
             'repository': repository,
             'overall_stats': overall_stats,
             'developer_activity': developer_activity,
+            'developer_activity_title': developer_activity_title,
             'commit_frequency': commit_frequency,
             'release_frequency': release_frequency,
             'total_releases': total_releases,
@@ -253,6 +279,7 @@ def repository_detail(request, repo_id):
             'repository': repository,
             'overall_stats': {'total_commits': 0, 'total_authors': 0, 'total_additions': 0, 'total_deletions': 0, 'net_lines': 0},
             'developer_activity': {'developers': []},
+            'developer_activity_title': developer_activity_title,
             'commit_frequency': {'avg_commits_per_day': 0, 'recent_activity_score': 0, 'consistency_score': 0, 'overall_frequency_score': 0, 'commits_last_30_days': 0, 'commits_last_90_days': 0, 'days_since_last_commit': None, 'active_days': 0, 'total_days': 0},
             'release_frequency': {'releases_per_month': 0, 'releases_per_week': 0, 'total_releases': 0, 'period_days': 90},
             'total_releases': 0,
