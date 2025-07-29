@@ -175,7 +175,7 @@ class Commit(Document):
             'authored_date',
             ('repository_full_name', 'authored_date'),
             ('application_id', 'authored_date'),
-            # Composite unique index: SHA + repository
+            # Composite unique index: SHA + repository (unique constraint)
             ('sha', 'repository_full_name'),
         ]
     }

@@ -133,11 +133,7 @@ class IntelligentIndexingService:
             
             since_date = until_date - timedelta(days=batch_size_days)
             
-            # Don't go too far back (e.g., 2 years)
-            oldest_allowed = now - timedelta(days=730)
-            if since_date < oldest_allowed:
-                since_date = oldest_allowed
-                logger.info(f"Reached oldest allowed date for {self.repository.full_name} - {self.entity_type}")
+            # No time limit - index all commits from the beginning of the repository
             
             logger.info(f"Backfill batch for {self.repository.full_name} - {self.entity_type}: "
                        f"{since_date.strftime('%Y-%m-%d')} to {until_date.strftime('%Y-%m-%d')}")
@@ -154,14 +150,9 @@ class IntelligentIndexingService:
         Returns:
             True if there's potentially more data to index
         """
-        now = timezone.now()
-        oldest_allowed = now - timedelta(days=730)  # 2 years back
-        
-        # Ensure since_date is timezone-aware for comparison
-        if since_date.tzinfo is None:
-            since_date = timezone.make_aware(since_date)
-            
-        return since_date > oldest_allowed
+        # No time limit - continue indexing until GitHub API returns no more data
+        # We'll rely on the fetch function returning empty results to stop indexing
+        return True
     
     def index_batch(self, 
                    fetch_function: Callable[[str, str, str, datetime, datetime], List[Dict]],

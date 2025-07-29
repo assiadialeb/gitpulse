@@ -1269,30 +1269,40 @@ def index_commits_intelligent_task(repository_id):
             from django.utils import timezone
             from datetime import timedelta
             
-            # Simple check: if we have recent commits, skip (unless forced)
+            # Check if we need to do a full re-sync
+            # Only skip if we have a reasonable number of commits AND they were synced recently
             recent_commits = Commit.objects.filter(
                 repository_full_name=repository.full_name,
                 synced_at__gte=timezone.now() - timedelta(hours=1)
             ).limit(1)
             
-            if recent_commits.count() > 0:
-                logger.info(f"Skipping git_local indexing for {repository.full_name} - recently synced")
+            total_commits = Commit.objects.filter(repository_full_name=repository.full_name).count()
+            
+            # Only skip if we have recent commits AND a reasonable number of total commits (>= 50)
+            if recent_commits.count() > 0 and total_commits >= 50:
+                logger.info(f"Skipping git_local indexing for {repository.full_name} - recently synced with {total_commits} commits")
                 result = {
                     'status': 'skipped',
-                    'reason': 'Recently synced (within 1 hour)',
+                    'reason': f'Recently synced with {total_commits} commits (within 1 hour)',
                     'repository_id': repository_id,
                     'repository_full_name': repository.full_name,
                     'indexing_service': 'git_local',
                     'has_more': False,
                     'backfill_complete': True
                 }
-            else:
+            
+            if not (recent_commits.count() > 0 and total_commits >= 50):
+                # Either no recent commits OR insufficient commits - do a full sync
+                if recent_commits.count() > 0:
+                    logger.info(f"Forcing re-sync for {repository.full_name} - only {total_commits} commits found")
+                
                 # Use FULL sync to get ALL commits in one go (no artificial batching)
+                # Always do FULL sync to ensure we have ALL commits from the entire repository history
                 result = sync_service.sync_repository(
                     repository.full_name,
                     repository.clone_url,
                     None,  # No application_id needed for repository-based indexing
-                    'full'  # FULL sync - get ALL commits, no date restrictions
+                    'full'  # FULL sync - get ALL commits, no date restrictions, no time limits
                 )
                 
                 # Convert GitSyncService result format to match expected format
@@ -1379,16 +1389,23 @@ def index_commits_git_local_task(repository_id):
         from django.utils import timezone
         from datetime import timedelta
         
+        # Check if we need to do a full re-sync
+        # Only skip if we have a reasonable number of commits AND they were synced recently
         recent_commits = Commit.objects.filter(
             repository_full_name=repository.full_name,
             synced_at__gte=timezone.now() - timedelta(minutes=30)  # 30 min cooldown
         ).limit(1)
         
-        print(f"DEBUG: Recent commits count: {recent_commits.count()}")
+        total_commits = Commit.objects.filter(repository_full_name=repository.full_name).count()
         
-        if recent_commits.count() > 0:
-            print(f"DEBUG: Skipping due to recent sync, but marking as indexed")
-            logger.info(f"Skipping git_local indexing for {repository.full_name} - recently synced")
+        print(f"DEBUG: Recent commits count: {recent_commits.count()}")
+        print(f"DEBUG: Total commits in DB: {total_commits}")
+        
+        # Only skip if we have recent commits AND a reasonable number of total commits (>= 50)
+        # This ensures we don't skip repositories with very few commits that might be incomplete
+        if recent_commits.count() > 0 and total_commits >= 50:
+            print(f"DEBUG: Skipping due to recent sync and sufficient commits ({total_commits})")
+            logger.info(f"Skipping git_local indexing for {repository.full_name} - recently synced with {total_commits} commits")
             
             # Even if skipped, mark as indexed
             repository.is_indexed = True
@@ -1397,12 +1414,15 @@ def index_commits_git_local_task(repository_id):
             
             return {
                 'status': 'skipped',
-                'reason': 'Recently synced (within 5 minutes)',
+                'reason': f'Recently synced with {total_commits} commits (within 30 minutes)',
                 'repository_id': repository_id,
                 'repository_full_name': repository.full_name,
                 'indexing_service': 'git_local',
                 'is_indexed_updated': True
             }
+        elif recent_commits.count() > 0:
+            print(f"DEBUG: Recent sync detected but only {total_commits} commits - forcing re-sync to ensure completeness")
+            logger.info(f"Forcing re-sync for {repository.full_name} - only {total_commits} commits found")
         
         # Use Git local service for FULL backfill
         print(f"DEBUG: About to start GitSyncService for {repository.full_name}")
@@ -1412,12 +1432,13 @@ def index_commits_git_local_task(repository_id):
         print(f"DEBUG: GitSyncService created")
         
         # Use FULL sync to get ALL commits in one go
+        # Always do FULL sync to ensure we have ALL commits from the entire repository history
         try:
             result = sync_service.sync_repository(
                 repository.full_name,
                 repository.clone_url,
                 None,  # No application_id needed for repository-based indexing
-                'full'  # FULL sync - get ALL commits, no date restrictions
+                'full'  # FULL sync - get ALL commits, no date restrictions, no time limits
             )
         except Exception as sync_error:
             # Handle specific sync errors gracefully

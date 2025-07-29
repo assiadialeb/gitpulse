@@ -195,6 +195,7 @@ class GitSyncService:
             if sync_type == 'incremental' and repo_stats.last_commit_date:
                 # Start from last synced commit date
                 since_date = repo_stats.last_commit_date.to_datetime() if hasattr(repo_stats.last_commit_date, 'to_datetime') else repo_stats.last_commit_date
+            # For 'full' sync, since_date remains None to get ALL commits from the beginning of time
             
             # Fetch commits from Git
             commits_data = self.git_service.fetch_commits(
