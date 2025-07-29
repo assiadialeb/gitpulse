@@ -452,7 +452,7 @@ class UnifiedMetricsService:
         closed_prs = self.prs.filter(state='closed').count()
         
         # Calculate old open PRs (open for more than 7 days)
-        cutoff_date = datetime.now() - timedelta(days=7)
+        cutoff_date = datetime.now(dt_timezone.utc) - timedelta(days=7)
         old_open_prs = 0
         for pr in self.prs.filter(state='closed'):
             if pr.created_at and pr.closed_at:

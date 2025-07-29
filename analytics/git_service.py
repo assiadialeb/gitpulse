@@ -201,8 +201,7 @@ class GitService:
                             raise GitServiceError(f"All clone strategies failed for {repo_full_name}. Last error: {result.stderr}")
 
                 # Only fetch additional branches if not a bare clone
-                if strategy_used and strategy_used != 3:  # Not bare clone
-                    # Fetch all branches and prune deleted ones (with error handling)
+                if not (strategy_used and strategy_used == 3):  # Not bare clone
                     try:
                         fetch_result = subprocess.run(
                             ['git', 'fetch', '--all', '--prune'],
@@ -271,8 +270,14 @@ class GitService:
         try:
             repo_path = self.get_repo_path(repo_full_name)
             
-            # Build git log command
-            cmd = ['git', 'log', '--all', '--pretty=format:%H|%an|%ae|%cn|%ce|%at|%ct|%s', '--no-merges']
+            # Debug: Log the working directory and repo path
+            logger.info(f"Working directory: {os.getcwd()}")
+            logger.info(f"Repository path: {repo_path}")
+            logger.info(f"Repository exists: {os.path.exists(repo_path)}")
+            logger.info(f"Repository is git: {os.path.exists(os.path.join(repo_path, '.git'))}")
+            
+            # Build git log command - REMOVED --no-merges to get ALL commits including GitHub auto-commits
+            cmd = ['git', 'log', '--all', '--pretty=format:%H|%an|%ae|%cn|%ce|%at|%ct|%s']
             
             # Add date filter if specified
             if since_date:
@@ -284,28 +289,54 @@ class GitService:
                 cmd.extend(['-n', str(max_commits)])
             
             # Execute git log
+            logger.info(f"Executing git command: {' '.join(cmd)}")
             result = subprocess.run(
                 cmd,
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=300,  # Increased timeout to 5 minutes
+                bufsize=0  # Unbuffered
             )
+            
+            logger.info(f"Git command return code: {result.returncode}")
+            if result.stderr:
+                logger.warning(f"Git command stderr: {result.stderr}")
             
             if result.returncode != 0:
                 raise GitServiceError(f"Failed to fetch commits: {result.stderr}")
             
             # Parse output
             commits = []
+            skipped_lines = 0
+            total_lines = 0
+            
+            # Debug: Log the raw output length
+            raw_output = result.stdout.strip()
+            logger.info(f"Raw git output length: {len(raw_output)} characters")
+            logger.info(f"Raw git output lines: {len(raw_output.split('\n'))}")
+            
             for line in result.stdout.strip().split('\n'):
+                total_lines += 1
                 if not line.strip():
+                    logger.debug(f"Empty line at position {total_lines}, skipping")
                     continue
                     
                 parts = line.split('|')
                 if len(parts) != 8:
+                    logger.warning(f"Malformed commit line in {repo_full_name}: {line}")
+                    logger.warning(f"Expected 8 parts, got {len(parts)}: {parts}")
+                    skipped_lines += 1
                     continue
                 
                 sha, author_name, author_email, committer_name, committer_email, authored_timestamp, committed_timestamp, message = parts
+                
+                # Debug: Log unusual commit patterns
+                if author_name != committer_name or author_email != committer_email:
+                    logger.info(f"Commit {sha[:8]} has different author/committer: {author_name} vs {committer_name}")
+                
+                if 'github' in author_email.lower() or 'noreply' in author_email.lower():
+                    logger.info(f"GitHub auto-commit detected: {sha[:8]} by {author_name} ({author_email})")
                 
                 commit = {
                     'sha': sha,
@@ -320,7 +351,16 @@ class GitService:
                 
                 commits.append(commit)
             
-            logger.info(f"Fetched {len(commits)} commits from {repo_full_name}")
+            # Debug: Log detailed parsing results
+            logger.info(f"=== PARSING DEBUG for {repo_full_name} ===")
+            logger.info(f"Total lines processed: {total_lines}")
+            logger.info(f"Lines skipped (malformed): {skipped_lines}")
+            logger.info(f"Commits successfully parsed: {len(commits)}")
+            logger.info(f"Expected commits (from git): 127")
+            logger.info(f"Missing commits: {127 - len(commits)}")
+            logger.info(f"=== END PARSING DEBUG ===")
+            
+            logger.info(f"Fetched {len(commits)} commits from {repo_full_name} (skipped {skipped_lines} malformed lines out of {total_lines} total)")
             return commits
             
         except subprocess.TimeoutExpired:

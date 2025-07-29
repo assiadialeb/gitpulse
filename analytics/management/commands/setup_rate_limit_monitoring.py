@@ -4,6 +4,7 @@ Management command to set up rate limit monitoring tasks
 from django.core.management.base import BaseCommand
 from django_q.models import Schedule
 from datetime import datetime, timedelta
+from django.utils import timezone as dt_timezone
 
 
 class Command(BaseCommand):
@@ -20,7 +21,7 @@ class Command(BaseCommand):
                     'func': 'analytics.services.process_pending_rate_limit_restarts',
                     'schedule_type': Schedule.MINUTES,
                     'minutes': 5,
-                    'next_run': datetime.now() + timedelta(minutes=1),
+                    'next_run': datetime.now(dt_timezone.utc) + timedelta(minutes=1),
                     'repeats': -1  # Infinite repeats
                 }
             )
@@ -40,7 +41,7 @@ class Command(BaseCommand):
                 defaults={
                     'func': 'analytics.services.cleanup_old_rate_limit_resets',
                     'schedule_type': Schedule.DAILY,
-                    'next_run': datetime.now().replace(hour=2, minute=0, second=0, microsecond=0),
+                    'next_run': datetime.now(dt_timezone.utc).replace(hour=2, minute=0, second=0, microsecond=0),
                     'repeats': -1  # Infinite repeats
                 }
             )

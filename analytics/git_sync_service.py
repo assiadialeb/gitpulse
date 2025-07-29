@@ -212,7 +212,7 @@ class GitSyncService:
             
             # Update sync log with success
             sync_log.status = 'completed'
-            sync_log.completed_at = datetime.utcnow()
+            sync_log.completed_at = datetime.now(dt_timezone.utc)
             sync_log.commits_processed = results['commits_processed']
             sync_log.commits_new = results['commits_new']
             sync_log.commits_updated = results['commits_updated']
@@ -231,7 +231,7 @@ class GitSyncService:
         except GitServiceError as e:
             # Handle Git service errors
             sync_log.status = 'failed'
-            sync_log.completed_at = datetime.utcnow()
+            sync_log.completed_at = datetime.now(dt_timezone.utc)
             sync_log.error_message = str(e)
             sync_log.save()
             
@@ -241,7 +241,7 @@ class GitSyncService:
         except Exception as e:
             # Handle other errors
             sync_log.status = 'failed'
-            sync_log.completed_at = datetime.utcnow()
+            sync_log.completed_at = datetime.now(dt_timezone.utc)
             sync_log.error_message = str(e)
             sync_log.save()
             
@@ -268,35 +268,42 @@ class GitSyncService:
             'commits_skipped': 0
         }
         
+        logger.info(f"Processing {len(commits_data)} commits for {repo_full_name}")
+        
         for commit_data in commits_data:
             try:
                 sha = commit_data.get('sha')
                 if not sha:
+                    logger.warning(f"Commit missing SHA, skipping")
                     results['commits_skipped'] += 1
                     continue
+                
+                logger.debug(f"Processing commit {sha[:8]} by {commit_data.get('author_name', 'unknown')}")
                 
                 # Check if commit already exists for this repository
                 existing_commit = Commit.objects(sha=sha, repository_full_name=repo_full_name).first()
                 
                 if existing_commit:
-                    # Skip if already synced recently (within 1 day)
-                    if existing_commit.synced_at:
-                        # Ensure synced_at is timezone-aware for comparison
-                        synced_at = existing_commit.synced_at
-                        if synced_at.tzinfo is None:
-                            synced_at = synced_at.replace(tzinfo=dt_timezone.utc)
-                        
-                        if (datetime.now(dt_timezone.utc) - synced_at).days < 1:
-                            results['commits_skipped'] += 1
-                            continue
+                    logger.debug(f"Commit {sha[:8]} already exists, will update")
+                    # Remove skip logic - always process commits for full re-indexing
+                    # if existing_commit.synced_at:
+                    #     # Ensure synced_at is timezone-aware for comparison
+                    #     synced_at = existing_commit.synced_at
+                    #     if synced_at.tzinfo is None:
+                    #         synced_at = synced_at.replace(tzinfo=dt_timezone.utc)
+                    #     
+                    #     if (datetime.now(dt_timezone.utc) - synced_at).days < 1:
+                    #         logger.debug(f"Commit {sha[:8]} synced recently, skipping")
+                    #         results['commits_skipped'] += 1
+                    #         continue
                 
                 # Get detailed commit data with file changes
                 try:
                     detailed_commit = self.git_service.get_commit_details(repo_full_name, sha)
                     commit_data.update(detailed_commit)
-                    logger.info(f"Successfully got details for commit {sha}: {detailed_commit.get('additions', 0)} additions, {detailed_commit.get('deletions', 0)} deletions")
+                    logger.debug(f"Got details for commit {sha[:8]}: {detailed_commit.get('additions', 0)} additions, {detailed_commit.get('deletions', 0)} deletions")
                 except GitServiceError as e:
-                    logger.warning(f"Could not fetch details for commit {sha}: {e}. Using basic data.")
+                    logger.warning(f"Could not fetch details for commit {sha[:8]}: {e}. Using basic data.")
                     # Continue with basic data
                 
                 # Parse commit data
@@ -311,6 +318,7 @@ class GitSyncService:
                 # Store or update commit
                 if existing_commit:
                     # Update existing commit
+                    logger.debug(f"Updating existing commit {sha[:8]}")
                     for field, value in parsed_data.items():
                         if field != 'sha':  # Don't update SHA
                             setattr(existing_commit, field, value)
@@ -319,11 +327,13 @@ class GitSyncService:
                 else:
                     # Create new commit
                     try:
+                        logger.debug(f"Creating new commit {sha[:8]} by {parsed_data.get('author_name', 'unknown')}")
                         commit = Commit(**parsed_data)
                         commit.save()
                         results['commits_new'] += 1
+                        logger.info(f"Successfully created commit {sha[:8]} by {parsed_data.get('author_name', 'unknown')}")
                     except NotUniqueError:
-                        logger.warning(f"Commit {sha} déjà présent, ignoré.")
+                        logger.warning(f"Commit {sha[:8]} already present, skipping")
                         results['commits_skipped'] += 1
                         continue
                 
@@ -334,6 +344,7 @@ class GitSyncService:
                 results['commits_skipped'] += 1
                 continue
         
+        logger.info(f"Processed {results['commits_processed']} commits for {repo_full_name}: {results['commits_new']} new, {results['commits_updated']} updated, {results['commits_skipped']} skipped")
         return results
     
     def _parse_commit_data(self, commit_data: Dict, repo_full_name: str, application_id: int = None) -> Dict:

@@ -191,7 +191,7 @@ class SyncService:
             
             # Update sync log with success
             sync_log.status = 'completed'
-            sync_log.completed_at = datetime.utcnow()
+            sync_log.completed_at = datetime.now(dt_timezone.utc)
             sync_log.commits_processed = results['commits_processed']
             sync_log.commits_new = results['commits_new']
             sync_log.commits_updated = results['commits_updated']
@@ -210,7 +210,7 @@ class SyncService:
         except GitHubRateLimitError as e:
             # Handle rate limit errors with automatic restart
             sync_log.status = 'failed'
-            sync_log.completed_at = datetime.utcnow()
+            sync_log.completed_at = datetime.now(dt_timezone.utc)
             sync_log.error_message = str(e)
             sync_log.save()
             
@@ -258,7 +258,7 @@ class SyncService:
         except GitHubAPIError as e:
             # Handle other GitHub API errors
             sync_log.status = 'failed'
-            sync_log.completed_at = datetime.utcnow()
+            sync_log.completed_at = datetime.now(dt_timezone.utc)
             sync_log.error_message = str(e)
             sync_log.save()
             
@@ -268,7 +268,7 @@ class SyncService:
         except Exception as e:
             # Handle other errors
             sync_log.status = 'failed'
-            sync_log.completed_at = datetime.utcnow()
+            sync_log.completed_at = datetime.now(dt_timezone.utc)
             sync_log.error_message = str(e)
             sync_log.error_details = {'error_type': type(e).__name__}
             sync_log.save()
@@ -308,16 +308,17 @@ class SyncService:
                 existing_commit = Commit.objects(sha=sha, repository_full_name=repo_full_name).first()
                 
                 if existing_commit:
-                    # Skip if already synced recently (within 1 day)
-                    if existing_commit.synced_at:
-                        # Ensure synced_at is timezone-aware for comparison
-                        synced_at = existing_commit.synced_at
-                        if synced_at.tzinfo is None:
-                            synced_at = synced_at.replace(tzinfo=dt_timezone.utc)
-                        
-                        if (datetime.now(dt_timezone.utc) - synced_at).days < 1:
-                            results['commits_skipped'] += 1
-                            continue
+                    # Remove skip logic - always process commits for full re-indexing
+                    # # Skip if already synced recently (within 1 day)
+                    # if existing_commit.synced_at:
+                    #     # Ensure synced_at is timezone-aware for comparison
+                    #     synced_at = existing_commit.synced_at
+                    #     if synced_at.tzinfo is None:
+                    #         synced_at = synced_at.replace(tzinfo=dt_timezone.utc)
+                    #     
+                    #     if (datetime.now(dt_timezone.utc) - synced_at).days < 1:
+                    #         results['commits_skipped'] += 1
+                    #         continue
                 
                 # Get detailed commit data if basic data doesn't have file changes
                 if 'files' not in commit_data or 'stats' not in commit_data:

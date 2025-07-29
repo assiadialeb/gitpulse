@@ -348,7 +348,7 @@ class RateLimitReset(Document):
     @property
     def is_ready_to_restart(self):
         """Check if enough time has passed to restart the task"""
-        current_time = datetime.utcnow()
+        current_time = datetime.now(dt_timezone.utc)
         reset_time = getattr(self, 'rate_limit_reset_time', None)
         if reset_time:
             return current_time >= reset_time
@@ -359,7 +359,7 @@ class RateLimitReset(Document):
         """Time until rate limit resets in seconds"""
         if self.is_ready_to_restart:
             return 0
-        current_time = datetime.utcnow()
+        current_time = datetime.now(dt_timezone.utc)
         reset_time = getattr(self, 'rate_limit_reset_time', None)
         if reset_time:
             return int((reset_time - current_time).total_seconds())

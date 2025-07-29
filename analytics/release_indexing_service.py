@@ -4,7 +4,7 @@ Fetches and processes GitHub Releases using the Intelligent Indexing Service
 """
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
 
@@ -250,7 +250,8 @@ class ReleaseIndexingService:
             if state and state.last_indexed_at:
                 since = state.last_indexed_at
             else:
-                since = now - timedelta(days=730)
+                # No time limit - index all releases from the beginning
+                since = datetime(2010, 1, 1, tzinfo=dt_timezone.utc)  # GitHub was founded in 2008, but use 2010 as safe start
             until = now
 
             github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
@@ -271,9 +272,7 @@ class ReleaseIndexingService:
                     remaining = rate_data['resources']['core']['remaining']
                     reset_time = rate_data['resources']['core']['reset']
                     if remaining < 20:
-                        import datetime
-                        from datetime import timezone as dt_timezone
-                        next_run = datetime.datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
+                        next_run = datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
                         from django_q.models import Schedule
                         Schedule.objects.create(
                             func='analytics.tasks.index_releases_intelligent_task',

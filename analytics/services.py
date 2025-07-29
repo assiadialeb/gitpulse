@@ -345,7 +345,7 @@ class RateLimitService:
             
             # Update rate limit reset status
             rate_limit_reset.status = 'completed'
-            rate_limit_reset.completed_at = datetime.utcnow()
+            rate_limit_reset.completed_at = datetime.now(dt_timezone.utc)
             rate_limit_reset.save()
             
             logger.info(f"Successfully restarted {rate_limit_reset.pending_task_type} task with ID {new_task_id}")

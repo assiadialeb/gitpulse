@@ -1103,7 +1103,8 @@ def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
             since = state.last_indexed_at
         else:
             # Si pas d'état, on commence il y a 2 ans (ou plus si tu veux)
-            since = now - timedelta(days=730)
+            # No time limit - index all releases from the beginning
+            since = datetime(2010, 1, 1, tzinfo=dt_timezone.utc)  # GitHub was founded in 2008, but use 2010 as safe start
         until = now
 
         # Récupérer un token GitHub
@@ -1126,9 +1127,7 @@ def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
                 remaining = rate_data['resources']['core']['remaining']
                 reset_time = rate_data['resources']['core']['reset']
                 if remaining < 20:
-                    import datetime
-                    from datetime import timezone as dt_timezone
-                    next_run = datetime.datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
+                    next_run = datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
                     from django_q.models import Schedule
                     Schedule.objects.create(
                         func='analytics.tasks.index_deployments_intelligent_task',
@@ -1269,55 +1268,29 @@ def index_commits_intelligent_task(repository_id):
             from django.utils import timezone
             from datetime import timedelta
             
-            # Check if we need to do a full re-sync
-            # Only skip if we have a reasonable number of commits AND they were synced recently
-            recent_commits = Commit.objects.filter(
-                repository_full_name=repository.full_name,
-                synced_at__gte=timezone.now() - timedelta(hours=1)
-            ).limit(1)
+            # Always do a full sync - no artificial limits since constraints are now correct
+            # Use FULL sync to get ALL commits in one go (no artificial batching)
+            # Always do FULL sync to ensure we have ALL commits from the entire repository history
+            result = sync_service.sync_repository(
+                repository.full_name,
+                repository.clone_url,
+                None,  # No application_id needed for repository-based indexing
+                'full'  # FULL sync - get ALL commits, no date restrictions, no time limits
+            )
             
-            total_commits = Commit.objects.filter(repository_full_name=repository.full_name).count()
-            
-            # Only skip if we have recent commits AND a reasonable number of total commits (>= 50)
-            if recent_commits.count() > 0 and total_commits >= 50:
-                logger.info(f"Skipping git_local indexing for {repository.full_name} - recently synced with {total_commits} commits")
-                result = {
-                    'status': 'skipped',
-                    'reason': f'Recently synced with {total_commits} commits (within 1 hour)',
-                    'repository_id': repository_id,
-                    'repository_full_name': repository.full_name,
-                    'indexing_service': 'git_local',
-                    'has_more': False,
-                    'backfill_complete': True
-                }
-            
-            if not (recent_commits.count() > 0 and total_commits >= 50):
-                # Either no recent commits OR insufficient commits - do a full sync
-                if recent_commits.count() > 0:
-                    logger.info(f"Forcing re-sync for {repository.full_name} - only {total_commits} commits found")
-                
-                # Use FULL sync to get ALL commits in one go (no artificial batching)
-                # Always do FULL sync to ensure we have ALL commits from the entire repository history
-                result = sync_service.sync_repository(
-                    repository.full_name,
-                    repository.clone_url,
-                    None,  # No application_id needed for repository-based indexing
-                    'full'  # FULL sync - get ALL commits, no date restrictions, no time limits
-                )
-                
-                # Convert GitSyncService result format to match expected format
-                result = {
-                    'status': 'success',
-                    'repository_id': repository_id,
-                    'repository_full_name': repository.full_name,
-                    'indexing_service': 'git_local',
-                    'commits_processed': result.get('commits_new', 0) + result.get('commits_updated', 0),
-                    'commits_new': result.get('commits_new', 0),
-                    'commits_updated': result.get('commits_updated', 0),
-                    'has_more': False,  # Git local processes ALL commits at once - no batching needed
-                    'backfill_complete': True,  # Full backfill completed in one shot
-                    'errors': result.get('errors', [])
-                }
+            # Convert GitSyncService result format to match expected format
+            result = {
+                'status': 'success',
+                'repository_id': repository_id,
+                'repository_full_name': repository.full_name,
+                'indexing_service': 'git_local',
+                'commits_processed': result.get('commits_new', 0) + result.get('commits_updated', 0),
+                'commits_new': result.get('commits_new', 0),
+                'commits_updated': result.get('commits_updated', 0),
+                'has_more': False,  # Git local processes ALL commits at once - no batching needed
+                'backfill_complete': True,  # Full backfill completed in one shot
+                'errors': result.get('errors', [])
+            }
         else:
             # Use GitHub API service for commits
             logger.info(f"Using GitHub API indexing service for commits in repository {repository.full_name}")
@@ -1389,42 +1362,7 @@ def index_commits_git_local_task(repository_id):
         from django.utils import timezone
         from datetime import timedelta
         
-        # Check if we need to do a full re-sync
-        # Only skip if we have a reasonable number of commits AND they were synced recently
-        recent_commits = Commit.objects.filter(
-            repository_full_name=repository.full_name,
-            synced_at__gte=timezone.now() - timedelta(minutes=30)  # 30 min cooldown
-        ).limit(1)
-        
-        total_commits = Commit.objects.filter(repository_full_name=repository.full_name).count()
-        
-        print(f"DEBUG: Recent commits count: {recent_commits.count()}")
-        print(f"DEBUG: Total commits in DB: {total_commits}")
-        
-        # Only skip if we have recent commits AND a reasonable number of total commits (>= 50)
-        # This ensures we don't skip repositories with very few commits that might be incomplete
-        if recent_commits.count() > 0 and total_commits >= 50:
-            print(f"DEBUG: Skipping due to recent sync and sufficient commits ({total_commits})")
-            logger.info(f"Skipping git_local indexing for {repository.full_name} - recently synced with {total_commits} commits")
-            
-            # Even if skipped, mark as indexed
-            repository.is_indexed = True
-            repository.save()
-            logger.info(f"Repository {repository.full_name} marked as indexed (skipped)")
-            
-            return {
-                'status': 'skipped',
-                'reason': f'Recently synced with {total_commits} commits (within 30 minutes)',
-                'repository_id': repository_id,
-                'repository_full_name': repository.full_name,
-                'indexing_service': 'git_local',
-                'is_indexed_updated': True
-            }
-        elif recent_commits.count() > 0:
-            print(f"DEBUG: Recent sync detected but only {total_commits} commits - forcing re-sync to ensure completeness")
-            logger.info(f"Forcing re-sync for {repository.full_name} - only {total_commits} commits found")
-        
-        # Use Git local service for FULL backfill
+        # Always do a full sync - no artificial limits since constraints are now correct
         print(f"DEBUG: About to start GitSyncService for {repository.full_name}")
         logger.info(f"Using Git local indexing service for FULL BACKFILL of repository {repository.full_name}")
         from .git_sync_service import GitSyncService
@@ -1653,8 +1591,7 @@ def index_pullrequests_intelligent_task(repository_id=None, args=None, **kwargs)
                         logger.warning(f"GitHub API rate limit low ({remaining} remaining), scheduling PR indexing for later")
                         
                         # Schedule next run after rate limit reset
-                        import datetime
-                        reset_time = datetime.datetime.fromtimestamp(rate_data['resources']['core']['reset'])
+                        reset_time = datetime.fromtimestamp(rate_data['resources']['core']['reset'])
                         next_run = reset_time + timedelta(minutes=5)  # 5 minutes after reset
                         
                         from django_q.models import Schedule
@@ -1827,8 +1764,7 @@ def index_releases_intelligent_task(repository_id=None, args=None, **kwargs):
                         logger.warning(f"GitHub API rate limit low ({remaining} remaining), scheduling release indexing for later")
                         
                         # Schedule next run after rate limit reset
-                        import datetime
-                        reset_time = datetime.datetime.fromtimestamp(rate_data['resources']['core']['reset'])
+                        reset_time = datetime.fromtimestamp(rate_data['resources']['core']['reset'])
                         next_run = reset_time + timedelta(minutes=10)  # 10 minutes after reset
                         
                         from django_q.models import Schedule

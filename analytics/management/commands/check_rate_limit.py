@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand
 from analytics.github_token_service import GitHubTokenService
 import requests
 import datetime
+from django.utils import timezone as dt_timezone
 
 
 class Command(BaseCommand):
@@ -73,7 +74,7 @@ class Command(BaseCommand):
                 self.stdout.write(f"  Reset at: {reset_time}")
                 
                 # Time until reset
-                now = datetime.datetime.now()
+                now = datetime.now(dt_timezone.utc)
                 time_until_reset = reset_time - now
                 if time_until_reset.total_seconds() > 0:
                     self.stdout.write(f"  Time until reset: {time_until_reset}")
