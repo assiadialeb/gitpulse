@@ -768,6 +768,87 @@ def project_detail(request, project_id):
     
     developer_activity_title = get_developer_activity_title()
 
+    # Calculate Codebase Size Breakdown data
+    codebase_size_data = {
+        'labels': [],
+        'values': [],
+        'colors': [],
+        'legend_data': []
+    }
+    
+    # Color palette for repositories (same as developers view)
+    color_palette = [
+        {'bg': 'rgba(16, 185, 129, 0.6)', 'border': 'rgba(16, 185, 129, 1)'},  # green
+        {'bg': 'rgba(59, 130, 246, 0.6)', 'border': 'rgba(59, 130, 246, 1)'},  # blue
+        {'bg': 'rgba(245, 158, 11, 0.6)', 'border': 'rgba(245, 158, 11, 1)'},  # orange
+        {'bg': 'rgba(139, 92, 246, 0.6)', 'border': 'rgba(139, 92, 246, 1)'},  # purple
+        {'bg': 'rgba(236, 72, 153, 0.6)', 'border': 'rgba(236, 72, 153, 1)'},  # pink
+        {'bg': 'rgba(34, 197, 94, 0.6)', 'border': 'rgba(34, 197, 94, 1)'},    # emerald
+    ]
+    
+    # Calculate net lines for each repository in the project
+    for i, repo in enumerate(repositories):
+        # Get commits for this repository within the date range
+        if start_str and end_str and not is_all_time:
+            # User specified date range - filter commits by date
+            repo_commits = Commit.objects.filter(
+                repository_full_name=repo.full_name,
+                authored_date__gte=start_dt,
+                authored_date__lt=end_dt,
+                authored_date__ne=None
+            )
+        elif is_all_time:
+            # "All Time" - show all commits for the repository
+            repo_commits = Commit.objects.filter(
+                repository_full_name=repo.full_name,
+                authored_date__ne=None
+            )
+        else:
+            # No date parameters - use default date range (30 days)
+            repo_commits = Commit.objects.filter(
+                repository_full_name=repo.full_name,
+                authored_date__gte=start_dt,
+                authored_date__lt=end_dt,
+                authored_date__ne=None
+            )
+        
+        # Calculate net lines (additions - deletions) for the filtered period
+        net_lines = 0
+        total_additions = 0
+        total_deletions = 0
+        
+        for commit in repo_commits:
+            additions = commit.additions or 0
+            deletions = commit.deletions or 0
+            total_additions += additions
+            total_deletions += deletions
+        
+        net_lines = total_additions - total_deletions
+        
+        # Only include repositories with data
+        if net_lines != 0:  # Changed from > 0 to != 0 to include negative values
+            codebase_size_data['labels'].append(repo.name)
+            codebase_size_data['values'].append(abs(net_lines))  # Use absolute value for display
+            codebase_size_data['colors'].append(color_palette[i % len(color_palette)])
+            codebase_size_data['legend_data'].append({
+                'label': repo.name,
+                'value': net_lines,  # Keep original value (can be negative)
+                'color': color_palette[i % len(color_palette)]['bg']
+            })
+    
+    # Sort data by values (largest to smallest) for proper display order
+    if codebase_size_data['labels']:
+        # Create list of tuples for sorting
+        sorted_data = list(zip(codebase_size_data['labels'], codebase_size_data['values'], codebase_size_data['colors'], codebase_size_data['legend_data']))
+        # Sort by values (ascending - smallest first, so largest appears at bottom)
+        sorted_data.sort(key=lambda x: x[1], reverse=False)
+        
+        # Reconstruct the data in sorted order
+        codebase_size_data['labels'] = [item[0] for item in sorted_data]
+        codebase_size_data['values'] = [item[1] for item in sorted_data]
+        codebase_size_data['colors'] = [item[2] for item in sorted_data]
+        codebase_size_data['legend_data'] = [item[3] for item in sorted_data]
+
     context = {
         'project': project,
         'total_commits': total_commits,
@@ -809,6 +890,9 @@ def project_detail(request, project_id):
         # Date range parameters for template
         'start_date': start_date,
         'end_date': end_date,
+        
+        # Codebase Size Breakdown data
+        'codebase_size_data': codebase_size_data,
     }
     return render(request, 'projects/detail.html', context)
 

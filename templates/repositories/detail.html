@@ -390,41 +390,6 @@
             </div>
         </div>
 
-        <!-- Developer Activity -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="text-xl font-semibold text-dark-gray mb-6">👥 {{ developer_activity_title|default:"Developer Activity (Last 30 Days)" }}</h3>
-            {% if developer_activity.developers %}
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
-                        <tr>
-                            <th>Developer</th>
-                            <th>Commits</th>
-                            <th>Additions</th>
-                            <th>Deletions</th>
-                            <th>Net Lines</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for developer in developer_activity.developers %}
-                        <tr>
-                            <td>{{ developer.name }}</td>
-                            <td>{{ developer.commits }}</td>
-                            <td class="text-green-600">+{{ developer.additions }}</td>
-                            <td class="text-red-600">-{{ developer.deletions }}</td>
-                            <td class="{% if developer.net_lines >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
-                                {{ developer.net_lines }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="text-center text-medium-gray py-8">No developer activity in the last 30 days</p>
-            {% endif %}
-        </div>
-
         <!-- Quality Metrics -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div class="bg-white p-6 rounded-xl shadow-lg">

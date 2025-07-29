@@ -296,70 +296,64 @@
             </div>
         </div>
 
-        <!-- Developer Activity -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="text-xl font-semibold text-dark-gray mb-6">👥 {{ developer_activity_title|default:"Developer Activity (Last 30 Days)" }}</h3>
-            {% if developer_activity.developers %}
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
-                        <tr>
-                            <th>Developer</th>
-                            <th>Commits</th>
-                            <th>Additions</th>
-                            <th>Deletions</th>
-                            <th>Net Lines</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for developer in developer_activity.developers %}
-                        <tr>
-                            <td>{{ developer.name }}</td>
-                            <td>{{ developer.commits }}</td>
-                            <td class="text-green-600">+{{ developer.additions }}</td>
-                            <td class="text-red-600">-{{ developer.deletions }}</td>
-                            <td class="{% if developer.net_lines >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
-                                {{ developer.net_lines }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="text-center text-medium-gray py-8">No developer activity in the last 30 days</p>
-            {% endif %}
-        </div>
-
         <!-- Quality Metrics -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <h3 class="text-xl font-semibold text-dark-gray mb-4">📝 Commit Quality</h3>
-                {% if commit_quality.total_commits > 0 %}
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between">
-                        <span class="text-medium-gray">Explicit Messages</span>
-                        <span class="font-bold text-primary-green">{{ commit_quality.explicit_ratio|default:"0" }}%</span>
+            <!-- Left Column: 2 rows -->
+            <div class="space-y-8">
+                <!-- Codebase Size Breakdown (Row 1) -->
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold text-dark-gray mb-4">⚖️ Codebase Size Breakdown</h3>
+                    {% if codebase_size_data.labels %}
+                    <div class="flex flex-col space-y-4">
+                        <div class="relative" style="width: 100%; height: 280px;">
+                            <canvas id="codebaseSizePolar"></canvas>
+                        </div>
+                        <div class="flex flex-wrap gap-4 justify-center">
+                            {% for item in codebase_size_data.legend_data|slice:":8" %}
+                                <div class="flex items-center space-x-2">
+                                    <span class="inline-block w-4 h-4 rounded-full" style="background-color: {{ item.color }};"></span>
+                                    <span class="text-sm text-dark-gray font-medium">{{ item.label }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-primary-green h-2 rounded-full" style="width: {{ commit_quality.explicit_ratio|default:0 }}%"></div>
+                    {% else %}
+                    <div class="text-center py-8">
+                        <p class="text-medium-gray">No repository data available</p>
                     </div>
-                    
-                    <div class="flex items-center justify-between">
-                        <span class="text-medium-gray">Generic Messages</span>
-                        <span class="font-bold text-red-500">{{ commit_quality.generic_ratio|default:"0" }}%</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-red-500 h-2 rounded-full" style="width: {{ commit_quality.generic_ratio|default:0 }}%"></div>
-                    </div>
+                    {% endif %}
                 </div>
-                {% else %}
-                <div class="text-center py-8">
-                    <p class="text-medium-gray">No commit quality data available</p>
+                
+                <!-- Commit Quality (Row 2) -->
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold text-dark-gray mb-4">📝 Commit Quality</h3>
+                    {% if commit_quality.total_commits > 0 %}
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-medium-gray">Explicit Messages</span>
+                            <span class="font-bold text-primary-green">{{ commit_quality.explicit_ratio|default:"0" }}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-primary-green h-2 rounded-full" style="width: {{ commit_quality.explicit_ratio|default:0 }}%"></div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-medium-gray">Generic Messages</span>
+                            <span class="font-bold text-red-500">{{ commit_quality.generic_ratio|default:"0" }}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-red-500 h-2 rounded-full" style="width: {{ commit_quality.generic_ratio|default:0 }}%"></div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-8">
+                        <p class="text-medium-gray">No commit quality data available</p>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
 
+            <!-- Right Column: 1 row spanning 2 rows -->
             <div class="bg-white p-6 rounded-xl shadow-lg relative">
                 <h3 class="text-xl font-semibold text-dark-gray mb-4">🍩 Commit Type Distribution</h3>
                 {% if commit_types.counts %}
@@ -675,6 +669,65 @@
                                  plugins: {
                                      legend: {
                                          display: false
+                                     }
+                                 }
+                             }
+                         });
+                         {% endif %}
+
+                         // Horizontal Bar chart for codebase size breakdown
+                         {% if codebase_size_data.labels %}
+                         const barCtx = document.getElementById('codebaseSizePolar').getContext('2d');
+                         new Chart(barCtx, {
+                             type: 'bar',
+                             data: {
+                                 labels: {{ codebase_size_data.labels|safe }},
+                                 datasets: [{
+                                     data: {{ codebase_size_data.values|safe }},
+                                     backgroundColor: [
+                                         {% for color in codebase_size_data.colors %}
+                                         '{{ color.bg }}',
+                                         {% endfor %}
+                                     ],
+                                     borderColor: [
+                                         {% for color in codebase_size_data.colors %}
+                                         '{{ color.border }}',
+                                         {% endfor %}
+                                     ],
+                                     borderWidth: 1
+                                 }]
+                             },
+                             options: {
+                                 indexAxis: 'y', // Horizontal bars
+                                 responsive: true,
+                                 maintainAspectRatio: false,
+                                 plugins: {
+                                     legend: {
+                                         display: false
+                                     },
+                                     tooltip: {
+                                         callbacks: {
+                                             label: function(context) {
+                                                 const label = context.label;
+                                                 const value = context.parsed.x;
+                                                 const originalValue = {{ codebase_size_data.values|safe }}[context.dataIndex];
+                                                 const sign = originalValue < 0 ? '-' : '';
+                                                 return `${label}: ${sign}${Math.abs(originalValue).toLocaleString()} net lines`;
+                                             }
+                                         }
+                                     }
+                                 },
+                                 scales: {
+                                     x: {
+                                         beginAtZero: true,
+                                         ticks: {
+                                             callback: function(value) {
+                                                 return value.toLocaleString();
+                                             }
+                                         }
+                                     },
+                                     y: {
+                                         display: false // Hide Y axis labels
                                      }
                                  }
                              }
