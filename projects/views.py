@@ -23,17 +23,17 @@ def project_detail(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     
     # Get date range parameters
-    start_date = request.GET.get('start')
-    end_date = request.GET.get('end')
+    start_str = request.GET.get('start')
+    end_str = request.GET.get('end')
     
     # Parse dates if provided
     from datetime import datetime, timedelta
     from django.utils import timezone
     import pytz
-    if start_date and end_date:
+    if start_str and end_str:
         try:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            start_dt = datetime.strptime(start_str, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            end_dt = datetime.strptime(end_str, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
             # Add one day to end_date to include the full day
             end_dt = end_dt + timedelta(days=1)
         except ValueError:
@@ -44,6 +44,11 @@ def project_detail(request, project_id):
         # Default to last 30 days
         end_dt = timezone.now()
         start_dt = end_dt - timedelta(days=30)
+    
+    # Convert the *calculated* datetime objects to strings for the template
+    # This ensures the date input fields are always populated by the server
+    start_date = start_dt.strftime("%Y-%m-%d")
+    end_date = end_dt.strftime("%Y-%m-%d")
     
     # Get all repositories in this project
     repositories = project.repositories.all()
@@ -70,7 +75,7 @@ def project_detail(request, project_id):
     # Calculate commits from MongoDB
     # Check if this is "All Time" (very old start date) or specific date range
     is_all_time = False
-    if start_date and end_date:
+    if start_str and end_str:
         # Check if start date is very old (more than 5 years ago) - indicates "All Time"
         from datetime import datetime, timedelta, timezone as dt_timezone
         current_year = timezone.now().year
@@ -78,7 +83,7 @@ def project_detail(request, project_id):
         if current_year - start_year > 5:
             is_all_time = True
     
-    if start_date and end_date and not is_all_time:
+    if start_str and end_str and not is_all_time:
         # User specified date range - filter commits
         recent_commits = Commit.objects.filter(
             repository_full_name__in=repo_full_names,
@@ -122,7 +127,7 @@ def project_detail(request, project_id):
     from analytics.models import Commit, Release, PullRequest, Deployment
     
     # Calculate additional metrics from MongoDB
-    if start_date and end_date and not is_all_time:
+    if start_str and end_str and not is_all_time:
         # User specified date range - filter metrics
         total_releases = Release.objects.filter(
             repository_full_name__in=repo_full_names,
@@ -231,7 +236,7 @@ def project_detail(request, project_id):
     from analytics.developer_grouping_service import DeveloperGroupingService
     
     # Get all commits for the project (filtered by date range if specified)
-    if start_date and end_date and not is_all_time:
+    if start_str and end_str and not is_all_time:
         # User specified date range - filter commits by date
         project_commits = Commit.objects.filter(
             repository_full_name__in=repo_full_names,
@@ -420,10 +425,15 @@ def project_detail(request, project_id):
         commit_frequency_advanced = all_metrics_aggregated.get('commit_frequency', {})
         release_frequency_advanced = all_metrics_aggregated.get('release_frequency', {})
         commit_quality = all_metrics_aggregated.get('commit_quality', {})
-        commit_types = all_metrics_aggregated.get('commit_type_distribution', {})
         pr_health_metrics = all_metrics_aggregated.get('pr_health_metrics', {})
         activity_heatmap = all_metrics_aggregated.get('commit_activity_by_hour', {})
         lines_added = all_metrics_aggregated.get('lines_added', 0)
+        
+        # Calculate commit types manually from all filtered commits to ensure date filtering is respected
+        from analytics.commit_classifier import get_commit_type_stats
+        
+        # Calculate commit types from all project commits (already filtered by date)
+        commit_types = get_commit_type_stats(all_project_commits)
         
         # Calculate global top contributors from all commits using developer grouping
         contributor_stats = {}
@@ -744,20 +754,11 @@ def project_detail(request, project_id):
     
     # Generate dynamic title for developer activity based on date filters
     def get_developer_activity_title():
-        if start_date and end_date and not is_all_time:
-            # Custom date range
-            # Convert to datetime if they are strings
-            if isinstance(start_date, str):
-                from datetime import datetime
-                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-            else:
-                start_dt = start_date
-                end_dt = end_date
-            
-            start_str = start_dt.strftime('%b %d, %Y')
-            end_str = end_dt.strftime('%b %d, %Y')
-            return f"Developer Activity ({start_str} - {end_str})"
+        if start_str and end_str and not is_all_time:
+            # Custom date range - start_dt and end_dt are now always datetime objects
+            start_str_formatted = start_dt.strftime('%b %d, %Y')
+            end_str_formatted = end_dt.strftime('%b %d, %Y')
+            return f"Developer Activity ({start_str_formatted} - {end_str_formatted})"
         elif is_all_time:
             # All time
             return "Developer Activity (All Time)"
@@ -784,8 +785,6 @@ def project_detail(request, project_id):
         'pr_cycle_time_min': pr_cycle_time_min,
         'pr_cycle_time_max': pr_cycle_time_max,
         'pr_cycle_time_count': pr_cycle_time_count,
-        'start_date': start_date,
-        'end_date': end_date,
         
         # Advanced metrics
         'developer_activity': developer_activity,

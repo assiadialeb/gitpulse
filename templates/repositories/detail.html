@@ -832,7 +832,10 @@ function setDateRange(days) {
     document.getElementById('start-date').value = start.toISOString().slice(0, 10);
     document.getElementById('end-date').value = end.toISOString().slice(0, 10);
     
-    updateDateRange();
+    // Add a small delay to ensure the DOM is updated before calling updateDateRange
+    setTimeout(() => {
+        updateDateRange();
+    }, 10);
 }
 
 // Set default dates if not provided

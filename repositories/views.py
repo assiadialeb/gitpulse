@@ -1,5 +1,4 @@
 import os
-print(f"[DEBUG] {os.path.abspath(__file__)} loaded (views.py)")
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -106,45 +105,41 @@ def repository_detail(request, repo_id):
     # Récupère la plage de dates depuis les paramètres GET
     from datetime import datetime, timedelta
     from django.utils import timezone
-    start_str = request.GET.get('start')
-    end_str = request.GET.get('end')
+    start_param = request.GET.get('start')
+    end_param = request.GET.get('end')
     
     # Check if this is "All Time" (very old start date) or specific date range
     is_all_time = False
-    if start_str and end_str:
+    if start_param and end_param:
         try:
-            start_date = datetime.strptime(start_str, "%Y-%m-%d")
-            end_date = datetime.strptime(end_str, "%Y-%m-%d")
+            start_dt = datetime.strptime(start_param, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_param, "%Y-%m-%d")
+            # Add one day to end_date to include the full day
+            end_dt = end_dt + timedelta(days=1)
             
             # Check if start date is very old (before 2010) - indicates "All Time"
             # This covers all reasonable commit dates (Git was created in 2005)
-            if start_date.year < 2010:
+            if start_dt.year < 2010:
                 is_all_time = True
         except Exception:
-            start_date = timezone.now() - timedelta(days=29)
-            end_date = timezone.now()
+            start_dt = timezone.now() - timedelta(days=29)
+            end_dt = timezone.now()
     else:
-        end_date = timezone.now()
-        start_date = end_date - timedelta(days=29)
+        end_dt = timezone.now()
+        start_dt = end_dt - timedelta(days=29)
     
-    print(f"[DEBUG] repository_detail: start_date={start_date}, end_date={end_date}, is_all_time={is_all_time}")
+    # Convert the *calculated* datetime objects to strings for the template
+    # This ensures the date input fields are always populated by the server
+    start_date = start_dt.strftime("%Y-%m-%d")
+    end_date = end_dt.strftime("%Y-%m-%d")
     
     # Generate dynamic title for developer activity based on date filters
     def get_developer_activity_title():
-        if start_date and end_date and not is_all_time:
-            # Custom date range
-            # Convert to datetime if they are strings
-            if isinstance(start_date, str):
-                from datetime import datetime
-                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-            else:
-                start_dt = start_date
-                end_dt = end_date
-            
-            start_str = start_dt.strftime('%b %d, %Y')
-            end_str = end_dt.strftime('%b %d, %Y')
-            return f"Developer Activity ({start_str} - {end_str})"
+        if start_dt and end_dt and not is_all_time:
+            # Custom date range - start_dt and end_dt are datetime objects
+            start_formatted = start_dt.strftime('%b %d, %Y')
+            end_formatted = end_dt.strftime('%b %d, %Y')
+            return f"Developer Activity ({start_formatted} - {end_formatted})"
         elif is_all_time:
             # All time
             return "Developer Activity (All Time)"
@@ -161,12 +156,10 @@ def repository_detail(request, repo_id):
             metrics_service = UnifiedMetricsService('repository', repo_id)
         else:
             # Specific date range - pass date filters
-            metrics_service = UnifiedMetricsService('repository', repo_id, start_date=start_date, end_date=end_date)
+            metrics_service = UnifiedMetricsService('repository', repo_id, start_date=start_dt, end_date=end_dt)
         
         # Get all metrics using the unified service
         all_metrics = metrics_service.get_all_metrics()
-        
-        # Debug logging removed for now
         
         # Extract specific metrics for template
         overall_stats = {
@@ -183,10 +176,32 @@ def repository_detail(request, repo_id):
         total_releases = all_metrics['total_releases']
         pr_cycle_time = all_metrics['pr_cycle_time']
         commit_quality = all_metrics['commit_quality']
-        commit_types = all_metrics['commit_type_distribution']
         pr_health_metrics = all_metrics['pr_health_metrics']
         top_contributors = all_metrics['top_contributors']
         activity_heatmap = all_metrics['commit_activity_by_hour']
+        
+        # Calculate commit types manually from filtered commits to ensure date filtering is respected
+        from analytics.commit_classifier import get_commit_type_stats
+        from analytics.models import Commit
+        
+        # Get commits for this repository in the date range
+        if is_all_time:
+            # "All Time" - get all commits
+            repo_commits = Commit.objects.filter(
+                repository_full_name=repository.full_name,
+                authored_date__ne=None
+            )
+        else:
+            # Specific date range - filter commits
+            repo_commits = Commit.objects.filter(
+                repository_full_name=repository.full_name,
+                authored_date__gte=start_dt,
+                authored_date__lt=end_dt,
+                authored_date__ne=None
+            )
+        
+        # Calculate commit types from filtered commits
+        commit_types = get_commit_type_stats(repo_commits)
         
         # Calculate PR cycle time statistics for template
         pr_cycle_time_median = pr_cycle_time.get('median_cycle_time_hours', 0)
@@ -197,7 +212,6 @@ def repository_detail(request, repo_id):
         commit_types_counts = commit_types.get('counts', {}) if isinstance(commit_types, dict) else {}
         commit_type_labels = json.dumps(list(commit_types_counts.keys()))
         commit_type_values = json.dumps(list(commit_types_counts.values()))
-        print("[DEBUG] After commit_type_labels")
         
         # Doughnut colors for commit types
         doughnut_colors = {
@@ -210,30 +224,24 @@ def repository_detail(request, repo_id):
             'chore': '#607d8b',
             'other': '#bdbdbd',
         }
-        print("[DEBUG] After doughnut_colors")
         
         # Legend data for commit types
         legend_data = []
         for label, count in commit_types_counts.items():
             color = doughnut_colors.get(label, '#bdbdbd')
             legend_data.append({'label': label, 'count': count, 'color': color})
-        print("[DEBUG] After legend_data")
         
         # Hourly activity data
         hourly_data = activity_heatmap.get('hourly_data', {})
-        print("[DEBUG] Before json.dumps")
         activity_heatmap_data = json.dumps([int(hourly_data.get(str(hour), 0)) for hour in range(24)])
-        print("[DEBUG] After json.dumps")
         
-        print("[DEBUG] About to convert commit_change_stats")
         # Ajout stats changements commit (calcul et conversion explicite)
         commit_change_stats = all_metrics['commit_change_stats']
         avg_total_changes = round(float(commit_change_stats.get('avg_total_changes', 0)), 2)
         avg_files_changed = round(float(commit_change_stats.get('avg_files_changed', 0)), 2)
         nb_commits = int(commit_change_stats.get('nb_commits', 0))
-        print(f"[DEBUG] Converted values: avg_total_changes={avg_total_changes}, avg_files_changed={avg_files_changed}, nb_commits={nb_commits}")
         
-        print("[DEBUG] About to create context")
+        # Prepare context
         context = {
             'repository': repository,
             'overall_stats': overall_stats,
@@ -263,8 +271,10 @@ def repository_detail(request, repo_id):
                 'avg_files_changed': avg_files_changed,
                 'nb_commits': nb_commits,
             },
+            # Date range for template
+            'start_date': start_date,
+            'end_date': end_date,
         }
-        print(f"[DEBUG] Context commit_change_stats: {context['commit_change_stats']}")
         
     except Exception as e:
         # If metrics calculation fails, provide empty data and log the error
@@ -274,6 +284,12 @@ def repository_detail(request, repo_id):
         logger.error(f"Error getting metrics for repository {repo_id}: {e}")
         logger.error(f"Exception type: {type(e)}")
         logger.error(f"Full traceback: {traceback.format_exc()}")
+        
+        # Ensure developer_activity_title is defined even in case of error
+        try:
+            developer_activity_title = get_developer_activity_title()
+        except:
+            developer_activity_title = "Developer Activity (Last 30 Days)"
         
         context = {
             'repository': repository,
@@ -297,10 +313,11 @@ def repository_detail(request, repo_id):
             'doughnut_colors': {},
             'activity_heatmap_data': json.dumps([0] * 24),
             'error': str(e),
-            'debug_error': True
+            'debug_error': True,
+            # Date range for template
+            'start_date': start_date,
+            'end_date': end_date,
         }
-    
-    # Removed debug code for now
     
     return render(request, 'repositories/detail.html', context)
 
@@ -436,22 +453,6 @@ def index_repository(request):
         return JsonResponse({'success': False, 'error': 'Invalid repository data'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': f'Error indexing repository: {str(e)}'})
-
-
-@login_required
-def repository_detail(request, repo_id):
-    """Show repository details"""
-    try:
-        repository = Repository.objects.get(id=repo_id, owner=request.user)
-    except Repository.DoesNotExist:
-        messages.error(request, 'Repository not found.')
-        return redirect('repositories:list')
-    
-    context = {
-        'repository': repository,
-    }
-    
-    return render(request, 'repositories/detail.html', context)
 
 
 @login_required

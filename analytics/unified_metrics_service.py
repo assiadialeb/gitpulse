@@ -266,10 +266,13 @@ class UnifiedMetricsService:
     def get_developer_activity(self, days: int = 30) -> Dict:
         """Developer Activity (AR)"""
         if self.start_date and self.end_date:
+            # Use the filtered commits that respect the date range
             recent_commits = self.commits
         else:
+            # Fallback to days-based filtering
             cutoff_date = django_timezone.now() - timedelta(days=days)
             recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
+        
         if self.entity_type == 'developer':
             return {
                 'developers': [{
@@ -282,8 +285,8 @@ class UnifiedMetricsService:
                 'total_developers': 1
             }
         
-        cutoff_date = django_timezone.now() - timedelta(days=days)
-        recent_commits = self.commits.filter(authored_date__gte=cutoff_date)
+        # Remove the redundant filtering for repositories
+        # recent_commits is already filtered by date range or days
         
         if self.entity_type == 'application':
             # Use grouped developers for applications
@@ -712,6 +715,14 @@ class UnifiedMetricsService:
     # Comprehensive metrics getter
     def get_all_metrics(self) -> Dict:
         """Get all metrics for the entity"""
+        # Calculate days based on date filters
+        if self.start_date and self.end_date:
+            # Calculate days between start and end date
+            delta = self.end_date - self.start_date
+            days = delta.days + 1  # Include both start and end date
+        else:
+            days = 30  # Default to 30 days
+        
         metrics = {
             # Basic stats
             'total_commits': self.get_total_commits(),
@@ -724,8 +735,8 @@ class UnifiedMetricsService:
             'commit_frequency': self.get_commit_frequency(),
             
             # Activity metrics  
-            'developer_activity_30d': self.get_developer_activity(days=30),
-            'commit_activity_by_hour': self.get_commit_activity_by_hour(days=30),
+            'developer_activity_30d': self.get_developer_activity(days=days),
+            'commit_activity_by_hour': self.get_commit_activity_by_hour(days=days),
             
             # Quality metrics
             'commit_quality': self.get_commit_quality(),
