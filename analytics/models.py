@@ -368,7 +368,7 @@ class RateLimitReset(Document):
 
 class Deployment(Document):
     """MongoDB document for storing GitHub deployments"""
-    deployment_id = fields.StringField(required=True, unique=True)
+    deployment_id = fields.StringField(required=True)  # Unique per repository, not globally
     application_id = fields.IntField(required=False, null=True)
     repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
     environment = fields.StringField()
@@ -385,6 +385,7 @@ class Deployment(Document):
             'application_id',
             'repository_full_name',
             ('application_id', 'repository_full_name'),
+            ('deployment_id', 'repository_full_name'),  # Unique constraint per repository
             'environment',
             'created_at',
         ]
@@ -396,7 +397,7 @@ class Deployment(Document):
 
 class Release(Document):
     """MongoDB document for storing GitHub releases"""
-    release_id = fields.StringField(required=True, unique=True)
+    release_id = fields.StringField(required=True)  # Unique per repository, not globally
     application_id = fields.IntField(required=False, null=True)
     repository_full_name = fields.StringField(required=True)  # e.g., "owner/repo"
     tag_name = fields.StringField()
@@ -417,6 +418,7 @@ class Release(Document):
             'application_id',
             'repository_full_name',
             ('application_id', 'repository_full_name'),
+            ('release_id', 'repository_full_name'),  # Unique constraint per repository
             'tag_name',
             'published_at',
         ]
@@ -464,6 +466,7 @@ class PullRequest(Document):
             'state',
             'merged_at',
             'merged_by',
+            'url',  # Unique constraint - URL is globally unique
             ('application_id', 'repository_full_name'),
             ('application_id', 'number'),
             ('repository_full_name', 'number'),
