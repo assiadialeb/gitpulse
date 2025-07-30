@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'developers',
     'repositories',
     'install',
+    'management',
     'django.contrib.sites',
     'allauth',
     'allauth.account',

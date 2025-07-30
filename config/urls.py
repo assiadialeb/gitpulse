@@ -30,5 +30,6 @@ urlpatterns = [
     path('developers/', include('developers.urls')),
     path('repositories/', include('repositories.urls')),
     path('install/', include('install.urls')),
+    path('management/', include('management.urls')),
     path('accounts/', include('allauth.urls')),
 ] + debug_toolbar_urls()

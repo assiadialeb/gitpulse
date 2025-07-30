@@ -1,0 +1,54 @@
+{% extends "base/base.html" %}
+
+{% block title %}{% block management_title %}GitPulse Management{% endblock %} - GitPulse{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Management Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold text-gray-900">GitPulse Management</h1>
+                    <span class="text-sm text-gray-500">Administration Panel</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-600">Logged in as: {{ user.username }}</span>
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">
+                        ← Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-white border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <nav class="flex space-x-8">
+                <a href="{% url 'management:dashboard' %}" 
+                   class="py-4 px-1 border-b-2 font-medium text-sm {% if active_section == 'dashboard' %}border-blue-500 text-blue-600{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                    Dashboard
+                </a>
+                <a href="{% url 'management:users' %}" 
+                   class="py-4 px-1 border-b-2 font-medium text-sm {% if active_section == 'users' %}border-blue-500 text-blue-600{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                    Users
+                </a>
+                <a href="{% url 'management:logs' %}" 
+                   class="py-4 px-1 border-b-2 font-medium text-sm {% if active_section == 'logs' %}border-blue-500 text-blue-600{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                    Logs
+                </a>
+                <a href="{% url 'management:integrations' %}" 
+                   class="py-4 px-1 border-b-2 font-medium text-sm {% if active_section == 'integrations' %}border-blue-500 text-blue-600{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}">
+                    Integrations
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {% block management_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %} 

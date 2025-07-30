@@ -1,0 +1,399 @@
+{% extends "management/base.html" %}
+
+{% block management_title %}Users Management{% endblock %}
+
+{% block management_content %}
+{% csrf_token %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-lg font-medium text-gray-900">Users Management</h2>
+                    <p class="mt-1 text-sm text-gray-500">Manage user accounts, permissions, and access.</p>
+                </div>
+                <div class="text-sm text-gray-500">
+                    {{ total_users }} total users
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <form method="get" class="flex space-x-4">
+                <div class="flex-1">
+                    <label for="search" class="sr-only">Search users</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                        <input type="text" name="search" id="search" 
+                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                               placeholder="Search users by name, email, or username"
+                               value="{{ search_query }}">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    Search
+                </button>
+                {% if search_query %}
+                    <a href="{% url 'management:users' %}" class="btn btn-outline">
+                        Clear
+                    </a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                User
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Email
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Role
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Joined
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for user in users %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10">
+                                        <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                                            <span class="text-sm font-medium text-gray-700">
+                                                {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">
+                                            {{ user.get_full_name|default:user.username }}
+                                        </div>
+                                        <div class="text-sm text-gray-500">
+                                            @{{ user.username }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">{{ user.email }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if user.is_active %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Active
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        Inactive
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if user.is_superuser %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        Superuser
+                                    </span>
+                                {% elif user.is_staff %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        Staff
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        User
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ user.date_joined|date:"M d, Y" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2">
+                                    <a href="{% url 'management:user_detail' user.id %}" 
+                                       class="text-blue-600 hover:text-blue-900">
+                                        View
+                                    </a>
+                                    <button onclick="toggleUserStatus({{ user.id }}, '{{ user.username }}')"
+                                            class="text-{% if user.is_active %}red{% else %}green{% endif %}-600 hover:text-{% if user.is_active %}red{% else %}green{% endif %}-900">
+                                        {% if user.is_active %}Deactivate{% else %}Activate{% endif %}
+                                    </button>
+                                    <button onclick="openLinkDeveloperModal({{ user.id }}, '{{ user.username }}')"
+                                            class="text-purple-600 hover:text-purple-900">
+                                        Link Dev
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                No users found.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if users.has_other_pages %}
+            <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    {% if users.has_previous %}
+                        <a href="?page={{ users.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                           class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Previous
+                        </a>
+                    {% endif %}
+                    {% if users.has_next %}
+                        <a href="?page={{ users.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                           class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Next
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            Showing <span class="font-medium">{{ users.start_index }}</span> to 
+                            <span class="font-medium">{{ users.end_index }}</span> of 
+                            <span class="font-medium">{{ users.paginator.count }}</span> results
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                            {% if users.has_previous %}
+                                <a href="?page={{ users.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                                   class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    Previous
+                                </a>
+                            {% endif %}
+                            
+                            {% for num in users.paginator.page_range %}
+                                {% if users.number == num %}
+                                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
+                                        {{ num }}
+                                    </span>
+                                {% elif num > users.number|add:'-3' and num < users.number|add:'3' %}
+                                    <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                                       class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                        {{ num }}
+                                    </a>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if users.has_next %}
+                                <a href="?page={{ users.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                                   class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    Next
+                                </a>
+                            {% endif %}
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Global variables for modal functionality
+let currentUserId = null;
+let currentUsername = null;
+
+// Global functions for modal
+function openLinkDeveloperModal(userId, username) {
+    currentUserId = userId;
+    currentUsername = username;
+    
+    // Reset modal
+    document.getElementById('developer-search').value = '';
+    document.getElementById('developer-results').innerHTML = '';
+    document.getElementById('modal-title').textContent = `Link Developer to ${username}`;
+    
+    // Show modal
+    document.getElementById('link-developer-modal').classList.remove('hidden');
+}
+
+function closeLinkDeveloperModal() {
+    document.getElementById('link-developer-modal').classList.add('hidden');
+    currentUserId = null;
+    currentUsername = null;
+}
+
+function searchDevelopers(query) {
+    if (query.length < 2) {
+        document.getElementById('developer-results').innerHTML = '';
+        return;
+    }
+    
+    fetch(`/management/users/search-developers/?q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            const resultsDiv = document.getElementById('developer-results');
+            resultsDiv.innerHTML = '';
+            
+            if (data.results.length === 0) {
+                resultsDiv.innerHTML = '<div class="p-3 text-gray-500">No developers found</div>';
+                return;
+            }
+            
+            data.results.forEach(dev => {
+                const devDiv = document.createElement('div');
+                devDiv.className = 'p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200';
+                devDiv.onclick = () => selectDeveloper(dev);
+                
+                devDiv.innerHTML = `
+                    <div class="font-medium">${dev.name}</div>
+                    <div class="text-sm text-gray-600">${dev.email}</div>
+                    <div class="text-xs text-gray-500">${dev.commit_count} commits</div>
+                `;
+                
+                resultsDiv.appendChild(devDiv);
+            });
+        })
+        .catch(error => {
+            console.error('Error searching developers:', error);
+            document.getElementById('developer-results').innerHTML = '<div class="p-3 text-red-500">Error searching developers</div>';
+        });
+}
+
+function selectDeveloper(developer) {
+    if (!confirm(`Link user "${currentUsername}" to developer "${developer.name}"?`)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('developer_id', developer.id);
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        alert('CSRF token not found. Please refresh the page and try again.');
+        return;
+    }
+    
+    fetch(`/management/users/${currentUserId}/link-developer/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken.value,
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            closeLinkDeveloperModal();
+            location.reload(); // Refresh to show updated status
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error linking user to developer:', error);
+        alert('An error occurred while linking user to developer');
+    });
+}
+
+function toggleUserStatus(userId, username) {
+    if (!confirm(`Are you sure you want to toggle the status for user "${username}"?`)) {
+        return;
+    }
+    
+    fetch(`/management/users/${userId}/toggle-status/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Reload the page to show updated status
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while updating user status');
+    });
+}
+
+// Add event listener for search input
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('developer-search');
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            searchDevelopers(this.value);
+        }, 300);
+    });
+});
+</script>
+
+<!-- Link Developer Modal -->
+<div id="link-developer-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modal-title" class="text-lg font-medium text-gray-900">Link Developer</h3>
+                <button onclick="closeLinkDeveloperModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="mb-4">
+                <label for="developer-search" class="block text-sm font-medium text-gray-700 mb-2">
+                    Search Developers
+                </label>
+                <input type="text" id="developer-search" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="Type developer name or email...">
+            </div>
+            
+            <div id="developer-results" class="max-h-60 overflow-y-auto border border-gray-200 rounded-md">
+                <!-- Results will be populated here -->
+            </div>
+            
+            <div class="mt-4 flex justify-end space-x-3">
+                <button onclick="closeLinkDeveloperModal()" 
+                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

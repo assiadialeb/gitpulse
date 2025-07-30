@@ -1,0 +1,214 @@
+{% extends "management/base.html" %}
+
+{% block management_title %}Integrations Management{% endblock %}
+
+{% block management_content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-lg font-medium text-gray-900">Integrations</h2>
+                    <p class="mt-1 text-sm text-gray-500">Manage external integrations and API connections.</p>
+                </div>
+                <div class="flex space-x-2">
+                    <button class="btn btn-primary btn-sm" onclick="addIntegration()">
+                        <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        Add Integration
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Integrations Grid -->
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {% for integration in integrations %}
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        {% if integration.name == 'GitHub' %}
+                            <div class="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center">
+                                <svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                                </svg>
+                            </div>
+                        {% elif integration.name == 'Slack' %}
+                            <div class="h-10 w-10 rounded-full bg-purple-600 flex items-center justify-center">
+                                <svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M6.194 14.644c0 1.16-.943 2.107-2.107 2.107-1.164 0-2.107-.947-2.107-2.107 0-1.16.943-2.106 2.107-2.106h2.107v2.106zm1.061 0c0-1.16.943-2.106 2.107-2.106 1.164 0 2.107.946 2.107 2.106v5.274c0 1.16-.943 2.107-2.107 2.107-1.164 0-2.107-.947-2.107-2.107v-5.274zm2.107-8.455c-1.164 0-2.107-.946-2.107-2.106 0-1.16.943-2.107 2.107-2.107s2.107.947 2.107 2.107v2.106h-2.107zm0 1.061c1.164 0 2.107.946 2.107 2.106s-.943 2.107-2.107 2.107h-5.274c-1.164 0-2.107-.947-2.107-2.107s.943-2.106 2.107-2.106h5.274zm8.455 2.107c0-1.16.943-2.107 2.107-2.107s2.107.947 2.107 2.107-.943 2.106-2.107 2.106h-2.107v-2.106zm-1.061 0c0 1.16-.943 2.106-2.107 2.106s-2.107-.946-2.107-2.106v-5.274c0-1.16.943-2.107 2.107-2.107s2.107.947 2.107 2.107v5.274zm-2.107 8.455c1.164 0 2.107.946 2.107 2.106 0 1.16-.943 2.107-2.107 2.107s-2.107-.947-2.107-2.107v-2.106h2.107zm0-1.061c-1.164 0-2.107-.946-2.107-2.106s.943-2.107 2.107-2.107h5.274c1.164 0 2.107.947 2.107 2.107s-.943 2.106-2.107 2.106h-5.274z"/>
+                                </svg>
+                            </div>
+                        {% elif integration.name == 'SonarCloud' %}
+                            <div class="h-10 w-10 rounded-full bg-orange-500 flex items-center justify-center">
+                                <svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24" role="img" xmlns="http://www.w3.org/2000/svg">
+                                    <title>SonarCloud icon</title>
+                                    <path d="M22.406 10.9a7.088 7.088 0 00-3.377-2.358v-.085c0-4.035-3.156-7.324-7.047-7.324-3.893 0-7.05 3.282-7.05 7.325v.1C2.081 9.492 0 12.268 0 15.542c0 4.035 3.159 7.325 7.05 7.325a6.907 6.907 0 004.952-2.108 6.885 6.885 0 004.947 2.108c3.884 0 7.051-3.282 7.051-7.325a7.572 7.572 0 00-1.594-4.643zM16.95 21.014c-2.903 0-5.267-2.456-5.267-5.474a.91.91 0 00-.89-.924.906.906 0 00-.892.925c0 1.368.367 2.651.994 3.748a5.156 5.156 0 01-3.845 1.733c-2.904 0-5.27-2.457-5.27-5.474 0-3.016 2.366-5.473 5.27-5.473.63 0 1.241.117 1.827.335.007 0 .013.007.02.007.203.071.489.21.578.287a.858.858 0 001.249-.1.942.942 0 00-.097-1.3c-.39-.342-.995-.575-1.144-.63a6.814 6.814 0 00-2.425-.443c-.113 0-.225 0-.338.007.12-2.916 2.433-5.247 5.27-5.247 2.903 0 5.267 2.456 5.267 5.474a5.569 5.569 0 01-2.215 4.463.948.948 0 00-.21 1.283c.171.25.45.39.727.39a.86.86 0 00.516-.172 7.381 7.381 0 002.709-4.02c2.035.785 3.449 2.829 3.449 5.139-.007 3.01-2.371 5.466-5.283 5.466z"/>
+                                </svg>
+                            </div>
+                        {% else %}
+                            <div class="h-10 w-10 rounded-full bg-gray-400 flex items-center justify-center">
+                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-lg font-medium text-gray-900">{{ integration.name }}</h3>
+                        <p class="text-sm text-gray-500">{{ integration.type }}</p>
+                    </div>
+                    <div class="ml-4">
+                        {% if integration.status == 'active' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Active
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                Inactive
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Last Sync</dt>
+                            <dd class="text-sm text-gray-900">{{ integration.last_sync }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Status</dt>
+                            <dd class="text-sm text-gray-900">
+                                {% if integration.status == 'active' %}
+                                    <span class="text-green-600">Connected</span>
+                                {% else %}
+                                    <span class="text-red-600">Disconnected</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+                
+                <div class="mt-6 flex space-x-3">
+                    <button onclick="configureIntegration('{{ integration.name }}')" 
+                            class="flex-1 btn btn-outline btn-sm">
+                        Configure
+                    </button>
+                    {% if integration.status == 'active' %}
+                        <button onclick="testIntegration('{{ integration.name }}')" 
+                                class="flex-1 btn btn-outline btn-sm">
+                            Test
+                        </button>
+                    {% else %}
+                        <button onclick="activateIntegration('{{ integration.name }}')" 
+                                class="flex-1 btn btn-primary btn-sm">
+                            Activate
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full">
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No integrations</h3>
+                <p class="mt-1 text-sm text-gray-500">Get started by adding your first integration.</p>
+                <div class="mt-6">
+                    <button onclick="addIntegration()" class="btn btn-primary">
+                        Add Integration
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Integration Statistics -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Active Integrations</dt>
+                            <dd class="text-lg font-medium text-gray-900">
+                                {{ integrations|length|add:"-1" }}
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Integrations</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ integrations|length }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Last Sync</dt>
+                            <dd class="text-lg font-medium text-gray-900">2 min ago</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function addIntegration() {
+    alert('Add integration functionality will be implemented here');
+}
+
+function configureIntegration(name) {
+    alert(`Configure ${name} integration`);
+}
+
+function testIntegration(name) {
+    alert(`Testing ${name} integration...`);
+}
+
+function activateIntegration(name) {
+    if (confirm(`Activate ${name} integration?`)) {
+        alert(`${name} integration activated`);
+        location.reload();
+    }
+}
+</script>
+{% endblock %} 
