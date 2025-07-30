@@ -933,21 +933,31 @@ def group_developer_identities_task(application_id=None):
         aliases_updated = 0
         
         for identity_data in identities.values():
+            # Use email as the unique key instead of (name, email)
             alias_filter = {
-                'name': identity_data['name'],
                 'email': identity_data['email']
             }
             
             alias = DeveloperAlias.objects(**alias_filter).first()
             if not alias:
-                alias = DeveloperAlias(**alias_filter)
+                # Create new alias
+                alias = DeveloperAlias(
+                    name=identity_data['name'],
+                    email=identity_data['email']
+                )
                 aliases_created += 1
             else:
+                # Update existing alias - merge names if different
+                if alias.name != identity_data['name']:
+                    # If names are different, combine them
+                    if identity_data['name'] not in alias.name:
+                        alias.name = f"{alias.name} | {identity_data['name']}"
                 aliases_updated += 1
             
+            # Update commit count and dates
             alias.commit_count = identity_data['commit_count']
-            alias.first_seen = identity_data['first_seen']
-            alias.last_seen = identity_data['last_seen']
+            alias.first_seen = min(alias.first_seen, identity_data['first_seen'])
+            alias.last_seen = max(alias.last_seen, identity_data['last_seen'])
             alias.save()
         
         logger.info(f"Created {aliases_created} new aliases, updated {aliases_updated} existing aliases")

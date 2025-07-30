@@ -989,16 +989,21 @@ class DeveloperGroupingService:
                 moved_count = 0
                 
                 for alias in aliases_to_move:
-                    # Check if this alias already exists in developer1
+                    # Check if this alias already exists in developer1 (by email only)
                     existing_alias = DeveloperAlias.objects.filter(
                         developer=developer1,
-                        email=alias.email,
-                        name=alias.name
+                        email=alias.email
                     ).first()
                     
                     if existing_alias:
-                        # Update existing alias
+                        # Update existing alias - merge names if different
+                        if alias.name != existing_alias.name:
+                            if alias.name not in existing_alias.name:
+                                existing_alias.name = f"{existing_alias.name} | {alias.name}"
+                        
+                        # Update commit count and dates
                         existing_alias.commit_count += alias.commit_count
+                        existing_alias.first_seen = min(existing_alias.first_seen, alias.first_seen)
                         existing_alias.last_seen = max(existing_alias.last_seen, alias.last_seen)
                         existing_alias.save()
                         alias.delete()
