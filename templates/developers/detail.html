@@ -28,11 +28,22 @@
                 {% if developer.github_id %}
                     <p class="text-sm text-blue-600">GitHub ID: {{ developer.github_id }}</p>
                 {% endif %}
-                <p class="text-sm text-gray-400">
+                <div class="flex flex-wrap gap-2 mt-2">
                     {% for alias in developer.aliases %}
-                        {{ alias.email }}{% if not forloop.last %}, {% endif %}
+                        <div class="flex items-center space-x-1 bg-gray-100 rounded-lg px-3 py-1 text-sm" id="alias-{{ alias.id }}">
+                            <span class="text-gray-700">{{ alias.email }}</span>
+                            <button 
+                                class="text-red-500 hover:text-red-700 transition-colors duration-200 ml-2" 
+                                onclick="removeAlias('{{ alias.id }}', '{{ alias.email }}')" 
+                                title="Remove this alias"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
                     {% endfor %}
-                </p>
+                </div>
             {% else %}
                 <p class="text-sm text-gray-500">Individual Alias</p>
             {% endif %}
@@ -425,6 +436,58 @@ function saveName() {
     .catch(error => {
         console.error('Error:', error);
         alert('An error occurred while updating the name');
+    });
+}
+
+// Function to remove an alias
+function removeAlias(aliasId, aliasEmail) {
+    if (!confirm(`Are you sure you want to remove the alias "${aliasEmail}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    const developerId = '{{ developer_id }}';
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`/developers/${developerId}/remove-alias/${aliasId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the alias element from the DOM
+            const aliasElement = document.getElementById(`alias-${aliasId}`);
+            if (aliasElement) {
+                aliasElement.remove();
+            }
+            
+            // Update the alias count
+            const aliasCountElement = document.querySelector('.text-sm.text-gray-500');
+            if (aliasCountElement && aliasCountElement.textContent.includes('aliases for this developer')) {
+                const currentCount = parseInt(aliasCountElement.textContent.match(/(\d+)/)[1]);
+                aliasCountElement.textContent = `${currentCount - 1} aliases for this developer`;
+            }
+            
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'alert alert-success mb-4';
+            successDiv.textContent = data.message;
+            document.querySelector('.container').insertBefore(successDiv, document.querySelector('.container').firstChild);
+            
+            // Remove success message after 3 seconds
+            setTimeout(() => {
+                successDiv.remove();
+            }, 3000);
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while removing the alias');
     });
 }
 

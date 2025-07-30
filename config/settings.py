@@ -169,9 +169,9 @@ LOGOUT_REDIRECT_URL = '/'
 # Django-Q Configuration
 Q_CLUSTER = {
     'name': 'GitPulse',
-    'workers': 5,
+    'workers': 4,
     'recycle': 500,
-    'timeout': 1800,  # 30 minutes for indexing tasks
+    'timeout': 3600,  # 30 minutes for indexing tasks
     'retry': 2000,    # retry > timeout (en secondes)
     'compress': True,
     'save_limit': 250,

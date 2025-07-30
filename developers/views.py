@@ -672,6 +672,67 @@ def developer_detail(request, developer_id):
     return render(request, 'developers/detail.html', context)
 
 
+@login_required
+@require_http_methods(["POST"])
+def remove_developer_alias(request, developer_id, alias_id):
+    """Remove an alias from a developer via AJAX"""
+    try:
+        from bson import ObjectId
+        
+        # Convert string to ObjectId for developer
+        developer_object_id = ObjectId(developer_id)
+        developer = Developer.objects(id=developer_object_id).first()
+        
+        # Convert string to ObjectId for alias
+        alias_object_id = ObjectId(alias_id)
+        alias = DeveloperAlias.objects(id=alias_object_id).first()
+        
+    except (ValueError, TypeError):
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid ID format'
+        }, status=400)
+    
+    if developer is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Developer not found'
+        }, status=404)
+    
+    if alias is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Alias not found'
+        }, status=404)
+    
+    # Verify that the alias belongs to this developer
+    if alias.developer != developer:
+        return JsonResponse({
+            'success': False,
+            'error': 'Alias does not belong to this developer'
+        }, status=400)
+    
+    # Store alias info before deletion for response
+    alias_name = alias.name
+    alias_email = alias.email
+    
+    try:
+        # Delete the alias
+        alias.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Successfully removed alias "{alias_name}" ({alias_email}) from developer',
+            'removed_alias_id': alias_id
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error removing alias: {str(e)}'
+        }, status=500)
+
+
 # Helper for legend colors
 def _get_commit_type_color(commit_type):
     colors = {

@@ -11,5 +11,6 @@ urlpatterns = [
     path('search/', views.search_developers_ajax, name='search_ajax'),
     path('merge/', views.merge_developers, name='merge'),
     path('<str:developer_id>/update-name/', views.update_developer_name, name='update_name'),
+    path('<str:developer_id>/remove-alias/<str:alias_id>/', views.remove_developer_alias, name='remove_alias'),
     path('<str:developer_id>/', views.developer_detail, name='detail'),
 ] 
