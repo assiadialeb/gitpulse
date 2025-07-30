@@ -44,7 +44,7 @@
                             <button 
                                 class="text-red-500 hover:text-red-700 transition-colors duration-200 ml-2" 
                                 onclick="removeAlias('{{ alias.id }}', '{{ alias.email }}')" 
-                                title="Remove this alias"
+                                title="Disassociate this alias from developer"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -450,7 +450,7 @@ function saveName() {
 
 // Function to remove an alias
 function removeAlias(aliasId, aliasEmail) {
-    if (!confirm(`Are you sure you want to remove the alias "${aliasEmail}"? This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to disassociate the alias "${aliasEmail}" from this developer? The alias will become orphaned and can be reassigned later.`)) {
         return;
     }
     

@@ -717,12 +717,13 @@ def remove_developer_alias(request, developer_id, alias_id):
     alias_email = alias.email
     
     try:
-        # Delete the alias
-        alias.delete()
+        # Disassociate the alias from the developer (don't delete it)
+        alias.developer = None
+        alias.save()
         
         return JsonResponse({
             'success': True,
-            'message': f'Successfully removed alias "{alias_name}" ({alias_email}) from developer',
+            'message': f'Successfully disassociated alias "{alias_name}" ({alias_email}) from developer',
             'removed_alias_id': alias_id
         })
         
