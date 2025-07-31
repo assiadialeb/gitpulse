@@ -157,7 +157,7 @@ def integrations_management(request):
         {
             'name': 'Slack',
             'status': 'inactive',
-            'type': 'Webhook',
+            'type': 'Coming Soon',
             'last_sync': 'Never',
             'config': {
                 'webhook_url': 'not_configured',
@@ -166,7 +166,7 @@ def integrations_management(request):
         {
             'name': 'SonarCloud',
             'status': 'inactive',
-            'type': 'API',
+            'type': 'Coming Soon',
             'last_sync': 'Never',
             'config': {
                 'api_token': 'not_configured',
