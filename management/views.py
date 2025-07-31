@@ -395,12 +395,13 @@ def test_sonarcloud_connection(request):
         
         # Test SonarCloud API connection
         headers = {
-            'Authorization': f'Bearer {config.access_token}',
             'Content-Type': 'application/json'
         }
         
-        # Try to get user info (basic API call)
-        response = requests.get('https://sonarcloud.io/api/user/current', headers=headers, timeout=10)
+        # Try to validate authentication (correct API endpoint)
+        response = requests.get('https://sonarcloud.io/api/authentication/validate', 
+                              params={'token': config.access_token}, 
+                              headers=headers, timeout=10)
         
         if response.status_code == 200:
             return JsonResponse({
