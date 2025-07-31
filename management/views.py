@@ -71,36 +71,69 @@ def users_management(request):
 @login_required
 @user_passes_test(is_admin)
 def logs_management(request):
-    """Logs management section"""
-    # Get log files or recent log entries
-    # This is a placeholder - you can implement actual log viewing
-    log_entries = []
+    """Logs management section - Django Q Tasks"""
+    from django_q.models import Success
     
-    # Example log entries (replace with actual log reading)
-    log_entries = [
-        {
-            'timestamp': '2024-01-15 10:30:00',
-            'level': 'INFO',
-            'message': 'User login successful',
-            'user': 'admin',
-        },
-        {
-            'timestamp': '2024-01-15 10:25:00',
-            'level': 'WARNING',
-            'message': 'Rate limit approaching',
-            'user': 'system',
-        },
-        {
-            'timestamp': '2024-01-15 10:20:00',
-            'level': 'ERROR',
-            'message': 'GitHub API connection failed',
-            'user': 'system',
-        },
-    ]
+    # Get all tasks, ordered by most recent first
+    tasks = Success.objects.all().order_by('-started')
+    
+    # Apply filters
+    success_filter = request.GET.get('success', '').strip()
+    task_filter = request.GET.get('task', '').strip()
+    date_filter = request.GET.get('date', '24h').strip()
+    
+    if success_filter:
+        if success_filter == 'success':
+            tasks = tasks.filter(success=True)
+        elif success_filter == 'fail':
+            tasks = tasks.filter(success=False)
+    
+    if task_filter:
+        tasks = tasks.filter(func__icontains=task_filter)
+    
+    # Apply date filter
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    if date_filter == '1h':
+        start_date = now - timedelta(hours=1)
+    elif date_filter == '24h':
+        start_date = now - timedelta(days=1)
+    elif date_filter == '7d':
+        start_date = now - timedelta(days=7)
+    elif date_filter == '30d':
+        start_date = now - timedelta(days=30)
+    else:
+        start_date = now - timedelta(days=1)  # Default to 24h
+    
+    tasks = tasks.filter(started__gte=start_date)
+    
+    # Get unique task functions for filter dropdown
+    task_functions = Success.objects.values_list('func', flat=True).distinct().order_by('func')
+    
+    # Pagination
+    paginator = Paginator(tasks, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Calculate statistics
+    total_tasks = tasks.count()
+    successful_tasks = tasks.filter(success=True).count()
+    failed_tasks = tasks.filter(success=False).count()
+    success_rate = (successful_tasks / total_tasks * 100) if total_tasks > 0 else 0
     
     context = {
         'active_section': 'logs',
-        'log_entries': log_entries,
+        'log_entries': page_obj,
+        'task_functions': task_functions,
+        'total_tasks': total_tasks,
+        'successful_tasks': successful_tasks,
+        'failed_tasks': failed_tasks,
+        'success_rate': success_rate,
+        'current_filters': {
+            'success': success_filter,
+            'task': task_filter,
+            'date': date_filter,
+        }
     }
     return render(request, 'management/logs.html', context)
 
