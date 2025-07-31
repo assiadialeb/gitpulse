@@ -143,6 +143,7 @@ def logs_management(request):
 def integrations_management(request):
     """Integrations management section"""
     from github.models import GitHubApp
+    from sonarcloud.models import SonarCloudConfig
     
     # Get GitHub configuration
     github_config = None
@@ -169,6 +170,27 @@ def integrations_management(request):
             'client_secret': 'Error loading config',
         }
     
+    # Get SonarCloud configuration
+    sonarcloud_config = None
+    sonarcloud_status = 'inactive'
+    
+    try:
+        sonarcloud_app = SonarCloudConfig.get_config()
+        
+        if sonarcloud_app and sonarcloud_app.access_token:
+            sonarcloud_config = {
+                'access_token': sonarcloud_app.access_token[:10] + '...' if sonarcloud_app.access_token else 'Not configured',
+            }
+            sonarcloud_status = 'active'
+        else:
+            sonarcloud_config = {
+                'access_token': 'Not configured',
+            }
+    except Exception as e:
+        sonarcloud_config = {
+            'access_token': 'Error loading config',
+        }
+    
     integrations = [
         {
             'name': 'GitHub',
@@ -188,13 +210,10 @@ def integrations_management(request):
         },
         {
             'name': 'SonarCloud',
-            'status': 'inactive',
-            'type': 'Coming Soon',
+            'status': sonarcloud_status,
+            'type': 'API',
             'last_sync': 'Never',
-            'config': {
-                'api_token': 'not_configured',
-                'organization': 'not_configured',
-            }
+            'config': sonarcloud_config,
         },
     ]
     
@@ -296,6 +315,113 @@ def get_github_config(request):
         return JsonResponse({
             'success': False,
             'message': f'Error loading configuration: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(is_admin)
+def get_sonarcloud_config(request):
+    """Get SonarCloud configuration for modal"""
+    from sonarcloud.models import SonarCloudConfig
+    
+    try:
+        config = SonarCloudConfig.get_config()
+        
+        config_data = {
+            'access_token': config.access_token if config.access_token else '',
+            'configured': bool(config.access_token)
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'config': config_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error loading configuration: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+def save_sonarcloud_config(request):
+    """Save SonarCloud configuration"""
+    from sonarcloud.models import SonarCloudConfig
+    
+    try:
+        access_token = request.POST.get('access_token', '').strip()
+        
+        if not access_token:
+            return JsonResponse({
+                'success': False,
+                'message': 'Access token is required'
+            })
+        
+        config = SonarCloudConfig.get_config()
+        config.access_token = access_token
+        config.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'SonarCloud configuration saved successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error saving configuration: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+def test_sonarcloud_connection(request):
+    """Test SonarCloud API connection"""
+    from sonarcloud.models import SonarCloudConfig
+    import requests
+    
+    try:
+        config = SonarCloudConfig.get_config()
+        
+        if not config.access_token:
+            return JsonResponse({
+                'success': False,
+                'message': 'SonarCloud not configured. Please configure access token first.'
+            })
+        
+        # Test SonarCloud API connection
+        headers = {
+            'Authorization': f'Bearer {config.access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Try to get user info (basic API call)
+        response = requests.get('https://sonarcloud.io/api/user/current', headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            return JsonResponse({
+                'success': True,
+                'message': 'SonarCloud API connection successful. Token is valid.'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': f'SonarCloud API connection failed. Status: {response.status_code}'
+            })
+            
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Network error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error testing connection: {str(e)}'
         })
 
 

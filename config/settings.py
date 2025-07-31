@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'repositories',
     'install',
     'management',
+    'sonarcloud',
     'django.contrib.sites',
     'allauth',
     'allauth.account',

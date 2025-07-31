@@ -99,6 +99,15 @@
                                 class="flex-1 btn btn-outline btn-sm">
                             Test Connection
                         </button>
+                    {% elif integration.name == 'SonarCloud' %}
+                        <button onclick="openSonarCloudConfigModal()" 
+                                class="flex-1 btn btn-outline btn-sm">
+                            Configure
+                        </button>
+                        <button onclick="testSonarCloudConnection()" 
+                                class="flex-1 btn btn-outline btn-sm">
+                            Test Connection
+                        </button>
                     {% else %}
                         <button onclick="configureIntegration('{{ integration.name }}')" 
                                 class="flex-1 btn btn-outline btn-sm">
@@ -125,6 +134,40 @@
     </div>
 
 
+</div>
+
+<!-- SonarCloud Configuration Modal -->
+<div id="sonarcloud-config-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            {% csrf_token %}
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900">SonarCloud Configuration</h3>
+                <button onclick="closeSonarCloudConfigModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="sonarcloud-config-content" class="space-y-4">
+                <div>
+                    <label for="sonarcloud-access-token" class="block text-sm font-medium text-gray-700">Access Token</label>
+                    <input type="password" id="sonarcloud-access-token" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter SonarCloud Access Token">
+                    <p class="mt-1 text-xs text-gray-500">Get your token from <a href="https://sonarcloud.io/account/security/" target="_blank" class="text-blue-600 hover:text-blue-800">SonarCloud Account Security</a></p>
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeSonarCloudConfigModal()" class="btn btn-outline btn-sm">
+                    Cancel
+                </button>
+                <button onclick="saveSonarCloudConfig()" class="btn btn-primary btn-sm">
+                    Save Configuration
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- GitHub Configuration Modal -->
@@ -262,6 +305,128 @@ function saveGitHubConfig() {
 
 function configureIntegration(name) {
     alert(`Configure ${name} integration`);
+}
+
+function openSonarCloudConfigModal() {
+    // Show modal
+    document.getElementById('sonarcloud-config-modal').classList.remove('hidden');
+    
+    // Get CSRF token from modal
+    const csrfToken = document.querySelector('#sonarcloud-config-modal [name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        console.error('CSRF token not found in modal');
+        alert('Error: CSRF token not found');
+        return;
+    }
+    
+    console.log('Loading SonarCloud configuration...');
+    
+    // Load current configuration
+    fetch('{% url "management:get_sonarcloud_config" %}', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': csrfToken.value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('SonarCloud config response:', data);
+        if (data.success) {
+            document.getElementById('sonarcloud-access-token').value = data.config.access_token;
+            console.log('Configuration loaded successfully');
+        } else {
+            console.error('Error in response:', data.message);
+            alert('Error loading configuration: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error loading configuration:', error);
+        alert('Error loading configuration: ' + error.message);
+    });
+}
+
+function closeSonarCloudConfigModal() {
+    document.getElementById('sonarcloud-config-modal').classList.add('hidden');
+}
+
+function saveSonarCloudConfig() {
+    const accessToken = document.getElementById('sonarcloud-access-token').value.trim();
+    
+    if (!accessToken) {
+        alert('Please enter an access token');
+        return;
+    }
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('#sonarcloud-config-modal [name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        alert('Error: CSRF token not found');
+        return;
+    }
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('access_token', accessToken);
+    
+    // Save configuration
+    fetch('{% url "management:save_sonarcloud_config" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken.value,
+        },
+        body: formData,
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeSonarCloudConfigModal();
+            alert('✅ ' + data.message);
+            location.reload();
+        } else {
+            alert('❌ ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving configuration:', error);
+        alert('❌ Error saving configuration: ' + error.message);
+    });
+}
+
+function testSonarCloudConnection() {
+    const button = event.target;
+    const originalText = button.textContent;
+    button.textContent = 'Testing...';
+    button.disabled = true;
+    
+    fetch('{% url "management:test_sonarcloud_connection" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+        } else {
+            alert('❌ ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('❌ Error testing connection: ' + error.message);
+    })
+    .finally(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+    });
 }
 
 function testGitHubConnection() {
