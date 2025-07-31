@@ -23,4 +23,6 @@ urlpatterns = [
     
     # Integrations management
     path('integrations/', views.integrations_management, name='integrations'),
+    path('integrations/test-github/', views.test_github_connection, name='test_github_connection'),
+    path('integrations/github-config/', views.get_github_config, name='get_github_config'),
 ] 

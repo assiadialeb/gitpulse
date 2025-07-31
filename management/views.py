@@ -142,17 +142,40 @@ def logs_management(request):
 @user_passes_test(is_admin)
 def integrations_management(request):
     """Integrations management section"""
-    # Placeholder for integrations data
+    from github.models import GitHubApp
+    
+    # Get GitHub configuration
+    github_config = None
+    github_status = 'inactive'
+    
+    try:
+        # Get GitHubApp configuration
+        github_app = GitHubApp.objects.first()
+        
+        if github_app and github_app.client_id and github_app.client_secret:
+            github_config = {
+                'client_id': github_app.client_id,
+                'client_secret': github_app.client_secret[:10] + '...' if github_app.client_secret else 'Not configured',
+            }
+            github_status = 'active'
+        else:
+            github_config = {
+                'client_id': 'Not configured',
+                'client_secret': 'Not configured',
+            }
+    except Exception as e:
+        github_config = {
+            'client_id': 'Error loading config',
+            'client_secret': 'Error loading config',
+        }
+    
     integrations = [
         {
             'name': 'GitHub',
-            'status': 'active',
+            'status': github_status,
             'type': 'OAuth',
-            'last_sync': '2024-01-15 10:30:00',
-            'config': {
-                'client_id': 'configured',
-                'webhooks': 'enabled',
-            }
+            'last_sync': '2024-01-15 10:30:00',  # Placeholder
+            'config': github_config,
         },
         {
             'name': 'Slack',
@@ -180,6 +203,100 @@ def integrations_management(request):
         'integrations': integrations,
     }
     return render(request, 'management/integrations.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+def test_github_connection(request):
+    """Test GitHub OAuth connection"""
+    from allauth.socialaccount.models import SocialApp
+    from django.contrib.sites.models import Site
+    import requests
+    
+    try:
+        site = Site.objects.get_current()
+        social_app = SocialApp.objects.filter(provider='github', sites=site).first()
+        
+        if not social_app or not social_app.client_id or not social_app.secret:
+            return JsonResponse({
+                'success': False,
+                'message': 'GitHub OAuth not configured. Please configure client_id and client_secret first.'
+            })
+        
+        # Test GitHub API connection using client credentials
+        headers = {
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'GitPulse/1.0'
+        }
+        
+        # Try to get rate limit info (doesn't require authentication)
+        response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            return JsonResponse({
+                'success': True,
+                'message': 'GitHub API connection successful. OAuth configuration is valid.'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': f'GitHub API connection failed. Status: {response.status_code}'
+            })
+            
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Network error: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error testing connection: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(is_admin)
+def get_github_config(request):
+    """Get GitHub configuration for modal"""
+    from github.models import GitHubApp
+    
+    try:
+        # Get GitHub configuration from our custom model
+        github_app = GitHubApp.objects.first()
+        
+        # Generate correct callback URL from current request
+        current_url = request.build_absolute_uri()
+        # Extract base URL (e.g., http://localhost:8001)
+        base_url = current_url.split('/management/')[0]
+        callback_url = f"{base_url}/accounts/github/login/callback/"
+        
+        if github_app and github_app.client_id and github_app.client_secret:
+            config = {
+                'client_id': github_app.client_id,
+                'client_secret': github_app.client_secret,
+                'callback_url': callback_url,
+                'configured': True
+            }
+        else:
+            config = {
+                'client_id': '',
+                'client_secret': '',
+                'callback_url': callback_url,
+                'configured': False
+            }
+        
+        return JsonResponse({
+            'success': True,
+            'config': config
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error loading configuration: {str(e)}'
+        })
 
 
 @login_required
