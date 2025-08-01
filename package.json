@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "@cyclonedx/cdxgen": "^11.4.4"
+  }
+}
