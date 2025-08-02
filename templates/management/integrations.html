@@ -22,7 +22,7 @@
     <!-- Integrations Grid -->
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {% for integration in integrations %}
-        <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="bg-white overflow-hidden shadow rounded-lg" data-integration="{{ integration.name }}" data-config="{{ integration.config|safe }}">
             <div class="p-6">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
@@ -491,7 +491,53 @@ function testSonarCloudConnection() {
 }
 
 function openOSSIndexConfigModal() {
+    // Show modal
     document.getElementById('ossindex-config-modal').classList.remove('hidden');
+    
+    // Get CSRF token from modal
+    const csrfToken = document.querySelector('#ossindex-config-modal [name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        console.error('CSRF token not found in modal');
+        alert('Error: CSRF token not found');
+        return;
+    }
+    
+    console.log('Loading OSS Index configuration...');
+    
+    // Load current configuration
+    fetch('{% url "management:get_ossindex_config" %}', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': csrfToken.value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('OSS Index config response:', data);
+        if (data.success) {
+            document.getElementById('ossindex-email').value = data.config.email || '';
+            document.getElementById('ossindex-api-token').value = data.config.api_token || '';
+            console.log('Configuration loaded successfully');
+        } else {
+            console.error('Error in response:', data.message);
+            // Don't show alert for missing config, just clear fields
+            document.getElementById('ossindex-email').value = '';
+            document.getElementById('ossindex-api-token').value = '';
+        }
+    })
+    .catch(error => {
+        console.error('Error loading configuration:', error);
+        // Don't show alert for missing config, just clear fields
+        document.getElementById('ossindex-email').value = '';
+        document.getElementById('ossindex-api-token').value = '';
+    });
 }
 
 function closeOSSIndexConfigModal() {

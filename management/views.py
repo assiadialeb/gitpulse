@@ -243,13 +243,11 @@ def integrations_management(request):
             'config': github_config,
         },
         {
-            'name': 'Slack',
-            'status': 'inactive',
-            'type': 'Coming Soon',
+            'name': 'OSS Index',
+            'status': ossindex_status,
+            'type': 'Vulnerability Scanner',
             'last_sync': 'Never',
-            'config': {
-                'webhook_url': 'not_configured',
-            }
+            'config': ossindex_config,
         },
         {
             'name': 'SonarCloud',
@@ -259,11 +257,13 @@ def integrations_management(request):
             'config': sonarcloud_config,
         },
         {
-            'name': 'OSS Index',
-            'status': ossindex_status,
-            'type': 'Vulnerability Scanner',
+            'name': 'Slack',
+            'status': 'inactive',
+            'type': 'Coming Soon',
             'last_sync': 'Never',
-            'config': ossindex_config,
+            'config': {
+                'webhook_url': 'not_configured',
+            }
         },
     ]
     
@@ -760,4 +760,34 @@ def test_ossindex_connection(request):
         return JsonResponse({
             'success': False,
             'message': f'Error testing connection: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(is_admin)
+def get_ossindex_config(request):
+    """Get OSS Index configuration"""
+    try:
+        from management.models import OSSIndexConfig
+        
+        config = OSSIndexConfig.get_config()
+        
+        if config.email and config.api_token:
+            return JsonResponse({
+                'success': True,
+                'config': {
+                    'email': config.email,
+                    'api_token': config.api_token,
+                }
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'OSS Index configuration not found'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error loading configuration: {str(e)}'
         })
