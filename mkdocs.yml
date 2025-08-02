@@ -69,10 +69,7 @@ theme:
     collapse: material/chevron-up
 
 plugins:
-  - search:
-      separator: '[\s\-,:!=\[\]()"/`|]+'
-      prebuild_index: true
-      indexing: 'full'
+  - search
   - git-revision-date-localized:
       enable_creation_date: true
       type: datetime
