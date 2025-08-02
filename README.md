@@ -26,7 +26,7 @@ GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, an
    - Open http://localhost:8000
    - Login with your superuser credentials
 
-📖 **See [Docker Quick Start](docs/docker-quickstart.md) for detailed instructions**
+📖 **See [Docker Quick Start](docs/getting-started/quick-start.md) for detailed instructions**
 
 ### Option 2: Local Installation
 
@@ -78,6 +78,33 @@ GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, an
 8. **Access the application**
    - Open http://localhost:8000
    - Login with your superuser credentials
+
+## 📚 Documentation
+
+Comprehensive documentation is available at: **https://gitpulse.github.io/gitpulse**
+
+### Documentation Sections
+
+- **[Getting Started](docs/getting-started/quick-start.md)** - Quick setup and installation
+- **[User Guide](docs/user-guide/overview.md)** - How to use GitPulse features
+- **[Technical Docs](docs/technical/architecture.md)** - Architecture and API reference
+- **[Deployment](docs/deployment/docker.md)** - Production deployment guides
+
+### Local Documentation Development
+
+```bash
+# Install MkDocs
+pip install mkdocs mkdocs-material
+
+# Serve documentation locally
+mkdocs serve
+
+# Build documentation
+mkdocs build
+
+# Deploy to GitHub Pages
+./deploy-docs.sh
+```
 
 ## ⚙️ Environment Configuration
 
