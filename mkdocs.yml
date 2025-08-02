@@ -14,18 +14,10 @@ theme:
       scheme: default
       primary: indigo
       accent: indigo
-      background: white
-      surface: white
-      toggle:
-        icon: material/brightness-auto
-        name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: indigo
       accent: indigo
-      toggle:
-        icon: material/brightness-7
-        name: Switch to light mode
   features:
     - navigation.tabs
     - navigation.sections
@@ -34,46 +26,15 @@ theme:
     - search.suggest
     - search.highlight
     - content.code.copy
-    - content.tabs.link
-    - content.code.annotate
-    - content.code.select
-    - content.action.edit
-    - content.action.view
-    - header.autohide
-    - navigation.footer
-    - navigation.instant
-    - navigation.instant.prefetch
-    - navigation.instant.loading
-    - navigation.prune
-    - navigation.tracking
-    - search.share
-    - search.highlight
-    - search.suggest
-    - toc.follow
-    - toc.integrate
   icon:
     repo: fontawesome/brands/github
     edit: material/pencil
     view: material/eye
-    search: material/magnify
-    palette: material/palette-swatch
-    theme: material/brightness-auto
-    language: material/translate
-    version: material/tag
-    previous: material/arrow-left
-    next: material/arrow-right
-    top: material/arrow-up
-    home: material/home
-    menu: material/menu
-    expand: material/chevron-down
-    collapse: material/chevron-up
 
 plugins:
   - search
   - git-revision-date-localized:
       enable_creation_date: true
-      type: datetime
-      locale: en
 
 markdown_extensions:
   - abbr
