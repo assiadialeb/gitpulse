@@ -14,10 +14,18 @@ theme:
       scheme: default
       primary: blue
       accent: blue
+      background: white
+      surface: white
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: blue
       accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
   features:
     - navigation.tabs
     - navigation.sections
