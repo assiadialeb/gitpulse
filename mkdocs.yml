@@ -9,6 +9,19 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  language: en
+  features:
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.annotate
+    - content.tabs.link
+    - toc.integrate
+    - header.autohide
+
+# Important: disables pretty URLs for GitHub Pages compatibility
+use_directory_urls: false
 
 plugins:
   - search
@@ -16,21 +29,21 @@ plugins:
 nav:
   - Home: index.md
   - Getting Started:
-    - Quick Start: getting-started/quick-start.md
-    - Installation: getting-started/installation.md
-    - Configuration: getting-started/configuration.md
+      - Quick Start: getting-started/quick-start.md
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
   - User Guide:
-    - Overview: user-guide/overview.md
-    - GitHub Setup: user-guide/github-setup.md
-    - Projects: user-guide/projects.md
-    - Analytics: user-guide/analytics.md
-    - Developers: user-guide/developers.md
+      - Overview: user-guide/overview.md
+      - GitHub Setup: user-guide/github-setup.md
+      - Projects: user-guide/projects.md
+      - Analytics: user-guide/analytics.md
+      - Developers: user-guide/developers.md
   - Technical Documentation:
-    - Architecture: technical/architecture.md
-    - API Reference: technical/api.md
-    - Management Commands: technical/management-commands.md
-    - Troubleshooting: technical/troubleshooting.md
+      - Architecture: technical/architecture.md
+      - API Reference: technical/api.md
+      - Management Commands: technical/management-commands.md
+      - Troubleshooting: technical/troubleshooting.md
   - Deployment:
-    - Docker: deployment/docker.md
-    - Production: deployment/production.md
-    - GitHub Pages: deployment/github-pages.md 
+      - Docker: deployment/docker.md
+      - Production: deployment/production.md
+      - GitHub Pages: deployment/github-pages.md

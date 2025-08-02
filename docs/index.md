@@ -6,36 +6,46 @@
 [![Django](https://img.shields.io/badge/Django-5.2+-blue.svg)](https://djangoproject.com)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
 
-## 🚀 What is GitPulse?
+# 🧭 What is GitPulse?
 
-GitPulse is an open-source analytics dashboard designed to help CTOs, tech leads, and developers better understand developer activity and contribution trends within their GitHub organizations.
+**GitPulse** is an open-source dashboard designed to analyze developer activity and contribution trends within a GitHub organization.
 
-### ✨ Key Features
+I started building it as a **CTO** because I couldn't find a tool that was simple and reliable enough to track the activity of my teams and products. GitPulse is a **personal project**, developed during my free time. It will evolve based on my availability and interests.
 
-- **📊 Comprehensive Analytics**: Track commits, pull requests, code reviews, and more
-- **👥 Developer Insights**: Understand individual and team performance patterns
-- **📈 Trend Analysis**: Identify productivity trends and bottlenecks
-- **🔍 Deep Repository Analysis**: Detailed insights into code quality and activity
-- **⚡ Real-time Updates**: Live data from GitHub APIs
-- **🎯 Custom Metrics**: Define and track your own KPIs
+I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs or unexpected behavior, **contributions are welcome**—as long as they stay aligned with the spirit of the project: useful, readable, and not overengineered.
 
-### 🎯 Who is it for?
+---
 
-- **CTOs** looking to understand team productivity and project health
-- **Tech Leads** wanting to optimize development processes
-- **Project Managers** tracking project progress and team performance
-- **Developers** curious about their own and team's contribution patterns
+## ✨ Key Features
+
+- 📊 **Comprehensive Analytics**: Track commits, pull requests, reviews, and more
+- 👥 **Developer Insights**: Understand individual and team activity patterns
+- 📈 **Trend Analysis**: Visualize contribution trends and detect slowdowns
+- 🔍 **Repository Analytics**: Detailed view of code activity and quality
+- ⚡ **Real-time Updates**: Live data pulled from GitHub APIs
+- 🎯 **Custom Metrics**: Define and track your own KPIs
+
+---
+
+## 🎯 Who is it for?
+
+- **CTOs** who want a clear view of team productivity and project health
+- **Tech Leads** aiming to optimize engineering workflows
+- **Project Managers / POs** tracking delivery progress and team dynamics
+- **Developers** curious about their own or their team's contribution patterns
 - **Open Source Maintainers** monitoring community activity
 
-## 🏗️ Architecture
+---
 
-GitPulse is built with modern technologies:
+## 🏗️ Architecture (briefly)
 
-- **Backend**: Django 5.2+ with Python 3.12+
-- **Database**: MongoDB for analytics data, PostgreSQL for user data
-- **Task Queue**: Django-Q for background processing
-- **Frontend**: Modern responsive UI with DaisyUI
-- **Deployment**: Docker-ready with comprehensive documentation
+GitPulse uses a modern but focused tech stack:
+
+- **Backend**: Django 5.2+ (Python 3.12)
+- **Databases**: MongoDB (analytics data) + PostgreSQL (user data)
+- **Task Queue**: Django-Q
+- **UI**: Responsive frontend with DaisyUI
+- **Deployment**: Docker-ready with clean documentation
 
 ## 🚀 Quick Start
 
