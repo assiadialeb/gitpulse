@@ -47,14 +47,10 @@
                             </div>
                         {% elif integration.name == 'OSS Index' %}
                             <div class="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-                                <svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24" role="img" xmlns="http://www.w3.org/2000/svg">
+                                <svg class="h-6 w-6" viewBox="0 0 24 24" role="img" xmlns="http://www.w3.org/2000/svg">
                                     <title>OSS Index icon</title>
-                                    <!-- Hexagon outline (incomplete) -->
-                                    <path d="M12 2L20 7V17L12 22L4 17V7L12 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
-                                    <!-- Blue corner piece filling the gap -->
-                                    <path d="M20 7L18 8L18 16L20 17L20 7Z" fill="currentColor"/>
-                                    <!-- Plus sign in center -->
-                                    <path d="M11 10H13V12H15V14H13V16H11V14H9V12H11V10Z" fill="currentColor"/>
+                                    <!-- Hexagon with white stroke and blue fill -->
+                                    <path d="M12 2L20 7V17L12 22L4 17V7L12 2Z" stroke="white" stroke-width="2" fill="#3B82F6"/>
                                 </svg>
                             </div>
                         {% else %}
