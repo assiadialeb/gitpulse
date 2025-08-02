@@ -92,47 +92,15 @@ class GitHubUserService:
             logger.error(f"Error retrieving GitHub data for {username}: {str(e)}")
             raise
     
-    def save_user_to_mongodb(self, user_data: Dict) -> GitHubUser:
-        """Save or update GitHub user in MongoDB"""
-        try:
-            # Convert string dates to datetime objects
-            if user_data.get('github_created_at'):
-                user_data['github_created_at'] = datetime.fromisoformat(
-                    user_data['github_created_at'].replace('Z', '+00:00')
-                )
-            if user_data.get('github_updated_at'):
-                user_data['github_updated_at'] = datetime.fromisoformat(
-                    user_data['github_updated_at'].replace('Z', '+00:00')
-                )
-            
-            # Check if user already exists
-            existing_user = GitHubUser.objects(github_id=user_data['github_id']).first()
-            
-            if existing_user:
-                # Update existing user
-                for key, value in user_data.items():
-                    setattr(existing_user, key, value)
-                existing_user.updated_at = datetime.now(timezone.utc)
-                existing_user.save()
-                logger.info(f"Updated existing GitHubUser: {user_data['login']}")
-                return existing_user
-            else:
-                # Create new user
-                user_data['created_at'] = datetime.now(timezone.utc)
-                user_data['updated_at'] = datetime.now(timezone.utc)
-                github_user = GitHubUser(**user_data)
-                github_user.save()
-                logger.info(f"Created new GitHubUser: {user_data['login']}")
-                return github_user
-            
-        except Exception as e:
-            logger.error(f"Error saving GitHub user to MongoDB: {str(e)}")
-            raise
+    # def save_user_to_mongodb(self, user_data: Dict) -> GitHubUser:
+    #     """Save or update GitHub user in MongoDB - DEPRECATED"""
+    #     # This method is deprecated as we no longer use MongoDB for user data
+    #     pass
     
-    def sync_user_data(self, username: str) -> GitHubUser:
-        """Sync user data from GitHub and save to MongoDB"""
-        user_data = self.get_user_info(username)
-        return self.save_user_to_mongodb(user_data) 
+    # def sync_user_data(self, username: str) -> GitHubUser:
+    #     """Sync user data from GitHub and save to MongoDB - DEPRECATED"""
+    #     # This method is deprecated as we no longer use MongoDB for user data
+    #     pass 
 
     def get_authenticated_user_organizations(self) -> list:
         """Get all organizations for the authenticated user via GitHub API"""

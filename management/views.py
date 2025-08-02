@@ -111,6 +111,17 @@ def logs_management(request):
     # Filter by date
     tasks = [task for task in tasks if task.started and task.started >= start_date]
     
+    # Create user-friendly task names mapping
+    task_name_mapping = {
+        'analytics.tasks.check_new_releases_and_generate_sbom_task': 'SBOM Auto Generation',
+        'analytics.tasks.generate_sbom_task': 'SBOM Manual Generation',
+        'analytics.tasks.daily_indexing_all_repos_task': 'Daily Indexing',
+        'analytics.tasks.fetch_all_pull_requests_task': 'Pull Requests Indexing',
+        'analytics.tasks.release_indexing_all_repos_task': 'Releases Indexing',
+        'analytics.tasks.quality_analysis_all_repos_task': 'Quality Analysis',
+        'analytics.tasks.group_developer_identities_task': 'Developer Grouping',
+    }
+    
     # Apply success filter
     if success_filter:
         if success_filter == 'success':
@@ -143,17 +154,6 @@ def logs_management(request):
     scheduled_tasks = Schedule.objects.all()
     for task in scheduled_tasks:
         all_functions.add(task.func)
-    
-    # Create user-friendly task names mapping
-    task_name_mapping = {
-        'analytics.tasks.check_new_releases_and_generate_sbom_task': 'SBOM Generation',
-        'analytics.tasks.generate_sbom_task': 'SBOM Generation',
-        'analytics.tasks.daily_indexing_all_repos_task': 'Daily Indexing',
-        'analytics.tasks.fetch_all_pull_requests_task': 'Pull Requests Indexing',
-        'analytics.tasks.release_indexing_all_repos_task': 'Releases Indexing',
-        'analytics.tasks.quality_analysis_all_repos_task': 'Quality Analysis',
-        'analytics.tasks.group_developer_identities_task': 'Developer Grouping',
-    }
     
     # Filter to only show the main scheduled tasks
     main_tasks = [
