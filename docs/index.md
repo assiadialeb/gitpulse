@@ -2,14 +2,11 @@
 
 <div align="center">
 
-![GitPulse](https://img.shields.io/badge/GitPulse-GitHub%20Analytics-blue?style=for-the-badge&logo=github)
-
 **GitHub Analytics Dashboard for CTOs, Tech Leads, and Curious Developers**
 
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
 [![Django](https://img.shields.io/badge/Django-5.2+-blue.svg)](https://djangoproject.com)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
-[![Documentation](https://img.shields.io/badge/Documentation-MkDocs%20Material-blue.svg)](https://gitpulse.github.io)
 
 </div>
 
