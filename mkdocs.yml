@@ -19,7 +19,8 @@ theme:
     - content.tabs.link
     - toc.integrate
     - header.autohide
-
+extra_css:
+  - stylesheets/extra.css
 # Important: disables pretty URLs for GitHub Pages compatibility
 use_directory_urls: false
 
