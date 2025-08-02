@@ -10,7 +10,7 @@ GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, an
 
 1. **Clone and start**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/assiadialeb/gitpulse.git
    cd GitPulse
    cp env.example .env
    docker-compose up -d --build
@@ -39,7 +39,7 @@ GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, an
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/assiadialeb/gitpulse.git
    cd GitPulse
    ```
 

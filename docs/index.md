@@ -2,13 +2,13 @@
 
 <div align="center">
 
-![GitPulse Logo](https://img.shields.io/badge/GitPulse-GitHub%20Analytics-green?style=for-the-badge&logo=github)
+![GitPulse](https://img.shields.io/badge/GitPulse-GitHub%20Analytics-blue?style=for-the-badge&logo=github)
 
 **GitHub Analytics Dashboard for CTOs, Tech Leads, and Curious Developers**
 
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
-[![Django](https://img.shields.io/badge/Django-5.2+-green.svg)](https://djangoproject.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Django](https://img.shields.io/badge/Django-5.2+-blue.svg)](https://djangoproject.com)
+[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
 [![Documentation](https://img.shields.io/badge/Documentation-MkDocs%20Material-blue.svg)](https://gitpulse.github.io)
 
 </div>
@@ -49,7 +49,7 @@ GitPulse is built with modern technologies:
 ### Option 1: Docker (Recommended)
 
 ```bash
-git clone https://github.com/gitpulse/gitpulse.git
+git clone https://github.com/assiadialeb/gitpulse.git
 cd GitPulse
 cp env.example .env
 docker-compose up -d --build
@@ -58,7 +58,7 @@ docker-compose up -d --build
 ### Option 2: Local Installation
 
 ```bash
-git clone https://github.com/gitpulse/gitpulse.git
+git clone https://github.com/assiadialeb/gitpulse.git
 cd GitPulse
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -82,7 +82,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ### Development Setup
 
 ```bash
-git clone https://github.com/gitpulse/gitpulse.git
+git clone https://github.com/assiadialeb/gitpulse.git
 cd GitPulse
 python -m venv venv
 source venv/bin/activate
@@ -94,7 +94,7 @@ python manage.py runserver
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the AGPL v3 License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -108,6 +108,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ for the developer community**
 
-[GitHub](https://github.com/gitpulse/gitpulse) • [Issues](https://github.com/gitpulse/gitpulse/issues) • [Discussions](https://github.com/gitpulse/gitpulse/discussions)
+[GitHub](https://github.com/assiadialeb/gitpulse) • [Issues](https://github.com/assiadialeb/gitpulse/issues) • [Discussions](https://github.com/assiadialeb/gitpulse/discussions)
 
 </div> 

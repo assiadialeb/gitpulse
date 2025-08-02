@@ -76,7 +76,7 @@ if ghp-import -n -p -f site/; then
     echo ""
     echo "🎉 Documentation deployed to GitHub Pages!"
     echo "📖 Your documentation should be available at:"
-    echo "   https://your-username.github.io/gitpulse"
+    echo "   https://assiadialeb.github.io/gitpulse"
     echo ""
     echo "Note: It may take a few minutes for the changes to appear."
 else

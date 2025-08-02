@@ -1,10 +1,10 @@
 site_name: GitPulse
 site_description: GitHub Analytics Dashboard for CTOs and Tech Leads
 site_author: GitPulse Team
-site_url: https://gitpulse.github.io
+site_url: https://assiadialeb.github.io/gitpulse
 
-repo_name: gitpulse/gitpulse
-repo_url: https://github.com/gitpulse/gitpulse
+repo_name: assiadialeb/gitpulse
+repo_url: https://github.com/assiadialeb/gitpulse
 edit_uri: edit/main/docs/
 
 theme:
@@ -12,14 +12,16 @@ theme:
   palette:
     - media: "(prefers-color-scheme)"
       scheme: default
-      primary: green
+      primary: blue
       accent: blue
+      background: white
+      surface: white
       toggle:
         icon: material/brightness-auto
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: green
+      primary: blue
       accent: blue
       toggle:
         icon: material/brightness-7
@@ -101,4 +103,4 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/gitpulse/gitpulse 
+      link: https://github.com/assiadialeb/gitpulse 
