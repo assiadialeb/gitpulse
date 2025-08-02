@@ -1,6 +1,7 @@
 {% extends "management/base.html" %}
+{% load management_extras %}
 
-{% block management_title %}Logs Management{% endblock %}
+{% block management_title %}Logs Management{% endblock management_title %}
 
 {% block management_content %}
 <div class="space-y-6">
@@ -41,7 +42,13 @@
                     <select id="log-task" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
                         <option value="">All Tasks</option>
                         {% for task_func in task_functions %}
-                        <option value="{{ task_func }}" {% if current_filters.task == task_func %}selected{% endif %}>{{ task_func }}</option>
+                        <option value="{{ task_func }}" {% if current_filters.task == task_func %}selected{% endif %}>
+                            {% if task_name_mapping|get_item:task_func %}
+                                {{ task_name_mapping|get_item:task_func }}
+                            {% else %}
+                                {{ task_func }}
+                            {% endif %}
+                        </option>
                         {% endfor %}
                     </select>
                 </div>
@@ -187,6 +194,75 @@
         </div>
     </div>
 
+    <!-- Scheduled Tasks -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Scheduled Tasks</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Name
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Function
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Next Run
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Schedule Type
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for task in scheduled_tasks %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ task.name|default:"Unnamed" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {% if task_name_mapping|get_item:task.func %}
+                                    {{ task_name_mapping|get_item:task.func }}
+                                {% else %}
+                                    {{ task.func }}
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ task.next_run|date:"Y-m-d H:i:s" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ task.schedule_type }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if task.repeats == -1 %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Active
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        Limited
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                No scheduled tasks found.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Log Statistics -->
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-4">
         <div class="bg-white overflow-hidden shadow rounded-lg">
@@ -285,4 +361,4 @@ function applyFilters() {
     window.location.href = window.location.pathname + '?' + params.toString();
 }
 </script>
-{% endblock %} 
+{% endblock management_content %} 

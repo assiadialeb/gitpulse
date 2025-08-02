@@ -23,4 +23,5 @@ urlpatterns = [
     path('api/<int:repo_id>/developer-activity/', views.api_repository_developer_activity, name='api_developer_activity'),
     path('api/<int:repo_id>/commit-quality/', views.api_repository_commit_quality, name='api_commit_quality'),
     path('api/<int:repo_id>/commit-types/', views.api_repository_commit_types, name='api_commit_types'),
+    path('api/<int:repo_id>/licensing-analysis/', views.repository_licensing_analysis, name='api_licensing_analysis'),
 ] 

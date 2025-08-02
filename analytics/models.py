@@ -483,3 +483,146 @@ class PullRequest(Document):
 
     def __str__(self):
         return f"{self.repository_full_name}#{self.number} - {self.title}" 
+
+
+class SBOM(Document):
+    """MongoDB document for storing SBOM data"""
+    # Repository information
+    repository_full_name = fields.StringField(required=True)
+    application_id = fields.IntField(required=False, null=True)
+    
+    # SBOM metadata
+    bom_format = fields.StringField(required=True)  # "CycloneDX"
+    spec_version = fields.StringField(required=True)  # "1.6"
+    serial_number = fields.StringField(required=True)  # UUID
+    version = fields.IntField(required=True)
+    
+    # Generation metadata
+    generated_at = fields.DateTimeField(required=True)
+    tool_name = fields.StringField(required=True)  # "cdxgen"
+    tool_version = fields.StringField(required=True)  # "11.4.4"
+    
+    # Component information
+    component_count = fields.IntField(default=0)
+    vulnerability_count = fields.IntField(default=0)
+    
+    # Raw data
+    raw_sbom = fields.DictField(required=True)  # Complete SBOM JSON
+    
+    # Metadata
+    created_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    updated_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    
+    meta = {
+        'collection': 'sboms',
+        'indexes': [
+            'repository_full_name',
+            'application_id',
+            'generated_at',
+            ('repository_full_name', 'generated_at'),
+        ]
+    }
+    
+    def __str__(self):
+        return f"SBOM for {self.repository_full_name} ({self.generated_at})"
+
+
+class SBOMComponent(Document):
+    """MongoDB document for storing SBOM components"""
+    # Link to SBOM
+    sbom_id = fields.ReferenceField(SBOM, required=True)
+    
+    # Component identification
+    group = fields.StringField(required=False)  # e.g., "@cyclonedx"
+    name = fields.StringField(required=True)  # e.g., "cdxgen"
+    version = fields.StringField(required=True)  # e.g., "11.4.4"
+    purl = fields.StringField(required=True)  # Package URL
+    bom_ref = fields.StringField(required=True)  # Internal reference
+    
+    # Component type
+    component_type = fields.StringField(required=True)  # "library", "application", etc.
+    scope = fields.StringField(default="required")  # "required", "optional", "excluded"
+    
+    # Licenses
+    licenses = fields.ListField(fields.DictField())  # License information
+    
+    # Hashes
+    hashes = fields.ListField(fields.DictField())  # SHA hashes
+    
+    # Properties
+    properties = fields.ListField(fields.DictField())  # Additional properties
+    
+    # Evidence
+    evidence = fields.DictField()  # Evidence of component detection
+    
+    # Tags
+    tags = fields.ListField(fields.StringField())
+    
+    # Metadata
+    created_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    
+    meta = {
+        'collection': 'sbom_components',
+        'indexes': [
+            'sbom_id',
+            'name',
+            'version',
+            'purl',
+            ('name', 'version'),
+        ]
+    }
+    
+    def __str__(self):
+        return f"{self.name}@{self.version}"
+
+
+class SBOMVulnerability(Document):
+    """MongoDB document for storing SBOM vulnerabilities"""
+    # Link to SBOM
+    sbom_id = fields.ReferenceField(SBOM, required=True)
+    
+    # Vulnerability identification
+    vuln_id = fields.StringField(required=True)  # CVE ID or other identifier
+    source_name = fields.StringField(required=True)  # "ossindex", "nvd", etc.
+    
+    # Vulnerability details
+    title = fields.StringField()
+    description = fields.StringField()
+    severity = fields.StringField(choices=['critical', 'high', 'medium', 'low', 'info'])
+    cvss_score = fields.FloatField()
+    cvss_vector = fields.StringField()
+    
+    # Affected component
+    affected_component_purl = fields.StringField(required=True)
+    affected_component_name = fields.StringField(required=True)
+    affected_component_version = fields.StringField(required=True)
+    
+    # References
+    references = fields.ListField(fields.DictField())
+    
+    # Ratings
+    ratings = fields.ListField(fields.DictField())
+    
+    # Metadata
+    published_date = fields.DateTimeField()
+    updated_date = fields.DateTimeField()
+    
+    # Raw data
+    raw_vulnerability = fields.DictField(required=True)
+    
+    # Metadata
+    created_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    
+    meta = {
+        'collection': 'sbom_vulnerabilities',
+        'indexes': [
+            'sbom_id',
+            'vuln_id',
+            'severity',
+            'affected_component_purl',
+            ('sbom_id', 'severity'),
+        ]
+    }
+    
+    def __str__(self):
+        return f"{self.vuln_id} - {self.affected_component_name}@{self.affected_component_version}" 

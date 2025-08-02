@@ -275,6 +275,23 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- Licensing Analysis -->
+            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
+                 onclick="openLicensingAnalysis()">
+                <div class="flex items-start">
+                    <div class="p-3 bg-green-500 bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-medium-gray text-sm">Licensing</p>
+                        <p class="text-2xl font-bold text-green-500" id="licensing-status">Analyzing...</p>
+                        <p class="text-xs text-medium-gray">Commercial compatibility</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Frequency Metrics -->
@@ -958,5 +975,239 @@ function updateSortIcons(activeColumn, direction) {
         }
     });
 }
+
+// Licensing Analysis Slide-over
+let licensingAnalysisLoaded = false;
+
+function openLicensingAnalysis() {
+    const slideOver = document.getElementById('licensing-slide-over');
+    const slidePanel = document.getElementById('licensing-slide-panel');
+    const content = document.getElementById('licensing-content');
+    
+    // Show slide-over
+    slideOver.classList.remove('hidden');
+    
+    // Trigger slide animation
+    setTimeout(() => {
+        slidePanel.classList.remove('translate-x-full');
+    }, 10);
+    
+    // Load content only if not already loaded
+    if (!licensingAnalysisLoaded) {
+        loadLicensingAnalysis();
+    }
+}
+
+function closeLicensingAnalysis() {
+    const slideOver = document.getElementById('licensing-slide-over');
+    const slidePanel = document.getElementById('licensing-slide-panel');
+    const content = document.getElementById('licensing-content');
+    
+    // Trigger slide-out animation
+    slidePanel.classList.add('translate-x-full');
+    
+    // Hide slide-over after animation and clear content
+    setTimeout(() => {
+        slideOver.classList.add('hidden');
+        // Clear content and reset loaded state
+        content.innerHTML = '';
+        licensingAnalysisLoaded = false;
+    }, 300);
+}
+
+function loadLicensingAnalysis() {
+    const content = document.getElementById('licensing-content');
+    const statusElement = document.getElementById('licensing-status');
+    
+    // Show loading state
+    content.innerHTML = `
+        <div class="flex items-center justify-center h-64">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+        </div>
+    `;
+    
+    // Fetch licensing analysis
+    fetch(`/repositories/api/{{ repository.id }}/licensing-analysis/`)
+        .then(response => response.json())
+        .then(data => {
+            licensingAnalysisLoaded = true;
+            
+            if (data.success) {
+                displayLicensingAnalysis(data.analysis);
+                updateLicensingStatus(data.analysis);
+            } else {
+                content.innerHTML = `
+                    <div class="text-center p-8">
+                        <div class="text-red-500 text-6xl mb-4">⚠️</div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Error Loading Analysis</h3>
+                        <p class="text-gray-600">${data.error || 'Unknown error occurred'}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            content.innerHTML = `
+                <div class="text-center p-8">
+                    <div class="text-red-500 text-6xl mb-4">❌</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Network Error</h3>
+                    <p class="text-gray-600">Failed to load licensing analysis</p>
+                </div>
+            `;
+        });
+}
+
+function displayLicensingAnalysis(analysis) {
+    const content = document.getElementById('licensing-content');
+    
+    if (!analysis.has_sbom) {
+        content.innerHTML = `
+            <div class="text-center p-8">
+                <div class="text-gray-400 text-6xl mb-4">📦</div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">No SBOM Found</h3>
+                <p class="text-gray-600">${analysis.message}</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const componentRows = analysis.component_details.map(component => {
+        const licenseBadges = component.licenses.map(license => {
+            const isCommercial = ['MIT', 'APACHE-2.0', 'BSD', 'ISC', 'UNLICENSE'].includes(license.id);
+            const isCopyleft = ['GPL', 'AGPL', 'LGPL'].some(gpl => license.id.includes(gpl));
+            
+            let badgeClass = 'bg-gray-100 text-gray-800';
+            if (isCommercial) badgeClass = 'bg-green-100 text-green-800';
+            else if (isCopyleft) badgeClass = 'bg-red-100 text-red-800';
+            else badgeClass = 'bg-yellow-100 text-yellow-800';
+            
+            return `<span class="inline-block px-2 py-1 text-xs rounded-full ${badgeClass} mr-1">${license.id}</span>`;
+        }).join('');
+        
+        const warningIcon = component.warnings.length > 0 ? '<span class="text-red-500 ml-2">⚠️</span>' : '';
+        
+        return `
+            <tr class="border-b border-gray-200">
+                                <td class="py-3 px-4">
+                    <div class="font-medium">${component.name}${warningIcon}</div>
+                    <div class="text-sm text-gray-500">${component.version}</div>
+                </td>
+                <td class="py-3 px-4">
+                    ${licenseBadges}
+                </td>
+                <td class="py-3 px-4">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        component.commercial_compatible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }">
+                        ${component.commercial_compatible ? '✅ Compatible' : '❌ Incompatible'}
+                    </span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    content.innerHTML = `
+        <div class="space-y-6">
+            <!-- Summary -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Summary</h3>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="text-gray-600">Total Components:</span>
+                        <span class="font-medium ml-2">${analysis.total_components}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-600">Commercial Compatible:</span>
+                        <span class="font-medium ml-2 ${analysis.compatible ? 'text-green-600' : 'text-red-600'}">
+                            ${analysis.compatible ? 'Yes' : 'No'}
+                        </span>
+                    </div>
+                    <div>
+                        <span class="text-gray-600">SBOM Generated:</span>
+                        <span class="font-medium ml-2">${new Date(analysis.sbom_generated_at).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recommendations -->
+            ${analysis.recommendations.length > 0 ? `
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-3">Recommendations</h3>
+                    <ul class="space-y-2">
+                        ${analysis.recommendations.map(rec => `<li class="text-blue-700">• ${rec}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+            
+            <!-- Components Table -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Components & Licenses</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Component</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Licenses</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commercial</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            ${componentRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function updateLicensingStatus(analysis) {
+    const statusElement = document.getElementById('licensing-status');
+    
+    if (!analysis.has_sbom) {
+        statusElement.textContent = 'No SBOM';
+        statusElement.className = 'text-2xl font-bold text-gray-400';
+        return;
+    }
+    
+    if (analysis.compatible) {
+        statusElement.textContent = '✅ Compatible';
+        statusElement.className = 'text-2xl font-bold text-green-500';
+    } else {
+        statusElement.textContent = '⚠️ Review';
+        statusElement.className = 'text-2xl font-bold text-yellow-500';
+    }
+}
 </script>
+
+<!-- Licensing Slide-over Panel -->
+<div id="licensing-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
+    <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeLicensingAnalysis()"></div>
+        
+        <div class="fixed inset-y-0 right-0 flex justify-end">
+            <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" id="licensing-slide-panel">
+                <div class="h-full flex flex-col bg-white shadow-xl">
+                    <!-- Header -->
+                    <div class="flex-1 flex flex-col overflow-y-auto py-6 px-4 sm:px-6">
+                        <div class="flex items-start justify-between">
+                            <h2 class="text-lg font-medium text-gray-900">Licensing Analysis</h2>
+                            <button onclick="closeLicensingAnalysis()" class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div id="licensing-content" class="mt-6">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock content %} 

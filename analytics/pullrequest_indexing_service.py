@@ -338,13 +338,27 @@ class PullRequestIndexingService:
                     if remaining < 20:
                         next_run = datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
                         from django_q.models import Schedule
-                        Schedule.objects.create(
-                            func='analytics.tasks.index_pullrequests_intelligent_task',
-                            args=[repository_id],
-                            next_run=next_run,
-                            schedule_type=Schedule.ONCE,
+                        # Check if a retry task already exists for this repository
+                        existing_retry = Schedule.objects.filter(
                             name=f'pullrequest_indexing_repo_{repository_id}_retry'
-                        )
+                        ).first()
+                        
+                        if existing_retry:
+                            # Update existing retry schedule
+                            existing_retry.func = 'analytics.tasks.index_pullrequests_intelligent_task'
+                            existing_retry.args = [repository_id]
+                            existing_retry.next_run = next_run
+                            existing_retry.schedule_type = Schedule.ONCE
+                            existing_retry.save()
+                        else:
+                            # Create new retry schedule
+                            Schedule.objects.create(
+                                func='analytics.tasks.index_pullrequests_intelligent_task',
+                                args=[repository_id],
+                                next_run=next_run,
+                                schedule_type=Schedule.ONCE,
+                                name=f'pullrequest_indexing_repo_{repository_id}_retry'
+                            )
                         logger.warning(f"Rate limit reached, replanified for {next_run}")
                         return {'status': 'rate_limited', 'scheduled_for': next_run.isoformat()}
             except Exception as e:

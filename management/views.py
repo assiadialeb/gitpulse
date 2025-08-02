@@ -126,7 +126,35 @@ def logs_management(request):
     all_functions = set()
     for task in tasks:
         all_functions.add(task.func)
-    task_functions = sorted(list(all_functions))
+    
+    # Also get functions from scheduled tasks
+    from django_q.models import Schedule
+    scheduled_tasks = Schedule.objects.all()
+    for task in scheduled_tasks:
+        all_functions.add(task.func)
+    
+    # Create user-friendly task names mapping
+    task_name_mapping = {
+        'analytics.tasks.check_new_releases_and_generate_sbom_task': 'SBOM Generation',
+        'analytics.tasks.daily_indexing_all_repos_task': 'Daily Indexing',
+        'analytics.tasks.fetch_all_pull_requests_task': 'Pull Requests Indexing',
+        'analytics.tasks.release_indexing_all_repos_task': 'Releases Indexing',
+        'analytics.tasks.quality_analysis_all_repos_task': 'Quality Analysis',
+        'analytics.tasks.group_developer_identities_task': 'Developer Grouping',
+    }
+    
+    # Filter to only show the main scheduled tasks
+    main_tasks = [
+        'analytics.tasks.check_new_releases_and_generate_sbom_task',
+        'analytics.tasks.daily_indexing_all_repos_task',
+        'analytics.tasks.fetch_all_pull_requests_task',
+        'analytics.tasks.release_indexing_all_repos_task',
+        'analytics.tasks.quality_analysis_all_repos_task',
+        'analytics.tasks.group_developer_identities_task',
+    ]
+    
+    # Only include the main tasks that exist in the database
+    task_functions = [func for func in main_tasks if func in all_functions]
     
     # Pagination
     paginator = Paginator(tasks, 50)
@@ -139,10 +167,21 @@ def logs_management(request):
     failed_tasks = len([task for task in tasks if not hasattr(task, 'success') or not task.success])
     success_rate = (successful_tasks / total_tasks * 100) if total_tasks > 0 else 0
     
+    # Get scheduled tasks for display
+    scheduled_tasks = Schedule.objects.all().order_by('next_run')
+    
+    # Filter scheduled tasks to only show main tasks
+    main_scheduled_tasks = []
+    for task in scheduled_tasks:
+        if task.func in main_tasks:
+            main_scheduled_tasks.append(task)
+    
     context = {
         'active_section': 'logs',
         'log_entries': page_obj,
+        'scheduled_tasks': main_scheduled_tasks,
         'task_functions': task_functions,
+        'task_name_mapping': task_name_mapping,
         'total_tasks': total_tasks,
         'successful_tasks': successful_tasks,
         'failed_tasks': failed_tasks,

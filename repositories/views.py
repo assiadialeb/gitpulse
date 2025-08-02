@@ -1,5 +1,5 @@
 import os
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
@@ -11,6 +11,7 @@ import json
 from .models import Repository
 from analytics.github_token_service import GitHubTokenService
 from analytics.unified_metrics_service import UnifiedMetricsService
+from analytics.license_analysis_service import LicenseAnalysisService
 
 
 @login_required
@@ -667,3 +668,31 @@ def index_repositories(request):
         return JsonResponse({'success': True, 'added': added, 'skipped': skipped})
     except Exception as e:
         return JsonResponse({'success': False, 'error': f'Error adding repositories: {str(e)}'})
+
+
+@login_required
+def repository_licensing_analysis(request, repo_id):
+    """AJAX view for licensing analysis slide-over"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        
+        # Analyze licensing
+        license_service = LicenseAnalysisService(repository.full_name)
+        analysis = license_service.analyze_commercial_compatibility()
+        
+        return JsonResponse({
+            'success': True,
+            'analysis': analysis
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in licensing analysis: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)

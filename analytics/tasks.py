@@ -1196,13 +1196,27 @@ def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
                 if remaining < 20:
                     next_run = datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
                     from django_q.models import Schedule
-                    Schedule.objects.create(
-                        func='analytics.tasks.index_deployments_intelligent_task',
-                        args=[repository_id],
-                        next_run=next_run,
-                        schedule_type=Schedule.ONCE,
+                    # Check if a retry task already exists for this repository
+                    existing_retry = Schedule.objects.filter(
                         name=f'deployment_indexing_repo_{repository_id}_retry'
-                    )
+                    ).first()
+                    
+                    if existing_retry:
+                        # Update existing retry schedule
+                        existing_retry.func = 'analytics.tasks.index_deployments_intelligent_task'
+                        existing_retry.args = [repository_id]
+                        existing_retry.next_run = next_run
+                        existing_retry.schedule_type = Schedule.ONCE
+                        existing_retry.save()
+                    else:
+                        # Create new retry schedule
+                        Schedule.objects.create(
+                            func='analytics.tasks.index_deployments_intelligent_task',
+                            args=[repository_id],
+                            next_run=next_run,
+                            schedule_type=Schedule.ONCE,
+                            name=f'deployment_indexing_repo_{repository_id}_retry'
+                        )
                     logger.warning(f"Rate limit reached, replanified for {next_run}")
                     return {'status': 'rate_limited', 'scheduled_for': next_run.isoformat()}
         except Exception as e:
@@ -1377,13 +1391,29 @@ def index_commits_intelligent_task(repository_id):
             next_run = timezone.now() + timedelta(minutes=1)
             
             from django_q.models import Schedule
-            Schedule.objects.create(
-                func='analytics.tasks.index_commits_intelligent_task',
-                args=[repository_id],
-                next_run=next_run,
-                schedule_type=Schedule.ONCE,
+            # Check if a task already exists for this repository
+            existing_schedule = Schedule.objects.filter(
                 name=f'commit_indexing_repo_{repository_id}'
-            )
+            ).first()
+            
+            if existing_schedule:
+                # Update existing schedule instead of creating a new one
+                existing_schedule.func = 'analytics.tasks.index_commits_intelligent_task'
+                existing_schedule.args = [repository_id]
+                existing_schedule.next_run = next_run
+                existing_schedule.schedule_type = Schedule.ONCE
+                existing_schedule.save()
+                logger.info(f"Updated existing commit indexing schedule for repository {repository_id}")
+            else:
+                # Create new schedule only if none exists
+                Schedule.objects.create(
+                    func='analytics.tasks.index_commits_intelligent_task',
+                    args=[repository_id],
+                    next_run=next_run,
+                    schedule_type=Schedule.ONCE,
+                    name=f'commit_indexing_repo_{repository_id}'
+                )
+                logger.info(f"Created new commit indexing schedule for repository {repository_id}")
         
         # Always mark repository as indexed after processing
         print(f"DEBUG: Marking repository {repository.full_name} as indexed (intelligent task)")
@@ -1698,13 +1728,29 @@ def index_pullrequests_intelligent_task(repository_id=None, args=None, **kwargs)
             next_run = timezone.now() + timedelta(minutes=3)
             
             from django_q.models import Schedule
-            Schedule.objects.create(
-                func='analytics.tasks.index_pullrequests_intelligent_task',
-                args=[repository_id],
-                next_run=next_run,
-                schedule_type=Schedule.ONCE,
+            # Check if a task already exists for this repository
+            existing_schedule = Schedule.objects.filter(
                 name=f'pullrequest_indexing_repo_{repository_id}'
-            )
+            ).first()
+            
+            if existing_schedule:
+                # Update existing schedule instead of creating a new one
+                existing_schedule.func = 'analytics.tasks.index_pullrequests_intelligent_task'
+                existing_schedule.args = [repository_id]
+                existing_schedule.next_run = next_run
+                existing_schedule.schedule_type = Schedule.ONCE
+                existing_schedule.save()
+                logger.info(f"Updated existing pull request indexing schedule for repository {repository_id}")
+            else:
+                # Create new schedule only if none exists
+                Schedule.objects.create(
+                    func='analytics.tasks.index_pullrequests_intelligent_task',
+                    args=[repository_id],
+                    next_run=next_run,
+                    schedule_type=Schedule.ONCE,
+                    name=f'pullrequest_indexing_repo_{repository_id}'
+                )
+                logger.info(f"Created new pull request indexing schedule for repository {repository_id}")
         
         logger.info(f"Pull request indexing completed for repository {repository_id}: {result}")
         return result
@@ -1835,13 +1881,27 @@ def index_releases_intelligent_task(repository_id=None, args=None, **kwargs):
                         next_run = reset_time + timedelta(minutes=10)  # 10 minutes after reset
                         
                         from django_q.models import Schedule
-                        Schedule.objects.create(
-                            func='analytics.tasks.index_releases_intelligent_task',
-                            args=[repository_id],
-                            next_run=next_run,
-                            schedule_type=Schedule.ONCE,
+                        # Check if a retry task already exists for this repository
+                        existing_retry = Schedule.objects.filter(
                             name=f'release_indexing_repo_{repository_id}_retry'
-                        )
+                        ).first()
+                        
+                        if existing_retry:
+                            # Update existing retry schedule
+                            existing_retry.func = 'analytics.tasks.index_releases_intelligent_task'
+                            existing_retry.args = [repository_id]
+                            existing_retry.next_run = next_run
+                            existing_retry.schedule_type = Schedule.ONCE
+                            existing_retry.save()
+                        else:
+                            # Create new retry schedule
+                            Schedule.objects.create(
+                                func='analytics.tasks.index_releases_intelligent_task',
+                                args=[repository_id],
+                                next_run=next_run,
+                                schedule_type=Schedule.ONCE,
+                                name=f'release_indexing_repo_{repository_id}_retry'
+                            )
                         
                         return {
                             'status': 'rate_limited',
@@ -1871,13 +1931,29 @@ def index_releases_intelligent_task(repository_id=None, args=None, **kwargs):
             next_run = timezone.now() + timedelta(minutes=5)
             
             from django_q.models import Schedule
-            Schedule.objects.create(
-                func='analytics.tasks.index_releases_intelligent_task',
-                args=[repository_id],
-                next_run=next_run,
-                schedule_type=Schedule.ONCE,
+            # Check if a task already exists for this repository
+            existing_schedule = Schedule.objects.filter(
                 name=f'release_indexing_repo_{repository_id}'
-            )
+            ).first()
+            
+            if existing_schedule:
+                # Update existing schedule instead of creating a new one
+                existing_schedule.func = 'analytics.tasks.index_releases_intelligent_task'
+                existing_schedule.args = [repository_id]
+                existing_schedule.next_run = next_run
+                existing_schedule.schedule_type = Schedule.ONCE
+                existing_schedule.save()
+                logger.info(f"Updated existing release indexing schedule for repository {repository_id}")
+            else:
+                # Create new schedule only if none exists
+                Schedule.objects.create(
+                    func='analytics.tasks.index_releases_intelligent_task',
+                    args=[repository_id],
+                    next_run=next_run,
+                    schedule_type=Schedule.ONCE,
+                    name=f'release_indexing_repo_{repository_id}'
+                )
+                logger.info(f"Created new release indexing schedule for repository {repository_id}")
         
         logger.info(f"Release indexing completed for repository {repository_id}: {result}")
         return result
@@ -1936,4 +2012,141 @@ def index_all_releases_task():
         
     except Exception as e:
         logger.error(f"Failed to start release indexing for all repositories: {e}")
+        raise
+
+
+def generate_sbom_task(repository_id: int, force_generate: bool = False):
+    """
+    Django-Q task to generate SBOM for a repository
+    
+    Args:
+        repository_id: Repository ID to generate SBOM for
+        force_generate: Force generation even if SBOM exists
+    """
+    logger.info(f"Starting SBOM generation for repository {repository_id}")
+    
+    try:
+        from repositories.models import Repository
+        from .models import SBOM
+        from .sbom_service import SBOMService
+        from .git_service import GitService
+        from .github_token_service import GitHubTokenService
+        import shutil
+        
+        # Get repository
+        repository = Repository.objects.get(id=repository_id)
+        user_id = repository.owner.id
+        
+        # Check if SBOM already exists (unless forced)
+        if not force_generate:
+            existing_sbom = SBOM.objects(repository_full_name=repository.full_name).first()
+            if existing_sbom:
+                logger.info(f"SBOM already exists for {repository.full_name}, skipping")
+                return {
+                    'status': 'skipped',
+                    'reason': 'SBOM already exists',
+                    'repository_id': repository_id
+                }
+        
+        # Get GitHub token for cloning
+        github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+        if not github_token:
+            github_token = GitHubTokenService._get_user_token(user_id)
+        
+        # Clone repository
+        git_service = GitService()
+        repo_path = git_service.clone_repository(
+            repository.clone_url,
+            repository.full_name,
+            github_token
+        )
+        
+        # Generate SBOM
+        sbom_service = SBOMService(repository.full_name, user_id)
+        sbom_data = sbom_service.generate_sbom(repo_path)
+        sbom = sbom_service.process_sbom(sbom_data)
+        
+        # Cleanup
+        try:
+            shutil.rmtree(repo_path)
+        except Exception as e:
+            logger.warning(f"Failed to cleanup repo path {repo_path}: {e}")
+        
+        logger.info(f"Successfully generated SBOM for {repository.full_name}")
+        return {
+            'status': 'success',
+            'repository_id': repository_id,
+            'repository_full_name': repository.full_name,
+            'sbom_id': str(sbom.id),
+            'component_count': sbom.component_count,
+            'vulnerability_count': sbom.vulnerability_count
+        }
+        
+    except Exception as e:
+        logger.error(f"SBOM generation failed for repository {repository_id}: {e}")
+        raise
+
+
+def check_new_releases_and_generate_sbom_task():
+    """
+    Django-Q task to check for new releases and generate SBOM if needed
+    """
+    logger.info("Starting new release SBOM generation check")
+    
+    try:
+        from repositories.models import Repository
+        from .models import Release, SBOM
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        results = {
+            'repositories_checked': 0,
+            'sboms_generated': 0,
+            'errors': []
+        }
+        
+        # Get all indexed repositories
+        repositories = Repository.objects.filter(is_indexed=True)
+        
+        for repo in repositories:
+            try:
+                results['repositories_checked'] += 1
+                
+                # Check if repository has any SBOM
+                existing_sbom = SBOM.objects(repository_full_name=repo.full_name).first()
+                
+                # Check for new releases in the last 24 hours
+                recent_releases = Release.objects(
+                    repository_full_name=repo.full_name,
+                    published_at__gte=timezone.now() - timedelta(days=1)
+                ).count()
+                
+                # Generate SBOM if:
+                # 1. No SBOM exists for this repository, OR
+                # 2. New releases were published in the last 24 hours
+                should_generate = not existing_sbom or recent_releases > 0
+                
+                if should_generate:
+                    logger.info(f"Generating SBOM for {repo.full_name} "
+                              f"(existing_sbom: {bool(existing_sbom)}, "
+                              f"recent_releases: {recent_releases})")
+                    
+                    # Schedule SBOM generation task
+                    from django_q.tasks import async_task
+                    async_task('analytics.tasks.generate_sbom_task', repo.id)
+                    
+                    results['sboms_generated'] += 1
+                else:
+                    logger.info(f"No SBOM generation needed for {repo.full_name}")
+                    
+            except Exception as e:
+                error_msg = f"Error processing repository {repo.full_name}: {e}"
+                logger.error(error_msg)
+                results['errors'].append(error_msg)
+        
+        logger.info(f"SBOM generation check completed: {results}")
+        return results
+        
+    except Exception as e:
+        logger.error(f"SBOM generation check failed: {e}")
         raise
