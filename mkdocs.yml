@@ -9,62 +9,9 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  palette:
-    - media: "(prefers-color-scheme)"
-      scheme: default
-      primary: indigo
-      accent: indigo
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: indigo
-      accent: indigo
-  features:
-    - navigation.tabs
-    - navigation.sections
-    - navigation.expand
-    - navigation.top
-    - search.suggest
-    - search.highlight
-    - content.code.copy
-  icon:
-    repo: fontawesome/brands/github
-    edit: material/pencil
-    view: material/eye
 
 plugins:
   - search
-  - git-revision-date-localized:
-      enable_creation_date: true
-
-markdown_extensions:
-  - abbr
-  - admonition
-  - attr_list
-  - def_list
-  - footnotes
-  - md_in_html
-  - toc:
-      permalink: true
-  - pymdownx.betterem:
-      smart_enable: all
-  - pymdownx.caret
-  - pymdownx.details
-  - pymdownx.emoji:
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-  - pymdownx.highlight:
-      anchor_linenums: true
-      line_spans: __span
-      pygments_lang_class: true
-  - pymdownx.inlinehilite
-  - pymdownx.keys
-  - pymdownx.magiclink
-  - pymdownx.mark
-  - pymdownx.smartsymbols
-  - pymdownx.superfences
-  - pymdownx.tasklist:
-      custom_checkbox: true
-  - pymdownx.tilde
 
 nav:
   - Home: index.md
@@ -86,9 +33,4 @@ nav:
   - Deployment:
     - Docker: deployment/docker.md
     - Production: deployment/production.md
-    - GitHub Pages: deployment/github-pages.md
-
-extra:
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/assiadialeb/gitpulse 
+    - GitHub Pages: deployment/github-pages.md 
