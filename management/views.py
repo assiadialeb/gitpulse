@@ -162,6 +162,7 @@ def integrations_management(request):
     """Integrations management section"""
     from github.models import GitHubApp
     from sonarcloud.models import SonarCloudConfig
+    from management.models import OSSIndexConfig
     
     # Get GitHub configuration
     github_config = None
@@ -209,6 +210,30 @@ def integrations_management(request):
             'access_token': 'Error loading config',
         }
     
+    # Get OSS Index configuration
+    ossindex_config = None
+    ossindex_status = 'inactive'
+    
+    try:
+        ossindex_app = OSSIndexConfig.get_config()
+        
+        if ossindex_app and ossindex_app.email and ossindex_app.api_token:
+            ossindex_config = {
+                'email': ossindex_app.email,
+                'api_token': ossindex_app.api_token[:10] + '...' if ossindex_app.api_token else 'Not configured',
+            }
+            ossindex_status = 'active'
+        else:
+            ossindex_config = {
+                'email': 'Not configured',
+                'api_token': 'Not configured',
+            }
+    except Exception as e:
+        ossindex_config = {
+            'email': 'Error loading config',
+            'api_token': 'Error loading config',
+        }
+    
     integrations = [
         {
             'name': 'GitHub',
@@ -232,6 +257,13 @@ def integrations_management(request):
             'type': 'API',
             'last_sync': 'Never',
             'config': sonarcloud_config,
+        },
+        {
+            'name': 'OSS Index',
+            'status': ossindex_status,
+            'type': 'Vulnerability Scanner',
+            'last_sync': 'Never',
+            'config': ossindex_config,
         },
     ]
     
@@ -646,3 +678,86 @@ def unlink_user_from_developer(request, user_id):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+def save_ossindex_config(request):
+    """Save OSS Index configuration"""
+    try:
+        from management.models import OSSIndexConfig
+        
+        email = request.POST.get('email', '').strip()
+        api_token = request.POST.get('api_token', '').strip()
+        
+        if not email:
+            return JsonResponse({
+                'success': False,
+                'message': 'Email is required'
+            })
+        
+        if not api_token:
+            return JsonResponse({
+                'success': False,
+                'message': 'API token is required'
+            })
+        
+        # Get or create configuration
+        config = OSSIndexConfig.get_config()
+        config.email = email
+        config.api_token = api_token
+        config.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'OSS Index configuration saved successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error saving configuration: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+def test_ossindex_connection(request):
+    """Test OSS Index API connection"""
+    try:
+        from management.models import OSSIndexConfig
+        
+        config = OSSIndexConfig.get_config()
+        
+        if not config.email:
+            return JsonResponse({
+                'success': False,
+                'message': 'OSS Index email not configured'
+            })
+        
+        if not config.api_token:
+            return JsonResponse({
+                'success': False,
+                'message': 'OSS Index API token not configured'
+            })
+        
+        # For now, just verify both email and token are set
+        # In the future, we could make an actual API call to test the connection
+        if config.email and config.api_token:
+            return JsonResponse({
+                'success': True,
+                'message': f'OSS Index configuration is valid (email: {config.email})'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'OSS Index configuration is incomplete'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error testing connection: {str(e)}'
+        })

@@ -28,4 +28,6 @@ urlpatterns = [
     path('integrations/sonarcloud-config/', views.get_sonarcloud_config, name='get_sonarcloud_config'),
     path('integrations/save-sonarcloud/', views.save_sonarcloud_config, name='save_sonarcloud_config'),
     path('integrations/test-sonarcloud/', views.test_sonarcloud_connection, name='test_sonarcloud_connection'),
+    path('integrations/save-ossindex/', views.save_ossindex_config, name='save_ossindex_config'),
+    path('integrations/test-ossindex/', views.test_ossindex_connection, name='test_ossindex_connection'),
 ] 
