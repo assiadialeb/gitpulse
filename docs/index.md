@@ -1,14 +1,10 @@
 # GitPulse - GitHub Analytics Dashboard
 
-<div align="center">
-
 **GitHub Analytics Dashboard for CTOs, Tech Leads, and Curious Developers**
 
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
 [![Django](https://img.shields.io/badge/Django-5.2+-blue.svg)](https://djangoproject.com)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
-
-</div>
 
 ## 🚀 What is GitPulse?
 
@@ -101,10 +97,6 @@ This project is licensed under the AGPL v3 License - see the [LICENSE](LICENSE) 
 
 ---
 
-<div align="center">
-
 **Made with ❤️ for the developer community**
 
-[GitHub](https://github.com/assiadialeb/gitpulse) • [Issues](https://github.com/assiadialeb/gitpulse/issues) • [Discussions](https://github.com/assiadialeb/gitpulse/discussions)
-
-</div> 
+[GitHub](https://github.com/assiadialeb/gitpulse) • [Issues](https://github.com/assiadialeb/gitpulse/issues) • [Discussions](https://github.com/assiadialeb/gitpulse/discussions) 
