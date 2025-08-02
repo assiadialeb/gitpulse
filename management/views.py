@@ -72,28 +72,31 @@ def users_management(request):
 @user_passes_test(is_admin)
 def logs_management(request):
     """Logs management section - Django Q Tasks"""
-    from django_q.models import Success
+    from django_q.models import Success, Failure
     
-    # Get all tasks, ordered by most recent first
-    tasks = Success.objects.all().order_by('-started')
+    # Get all tasks (successful and failed), ordered by most recent first
+    from itertools import chain
+    from django.db.models import Q
+    
+    # Get successful tasks
+    successful_tasks = Success.objects.all()
+    # Get failed tasks and convert them to have success=False
+    failed_tasks = Failure.objects.all()
+    
+    # Combine both querysets
+    tasks = list(chain(successful_tasks, failed_tasks))
+    # Sort by started date (most recent first)
+    tasks.sort(key=lambda x: x.started, reverse=True)
     
     # Apply filters
     success_filter = request.GET.get('success', '').strip()
     task_filter = request.GET.get('task', '').strip()
     date_filter = request.GET.get('date', '24h').strip()
     
-    if success_filter:
-        if success_filter == 'success':
-            tasks = tasks.filter(success=True)
-        elif success_filter == 'fail':
-            tasks = tasks.filter(success=False)
-    
-    if task_filter:
-        tasks = tasks.filter(func__icontains=task_filter)
-    
-    # Apply date filter
+    # Apply date filter first
     from datetime import datetime, timedelta
-    now = datetime.now()
+    from django.utils import timezone
+    now = timezone.now()
     if date_filter == '1h':
         start_date = now - timedelta(hours=1)
     elif date_filter == '24h':
@@ -105,20 +108,35 @@ def logs_management(request):
     else:
         start_date = now - timedelta(days=1)  # Default to 24h
     
-    tasks = tasks.filter(started__gte=start_date)
+    # Filter by date
+    tasks = [task for task in tasks if task.started and task.started >= start_date]
+    
+    # Apply success filter
+    if success_filter:
+        if success_filter == 'success':
+            tasks = [task for task in tasks if hasattr(task, 'success') and task.success]
+        elif success_filter == 'fail':
+            tasks = [task for task in tasks if not hasattr(task, 'success') or not task.success]
+    
+    # Apply task filter
+    if task_filter:
+        tasks = [task for task in tasks if task_filter.lower() in task.func.lower()]
     
     # Get unique task functions for filter dropdown
-    task_functions = Success.objects.values_list('func', flat=True).distinct().order_by('func')
+    all_functions = set()
+    for task in tasks:
+        all_functions.add(task.func)
+    task_functions = sorted(list(all_functions))
     
     # Pagination
     paginator = Paginator(tasks, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # Calculate statistics
-    total_tasks = tasks.count()
-    successful_tasks = tasks.filter(success=True).count()
-    failed_tasks = tasks.filter(success=False).count()
+    # Calculate statistics on the filtered dataset
+    total_tasks = len(tasks)
+    successful_tasks = len([task for task in tasks if hasattr(task, 'success') and task.success])
+    failed_tasks = len([task for task in tasks if not hasattr(task, 'success') or not task.success])
     success_rate = (successful_tasks / total_tasks * 100) if total_tasks > 0 else 0
     
     context = {
