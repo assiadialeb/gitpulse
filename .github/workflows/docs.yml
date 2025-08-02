@@ -3,10 +3,10 @@ name: Deploy Documentation
 on:
   push:
     branches: [ main ]
-    paths: [ 'docs/**', 'mkdocs.yml' ]
+    paths: [ 'docs/**', 'mkdocs.yml', 'CNAME' ]
   pull_request:
     branches: [ main ]
-    paths: [ 'docs/**', 'mkdocs.yml' ]
+    paths: [ 'docs/**', 'mkdocs.yml', 'CNAME' ]
   workflow_dispatch:
 
 # Add permissions for GitHub Pages deployment
