@@ -52,6 +52,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
     - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.PERSONAL_TOKEN }}
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -70,6 +72,6 @@ jobs:
       id: deployment
       uses: peaceiris/actions-gh-pages@v3
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.PERSONAL_TOKEN }}
         publish_dir: ./site
         force_orphan: true 
