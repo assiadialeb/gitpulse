@@ -73,7 +73,7 @@ jobs:
       run: rm -rf site/
 
     - name: Build documentation
-      run: mkdocs build
+      run: mkdocs build --clean
 
     - name: Deploy to GitHub Pages
       id: deployment
