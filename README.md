@@ -79,6 +79,60 @@ GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, an
    - Open http://localhost:8000
    - Login with your superuser credentials
 
+## ⚙️ Environment Configuration
+
+GitPulse uses `python-decouple` to manage configuration through environment variables. All settings can be configured via the `.env` file.
+
+### Key Configuration Variables
+
+#### Django Core
+- `DEBUG`: Enable/disable debug mode (default: `True`)
+- `SECRET_KEY`: Django secret key for security
+- `ALLOWED_HOSTS`: Comma-separated list of allowed hosts
+- `LANGUAGE_CODE`: Language code (default: `en-us`)
+- `TIME_ZONE`: Timezone (default: `Europe/Paris`)
+
+#### Database Configuration
+- `MONGODB_HOST`: MongoDB host (default: `localhost`)
+- `MONGODB_PORT`: MongoDB port (default: `27017`)
+- `MONGODB_NAME`: MongoDB database name (default: `gitpulse`)
+- `POSTGRES_DB`: PostgreSQL database name (default: `gitpulse_new`)
+- `POSTGRES_USER`: PostgreSQL username (default: `gitpulse_user`)
+- `POSTGRES_PASSWORD`: PostgreSQL password (default: `gitpulse_password`)
+- `POSTGRES_HOST`: PostgreSQL host (default: `localhost`)
+- `POSTGRES_PORT`: PostgreSQL port (default: `5432`)
+
+#### GitPulse Configuration
+- `INDEXING_SERVICE`: Choose indexing service (`git_local` or `github_api`)
+- `GITHUB_API_RATE_LIMIT_WARNING`: Rate limit warning threshold (default: `10`)
+- `GITHUB_API_TIMEOUT`: API timeout in seconds (default: `30`)
+
+#### Ollama Configuration
+- `OLLAMA_HOST`: Ollama server URL (default: `http://localhost:11434`)
+- `OLLAMA_MODEL`: Ollama model name (default: `llama3.2:3b`)
+
+#### Django-Q Configuration
+- `Q_WORKERS`: Number of worker processes (default: `4`)
+- `Q_RECYCLE`: Worker recycle count (default: `500`)
+- `Q_TIMEOUT`: Task timeout in seconds (default: `3600`)
+- `Q_RETRY`: Retry count (default: `4000`)
+- `Q_SAVE_LIMIT`: Save limit (default: `250`)
+- `Q_QUEUE_LIMIT`: Queue limit (default: `500`)
+- `Q_CPU_AFFINITY`: CPU affinity (default: `1`)
+
+#### Cache Configuration
+- `CACHE_TIMEOUT`: Cache timeout in seconds (default: `3600`)
+- `CACHE_MAX_ENTRIES`: Maximum cache entries (default: `1000`)
+- `ANALYTICS_CACHE_TIMEOUT`: Analytics cache timeout (default: `3600`)
+- `PR_METRICS_CACHE_TIMEOUT`: PR metrics cache timeout (default: `1800`)
+- `COMMIT_METRICS_CACHE_TIMEOUT`: Commit metrics cache timeout (default: `7200`)
+
+### Example .env file
+```bash
+# Copy env.example to .env and customize as needed
+cp env.example .env
+```
+
 ## 🔐 GitHub OAuth2 Setup
 
 GitPulse uses OAuth2 to connect to GitHub. You need to create a GitHub App and configure it with GitPulse.

@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import mongoengine
-from decouple import config
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,12 +22,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-(nap2r)a$+asht$pmzb$eryl8i!j=6wd_s(*1(ntuftbvmf&%v'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-(nap2r)a$+asht$pmzb$eryl8i!j=6wd_s(*1(ntuftbvmf&%v')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver', cast=Csv())
 
 
 # Application definition
@@ -144,9 +144,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = config('LANGUAGE_CODE', default='en-us')
 
-TIME_ZONE = 'Europe/Paris'
+TIME_ZONE = config('TIME_ZONE', default='Europe/Paris')
 
 USE_I18N = True
 
@@ -171,14 +171,14 @@ LOGOUT_REDIRECT_URL = '/'
 # Django-Q Configuration
 Q_CLUSTER = {
     'name': 'GitPulse',
-    'workers': 4,
-    'recycle': 500,
-    'timeout': 3600,  # 30 minutes for indexing tasks
-    'retry': 4000,    # retry > timeout (en secondes)
+    'workers': config('Q_WORKERS', default=4, cast=int),
+    'recycle': config('Q_RECYCLE', default=500, cast=int),
+    'timeout': config('Q_TIMEOUT', default=3600, cast=int),  # 30 minutes for indexing tasks
+    'retry': config('Q_RETRY', default=4000, cast=int),    # retry > timeout (en secondes)
     'compress': True,
-    'save_limit': 250,
-    'queue_limit': 500,
-    'cpu_affinity': 1,
+    'save_limit': config('Q_SAVE_LIMIT', default=250, cast=int),
+    'queue_limit': config('Q_QUEUE_LIMIT', default=500, cast=int),
+    'cpu_affinity': config('Q_CPU_AFFINITY', default=1, cast=int),
     'label': 'Django Q',
     'mongo': {
         'host': MONGODB_HOST,
@@ -194,6 +194,10 @@ INDEXING_SERVICE = config('INDEXING_SERVICE', default='git_local')
 # GitHub API Configuration (only used if INDEXING_SERVICE = 'github_api')
 GITHUB_API_RATE_LIMIT_WARNING = int(config('GITHUB_API_RATE_LIMIT_WARNING', default=10))
 GITHUB_API_TIMEOUT = int(config('GITHUB_API_TIMEOUT', default=30))
+
+# Ollama Configuration
+OLLAMA_HOST = config('OLLAMA_HOST', default='http://localhost:11434')
+OLLAMA_MODEL = config('OLLAMA_MODEL', default='llama3.2:3b')
 
 SITE_ID = 1
 
@@ -222,17 +226,17 @@ CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
         'LOCATION': 'unique-snowflake',
-        'TIMEOUT': 3600,  # 1 hour default timeout
+        'TIMEOUT': config('CACHE_TIMEOUT', default=3600, cast=int),  # 1 hour default timeout
         'OPTIONS': {
-            'MAX_ENTRIES': 1000,  # Maximum number of entries in cache
+            'MAX_ENTRIES': config('CACHE_MAX_ENTRIES', default=1000, cast=int),  # Maximum number of entries in cache
         }
     }
 }
 
 # Cache settings for analytics
-ANALYTICS_CACHE_TIMEOUT = 1  # 1 hour for analytics data
-PR_METRICS_CACHE_TIMEOUT = 1  # 30 minutes for PR metrics
-COMMIT_METRICS_CACHE_TIMEOUT = 1 # 2 hours for commit metrics
+ANALYTICS_CACHE_TIMEOUT = config('ANALYTICS_CACHE_TIMEOUT', default=1, cast=int)  # 1 hour for analytics data
+PR_METRICS_CACHE_TIMEOUT = config('PR_METRICS_CACHE_TIMEOUT', default=1, cast=int)  # 30 minutes for PR metrics
+COMMIT_METRICS_CACHE_TIMEOUT = config('COMMIT_METRICS_CACHE_TIMEOUT', default=1, cast=int) # 2 hours for commit metrics
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
