@@ -404,7 +404,7 @@ docker-compose up -d --build
 
 ### Getting Help
 
-- Check the [Troubleshooting Guide](technical/troubleshooting.md)
+- Check the [Troubleshooting Guide](../technical/troubleshooting.md)
 - Review the [Configuration Guide](configuration.md)
 - Open an [issue on GitHub](https://github.com/gitpulse/gitpulse/issues)
 
@@ -412,5 +412,5 @@ docker-compose up -d --build
 
 - **[Configuration Guide](configuration.md)** - Configure your installation
 - **[Quick Start Guide](quick-start.md)** - Get started quickly
-- **[User Guide](user-guide/overview.md)** - Learn how to use GitPulse
-- **[Deployment Guide](deployment/production.md)** - Production deployment 
+- **[User Guide](../user-guide/overview.md)** - Learn how to use GitPulse
+- **[Deployment Guide](../deployment/production.md)** - Production deployment 

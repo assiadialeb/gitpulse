@@ -487,5 +487,5 @@ html5validator site/
 
 - **[Docker Deployment](docker.md)** - Deploy the application with Docker
 - **[Production Deployment](production.md)** - Production deployment guide
-- **[Configuration Guide](getting-started/configuration.md)** - Application configuration
-- **[Troubleshooting Guide](technical/troubleshooting.md)** - Common issues and solutions 
+- **[Configuration Guide](../getting-started/configuration.md)** - Application configuration
+- **[Troubleshooting Guide](../technical/troubleshooting.md)** - Common issues and solutions 

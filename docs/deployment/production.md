@@ -17,6 +17,6 @@ This documentation is under development. Please check back soon for the complete
 ## 📚 Related Documentation
 
 - **[Docker Deployment](docker.md)** - Docker deployment guide
-- **[Configuration Guide](getting-started/configuration.md)** - Environment configuration
-- **[Troubleshooting Guide](technical/troubleshooting.md)** - Common issues and solutions
+- **[Configuration Guide](../getting-started/configuration.md)** - Environment configuration
+- **[Troubleshooting Guide](../technical/troubleshooting.md)** - Common issues and solutions
 - **[GitHub Pages Deployment](github-pages.md)** - Deploy documentation to GitHub Pages 

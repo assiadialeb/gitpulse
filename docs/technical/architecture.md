@@ -17,4 +17,4 @@ This documentation is under development. Please check back soon for the complete
 - **[API Reference](api.md)** - API documentation
 - **[Management Commands](management-commands.md)** - Available management commands
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
-- **[Docker Deployment](deployment/docker.md)** - Docker deployment guide 
+- **[Docker Deployment](../deployment/docker.md)** - Docker deployment guide 

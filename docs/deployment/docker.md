@@ -452,6 +452,6 @@ networks:
 ## 📚 Next Steps
 
 - **[Production Deployment](production.md)** - Production deployment guide
-- **[Configuration Guide](getting-started/configuration.md)** - Advanced configuration
-- **[Troubleshooting Guide](technical/troubleshooting.md)** - Common issues and solutions
+- **[Configuration Guide](../getting-started/configuration.md)** - Advanced configuration
+- **[Troubleshooting Guide](../technical/troubleshooting.md)** - Common issues and solutions
 - **[GitHub Pages Deployment](github-pages.md)** - Deploy documentation to GitHub Pages 

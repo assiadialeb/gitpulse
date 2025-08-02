@@ -85,7 +85,7 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 
 ### Quick Setup
 
-1. **Install GitPulse**: Follow the [installation guide](getting-started/installation.md)
+1. **Install GitPulse**: Follow the [installation guide](../getting-started/installation.md)
 2. **Configure GitHub**: Set up OAuth integration
 3. **Add Repositories**: Connect your GitHub repositories
 4. **Start Analyzing**: Begin collecting and analyzing data

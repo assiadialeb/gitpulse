@@ -203,13 +203,13 @@ chmod +x manage.py
 
 ### Getting Help
 
-- Check the [Troubleshooting Guide](technical/troubleshooting.md)
-- Review the [Configuration Guide](getting-started/configuration.md)
-- Open an [issue on GitHub](https://github.com/gitpulse/gitpulse/issues)
+- Check the [Troubleshooting Guide](../technical/troubleshooting.md)
+- Review the [Configuration Guide](configuration.md)
+- Open an [issue on GitHub](https://github.com/assiadialeb/gitpulse/issues)
 
 ## 📚 Next Steps
 
 - **[Installation Guide](installation.md)** - Detailed installation instructions
 - **[Configuration Guide](configuration.md)** - Environment and application configuration
-- **[User Guide](user-guide/overview.md)** - How to use GitPulse features
-- **[GitHub Setup](user-guide/github-setup.md)** - Complete GitHub integration guide 
+- **[User Guide](../user-guide/overview.md)** - How to use GitPulse features
+- **[GitHub Setup](../user-guide/github-setup.md)** - Complete GitHub integration guide 

@@ -473,4 +473,4 @@ python manage.py schedule_daily_indexing --time 02:00
 - **[Technical Architecture](architecture.md)** - System architecture overview
 - **[API Reference](api.md)** - API documentation
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
-- **[Docker Deployment](deployment/docker.md)** - Docker deployment guide 
+- **[Docker Deployment](../deployment/docker.md)** - Docker deployment guide 

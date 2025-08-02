@@ -256,4 +256,4 @@ print(f"Scopes: {validation['scopes']}")
 - **[Projects Guide](projects.md)** - Add and manage repositories
 - **[Analytics Guide](analytics.md)** - Understand your data
 - **[Developers Guide](developers.md)** - Manage team analytics
-- **[Configuration Guide](getting-started/configuration.md)** - Advanced configuration 
+- **[Configuration Guide](../getting-started/configuration.md)** - Advanced configuration 

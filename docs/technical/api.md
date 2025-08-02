@@ -17,4 +17,4 @@ This documentation is under development. Please check back soon for the complete
 - **[Technical Architecture](architecture.md)** - System architecture overview
 - **[Management Commands](management-commands.md)** - Available management commands
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
-- **[GitHub Setup](user-guide/github-setup.md)** - GitHub integration setup 
+- **[GitHub Setup](../user-guide/github-setup.md)** - GitHub integration setup 

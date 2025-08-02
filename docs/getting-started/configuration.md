@@ -266,5 +266,5 @@ source venv/bin/activate
 
 - **[Quick Start Guide](quick-start.md)** - Get started quickly
 - **[Installation Guide](installation.md)** - Detailed installation instructions
-- **[Docker Guide](deployment/docker.md)** - Docker-specific configuration
-- **[Production Guide](deployment/production.md)** - Production deployment configuration 
+- **[Docker Guide](../deployment/docker.md)** - Docker-specific configuration
+- **[Production Guide](../deployment/production.md)** - Production deployment configuration 

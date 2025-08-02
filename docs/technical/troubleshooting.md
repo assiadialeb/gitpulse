@@ -399,12 +399,12 @@ print(f'CACHES: {settings.CACHES}')
 ### Community Support
 
 - **GitHub Issues**: [Create an issue](https://github.com/gitpulse/gitpulse/issues)
-- **Documentation**: Check the [Configuration Guide](getting-started/configuration.md)
+- **Documentation**: Check the [Configuration Guide](../getting-started/configuration.md)
 - **Management Commands**: See [Management Commands Reference](management-commands.md)
 
 ## 📚 Related Documentation
 
 - **[Management Commands](management-commands.md)** - Available management commands
-- **[Configuration Guide](getting-started/configuration.md)** - Environment configuration
-- **[Docker Deployment](deployment/docker.md)** - Docker deployment guide
-- **[GitHub Setup](user-guide/github-setup.md)** - GitHub integration setup 
+- **[Configuration Guide](../getting-started/configuration.md)** - Environment configuration
+- **[Docker Deployment](../deployment/docker.md)** - Docker deployment guide
+- **[GitHub Setup](../user-guide/github-setup.md)** - GitHub integration setup 
