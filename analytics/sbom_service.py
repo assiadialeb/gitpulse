@@ -52,6 +52,7 @@ class SBOMService:
             cmd = [
                 'npx', '@cyclonedx/cdxgen',
                 '--include-vulnerabilities',
+                '--profile', 'license-compliance',
                 '-o', sbom_file,
                 repo_path
             ]
@@ -190,6 +191,21 @@ class SBOMService:
             except Exception as e:
                 logger.warning(f"Failed to parse package.json: {e}")
         
+        # Check for Rust dependencies
+        cargo_toml_file = os.path.join(repo_path, "Cargo.toml")
+        if os.path.exists(cargo_toml_file):
+            try:
+                # Try to extract licenses using cargo-license
+                rust_licenses = self._extract_rust_licenses(repo_path)
+                if rust_licenses:
+                    logger.info(f"Extracted {len(rust_licenses)} Rust licenses")
+                    # Add license information to components
+                    for i, component in enumerate(components):
+                        if i < len(rust_licenses):
+                            component['licenses'] = [rust_licenses[i]]
+            except Exception as e:
+                logger.warning(f"Failed to extract Rust licenses: {e}")
+        
         # Create basic SBOM structure
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
@@ -326,3 +342,51 @@ class SBOMService:
         
         logger.info(f"Processed SBOM with {sbom.component_count} components and {sbom.vulnerability_count} vulnerabilities")
         return sbom 
+
+    def _extract_rust_licenses(self, repo_path: str) -> List[Dict]:
+        """
+        Extract licenses from Rust project using cargo-license
+        
+        Args:
+            repo_path: Path to the Rust repository
+            
+        Returns:
+            List of license information
+        """
+        try:
+            # Check if cargo-license is available
+            result = subprocess.run(['cargo', 'license', '--version'], 
+                                  capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.warning("cargo-license not available, skipping Rust license extraction")
+                return []
+            
+            # Run cargo license
+            cmd = ['cargo', 'license', '--json', '--direct-deps-only']
+            result = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                logger.warning(f"cargo-license failed: {result.stderr}")
+                return []
+            
+            # Parse JSON output
+            import json
+            licenses_data = json.loads(result.stdout)
+            
+            # Convert to CycloneDX format
+            licenses = []
+            for item in licenses_data:
+                if 'license' in item:
+                    licenses.append({
+                        'license': {
+                            'id': item['license'],
+                            'name': item.get('license', 'Unknown')
+                        }
+                    })
+            
+            logger.info(f"Extracted {len(licenses)} licenses from Rust project")
+            return licenses
+            
+        except Exception as e:
+            logger.error(f"Error extracting Rust licenses: {e}")
+            return [] 

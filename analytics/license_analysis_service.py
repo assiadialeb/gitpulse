@@ -89,6 +89,15 @@ class LicenseAnalysisService:
                 elif 'expression' in license_data:
                     license_id = license_data.get('expression', '').upper()
                     license_name = license_id
+                    # Parse license expression (e.g., "Apache-2.0 OR MIT")
+                    if ' OR ' in license_id:
+                        # For OR expressions, check if any license is compatible
+                        license_parts = [part.strip() for part in license_id.split(' OR ')]
+                        license_id = license_parts[0]  # Use first license for categorization
+                    elif ' AND ' in license_id:
+                        # For AND expressions, check if all licenses are compatible
+                        license_parts = [part.strip() for part in license_id.split(' AND ')]
+                        license_id = license_parts[0]  # Use first license for categorization
                 else:
                     license_id = 'UNKNOWN'
                     license_name = 'Unknown'
