@@ -110,6 +110,27 @@ def working_repository_detail(request, repo_id):
         avg_files_changed = round(float(commit_change_stats.get('avg_files_changed', 0)), 2)
         nb_commits = int(commit_change_stats.get('nb_commits', 0))
         
+        # Get SBOM vulnerability data
+        from analytics.models import SBOM, SBOMVulnerability
+        sbom = SBOM.objects(repository_full_name=repository.full_name).order_by('-created_at').first()
+        vulnerability_stats = {
+            'total_vulnerabilities': 0,
+            'severity_counts': {},
+            'has_sbom': False
+        }
+        
+        if sbom:
+            vulnerabilities = SBOMVulnerability.objects(sbom_id=sbom)
+            vulnerability_stats['has_sbom'] = True
+            vulnerability_stats['total_vulnerabilities'] = len(vulnerabilities)
+            
+            # Count by severity
+            severity_counts = {}
+            for vuln in vulnerabilities:
+                severity = vuln.severity or 'unknown'
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            vulnerability_stats['severity_counts'] = severity_counts
+        
         # Build context
         context = {
             'repository': repository,
@@ -139,6 +160,7 @@ def working_repository_detail(request, repo_id):
                 'avg_files_changed': avg_files_changed,
                 'nb_commits': nb_commits,
             },
+            'vulnerability_stats': vulnerability_stats,
         }
         
     except Exception as e:

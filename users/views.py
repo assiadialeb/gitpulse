@@ -17,7 +17,6 @@ from allauth.socialaccount.models import SocialAccount, SocialToken
 from analytics.analytics_service import AnalyticsService
 from analytics.models import Developer as MongoDeveloper, DeveloperAlias as MongoDeveloperAlias
 import requests
-from models import Repository
 from repositories.models import Repository
 
 

@@ -696,3 +696,78 @@ def repository_licensing_analysis(request, repo_id):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+@login_required
+def repository_vulnerabilities_analysis(request, repo_id):
+    """
+    Get SBOM vulnerabilities analysis for a repository
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        
+        # Get the latest SBOM for this repository
+        from analytics.models import SBOM
+        sbom = SBOM.objects(repository_full_name=repository.full_name).order_by('-created_at').first()
+        
+        if not sbom:
+            return JsonResponse({
+                'status': 'no_sbom',
+                'message': 'No SBOM found for this repository'
+            })
+        
+        # Get vulnerabilities from the SBOM
+        from analytics.models import SBOMVulnerability
+        vulnerabilities = SBOMVulnerability.objects(sbom_id=sbom)
+        
+        # Format vulnerabilities for display
+        vuln_list = []
+        for vuln in vulnerabilities:
+            vuln_data = {
+                'id': vuln.vuln_id,
+                'title': vuln.title,
+                'description': vuln.description,
+                'severity': vuln.severity,
+                'cvss_score': vuln.cvss_score,
+                'cvss_vector': vuln.cvss_vector,
+                'source_name': vuln.source_name,
+                'affected_component': {
+                    'name': vuln.affected_component_name,
+                    'version': vuln.affected_component_version,
+                    'purl': vuln.affected_component_purl
+                },
+                'published_date': vuln.published_date.isoformat() if vuln.published_date else None,
+                'updated_date': vuln.updated_date.isoformat() if vuln.updated_date else None,
+                'references': vuln.references or []
+            }
+            vuln_list.append(vuln_data)
+        
+        # Group vulnerabilities by severity
+        severity_counts = {}
+        for vuln in vuln_list:
+            severity = vuln['severity'] or 'unknown'
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+        
+        return JsonResponse({
+            'status': 'success',
+            'total_vulnerabilities': len(vuln_list),
+            'severity_counts': severity_counts,
+            'vulnerabilities': vuln_list
+        })
+        
+    except Repository.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Repository not found'
+        }, status=404)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in vulnerabilities analysis: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)

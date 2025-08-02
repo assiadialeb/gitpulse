@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 from django.conf import settings
 from github.models import GitHubToken
-from models import GitHubUser
+# from models import GitHubUser  # Removed - using Django models instead
 
 logger = logging.getLogger(__name__)
 

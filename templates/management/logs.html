@@ -42,7 +42,7 @@
                     <select id="log-task" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
                         <option value="">All Tasks</option>
                         {% for task_func in task_functions %}
-                        <option value="{{ task_func }}" {% if current_filters.task == task_func %}selected{% endif %}>
+                        <option value="{% if task_name_mapping|get_item:task_func %}{{ task_name_mapping|get_item:task_func }}{% else %}{{ task_func }}{% endif %}" {% if current_filters.task == task_name_mapping|get_item:task_func or current_filters.task == task_func %}selected{% endif %}>
                             {% if task_name_mapping|get_item:task_func %}
                                 {{ task_name_mapping|get_item:task_func }}
                             {% else %}
@@ -109,7 +109,11 @@
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ log.func }}
+                                {% if task_name_mapping|get_item:log.func %}
+                                    {{ task_name_mapping|get_item:log.func }}
+                                {% else %}
+                                    {{ log.func }}
+                                {% endif %}
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 <div class="max-w-xs truncate" title="{{ log.result }}">

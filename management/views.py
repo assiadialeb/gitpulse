@@ -118,9 +118,20 @@ def logs_management(request):
         elif success_filter == 'fail':
             tasks = [task for task in tasks if not hasattr(task, 'success') or not task.success]
     
-    # Apply task filter
+    # Apply task filter - improved logic
     if task_filter:
-        tasks = [task for task in tasks if task_filter.lower() in task.func.lower()]
+        # Check if this is a user-friendly name from our mapping
+        technical_names = []
+        for tech_name, friendly_name in task_name_mapping.items():
+            if friendly_name == task_filter:
+                technical_names.append(tech_name)
+        
+        if technical_names:
+            # Filter by exact technical names
+            tasks = [task for task in tasks if task.func in technical_names]
+        else:
+            # Fallback to partial match for any task
+            tasks = [task for task in tasks if task_filter.lower() in task.func.lower()]
     
     # Get unique task functions for filter dropdown
     all_functions = set()
@@ -136,6 +147,7 @@ def logs_management(request):
     # Create user-friendly task names mapping
     task_name_mapping = {
         'analytics.tasks.check_new_releases_and_generate_sbom_task': 'SBOM Generation',
+        'analytics.tasks.generate_sbom_task': 'SBOM Generation',
         'analytics.tasks.daily_indexing_all_repos_task': 'Daily Indexing',
         'analytics.tasks.fetch_all_pull_requests_task': 'Pull Requests Indexing',
         'analytics.tasks.release_indexing_all_repos_task': 'Releases Indexing',
@@ -146,6 +158,7 @@ def logs_management(request):
     # Filter to only show the main scheduled tasks
     main_tasks = [
         'analytics.tasks.check_new_releases_and_generate_sbom_task',
+        'analytics.tasks.generate_sbom_task',
         'analytics.tasks.daily_indexing_all_repos_task',
         'analytics.tasks.fetch_all_pull_requests_task',
         'analytics.tasks.release_indexing_all_repos_task',

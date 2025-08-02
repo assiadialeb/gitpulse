@@ -174,7 +174,7 @@ Q_CLUSTER = {
     'workers': 4,
     'recycle': 500,
     'timeout': 3600,  # 30 minutes for indexing tasks
-    'retry': 2000,    # retry > timeout (en secondes)
+    'retry': 4000,    # retry > timeout (en secondes)
     'compress': True,
     'save_limit': 250,
     'queue_limit': 500,
