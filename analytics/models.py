@@ -87,6 +87,9 @@ class Developer(Document):
             'github_id',
             ('application_id', 'primary_email'),
             ('application_id', 'github_id'),
+        ],
+        'unique_indexes': [
+            'primary_email',  # Contrainte unique sur email
         ]
     }
     
@@ -116,6 +119,9 @@ class DeveloperAlias(Document):
             'email',
             'name',
             ('email', 'name'),
+        ],
+        'unique_indexes': [
+            'email',  # Contrainte unique sur email
         ]
     }
     

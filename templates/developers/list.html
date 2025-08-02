@@ -13,8 +13,8 @@
     </div>
 
     <!-- Merge Actions -->
-    <div id="mergeActions" class="mb-6 hidden">
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+    <div id="mergeActions" class="hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-lg">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
                     <span class="text-blue-800 font-medium">
@@ -89,7 +89,7 @@
                             Email
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            GitHub ID
+                            Aliases
                         </th>
                     </tr>
                 </thead>
@@ -115,8 +115,12 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {{ developer.primary_email|default:"No email" }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ developer.github_id|default:"—" }}
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                {% if developer.aliases_list %}
+                                    {{ developer.aliases_list|join:", " }}
+                                {% else %}
+                                    <span class="text-gray-400">No aliases</span>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endfor %}
@@ -273,8 +277,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         ${developer.email}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${developer.github_id}
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        ${developer.aliases}
                     </td>
                 `;
                 

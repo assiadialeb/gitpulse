@@ -31,10 +31,21 @@ def list_developers(request):
             primary_name__icontains=search_query
         )
     
+    # Add aliases for each developer
+    developers_list = list(developers)  # Convert to list to ensure we can modify
+    for developer in developers_list:
+        aliases = DeveloperAlias.objects.filter(developer=developer)
+        # Only show aliases with different emails than the primary email
+        different_emails = []
+        for alias in aliases:
+            if alias.email.lower() != developer.primary_email.lower():
+                different_emails.append(alias.email)
+        developer.aliases_list = different_emails
+    
     context = {
-        'developers': developers,
+        'developers': developers_list,
         'search_query': search_query,
-        'total_count': developers.count(),
+        'total_count': len(developers_list),
     }
     
     return render(request, 'developers/list.html', context)
@@ -78,11 +89,19 @@ def search_developers_ajax(request):
     # Convert to list for JSON serialization
     developers_data = []
     for dev in developers:
+        # Get aliases for this developer
+        aliases = DeveloperAlias.objects.filter(developer=dev)
+        # Only show aliases with different emails than the primary email
+        different_emails = []
+        for alias in aliases:
+            if alias.email.lower() != dev.primary_email.lower():
+                different_emails.append(alias.email)
+        
         developers_data.append({
             'id': str(dev.id),
             'name': dev.primary_name or 'Unknown',
             'email': dev.primary_email or 'No email',
-            'github_id': dev.github_id or '—',
+            'aliases': ', '.join(different_emails) if different_emails else 'No aliases',
             'detail_url': f'/developers/{dev.id}/'
         })
     
