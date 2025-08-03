@@ -34,7 +34,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin
+        pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin pymdown-extensions mkdocs-glightbox
 
     - name: Clean previous site folder
       run: rm -rf site/

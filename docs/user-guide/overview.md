@@ -33,6 +33,10 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 - **Commit Classification**: AI-powered commit categorization
 - **Trend Analysis**: Identify patterns over time
 - **Compliance**: License compliance, dependency vulnerabilities, and code quality
+<figure markdown="span">
+![Licence Compliance](../images/licence.png){ width="200" }
+<figcaption>Licence Compliance</figcaption>
+</figure>
 
 ### 🧩 Project Management
 Group multiple repositories under a single logical product view.
