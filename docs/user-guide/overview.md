@@ -34,6 +34,15 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 - **Trend Analysis**: Identify patterns over time
 - **Compliance**: License compliance, dependency vulnerabilities, and code quality
 
+### 🧩 Project Management
+Group multiple repositories under a single logical product view.
+Track commits, PRs, and developer activity across related services or components.
+
+- **Code Quality Metrics**: Track code quality indicators
+- **Commit Classification**: AI-powered commit categorization
+- **Trend Analysis**: Identify patterns over time
+- **Compliance**: License compliance, dependency vulnerabilities, and code quality
+
 ### ⚡ Real-time Updates
 
 - **Background Processing**: Automated data collection
@@ -42,11 +51,6 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 
 ## 🎨 User Interface
 
-### Modern Design
-
-- **Responsive Layout**: Works on desktop, tablet, and mobile
-- **Intuitive Navigation**: Easy-to-use interface
-- **Interactive Charts**: Dynamic data visualization
 
 ### Key Sections
 
