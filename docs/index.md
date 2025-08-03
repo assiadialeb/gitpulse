@@ -70,10 +70,10 @@ docker-compose up -d --build
 
 ### Option 2: Local Installation
 
-- Requirements
--- PostgreSQL 
--- MongoDB
--- Ollama
+#### Requirements
+- PostgreSQL
+- MongoDB
+- Ollama
 
 
 ```bash
