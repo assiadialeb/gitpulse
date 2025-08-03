@@ -37,11 +37,11 @@ It includes commit/change statistics, PR cycle time, release cadence, and deploy
 <figcaption>Repository Overview</figcaption>
 </figure>
 
-- **Code Quality Metrics**: Track code quality indicators
+- **Code Quality Metrics**: “Track code quality indicators”
 
 (coming soon)
 
-- **Commit Frequency**: Quantifying coding rhythm and consistency
+- **Commit Frequency**: “Quantifying coding rhythm and consistency”
 
 This panel evaluates how frequently and consistently code is pushed to the repository, providing a set of scores to assess recent development momentum:
 
@@ -58,7 +58,7 @@ A tooltip expands to explain the formulas used for each score, making the metric
 <figcaption>Commit Frequency</figcaption>
 </figure>
 
-- **Commit Classification**: AI-powered commit categorization
+- **Commit Classification**: “AI-powered commit categorization”
 
 This view breaks down the types of commits in the codebase—features, fixes, refactors, chores, etc.—giving a clear picture of development focus.
 It also provides key derived ratios:
@@ -91,7 +91,7 @@ It’s useful for understanding team habits and optimizing collaboration or revi
 <figcaption>Commit Trend Analysis</figcaption>
 </figure>
 
-- **Release Frequency**: Shipping velocity and code review responsiveness
+- **Release Frequency**: “Shipping velocity and code review responsiveness”
 
 This section helps assess how often code is being shipped and how efficiently pull requests are processed.
 
@@ -109,7 +109,7 @@ These metrics reveal how quickly changes reach production, highlighting the team
 </figure>
 
 
-- **Compliance**: License compliance, dependency vulnerabilities, and code quality
+- **Compliance**: “License compliance, dependency vulnerabilities, and code quality”
 
 This view provides a summary of the licensing status of all detected components within the project. It includes:
 

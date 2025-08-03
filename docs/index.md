@@ -15,6 +15,12 @@ Most GitHub/Git analytics tools focus on repository-level data. GitPulse lets yo
 
 I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs or unexpected behavior, **contributions are welcome**—as long as they stay aligned with the spirit of the project: useful, readable, and not overengineered.
 
+<figure markdown="span">
+![GitPulse Dashboard](images/dashboard.png){ width="400" }
+<figcaption>GitPulse Dashboard</figcaption>
+</figure>
+
+
 ---
 
 ## ✨ Key Features
