@@ -25,4 +25,6 @@ urlpatterns = [
     path('api/<int:repo_id>/commit-types/', views.api_repository_commit_types, name='api_commit_types'),
     path('api/<int:repo_id>/licensing-analysis/', views.repository_licensing_analysis, name='api_licensing_analysis'),
     path('api/<int:repo_id>/vulnerabilities-analysis/', views.repository_vulnerabilities_analysis, name='api_vulnerabilities_analysis'),
+    path('api/<int:repo_id>/llm-license-analysis/', views.repository_llm_license_analysis, name='api_llm_license_analysis'),
+    path('api/<int:repo_id>/llm-license-verdict/', views.repository_llm_license_verdict, name='api_llm_license_verdict'),
 ] 

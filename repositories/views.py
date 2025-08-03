@@ -12,6 +12,7 @@ from .models import Repository
 from analytics.github_token_service import GitHubTokenService
 from analytics.unified_metrics_service import UnifiedMetricsService
 from analytics.license_analysis_service import LicenseAnalysisService
+from analytics.llm_service import LLMService
 
 
 @login_required
@@ -692,6 +693,112 @@ def repository_licensing_analysis(request, repo_id):
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Error in licensing analysis: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def repository_llm_license_analysis(request, repo_id):
+    """AJAX view for LLM license analysis"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        
+        # Get license analysis first
+        license_service = LicenseAnalysisService(repository.full_name)
+        analysis = license_service.analyze_commercial_compatibility()
+        
+        if not analysis['has_sbom']:
+            return JsonResponse({
+                'success': False,
+                'error': 'No SBOM found for this repository'
+            })
+        
+        # Extract unique licenses
+        unique_licenses = list(analysis['license_summary'].keys())
+        
+        if not unique_licenses:
+            return JsonResponse({
+                'success': False,
+                'error': 'No licenses found in SBOM'
+            })
+        
+        # Analyze with LLM
+        llm_service = LLMService()
+        llm_result = llm_service.analyze_licenses(unique_licenses)
+        
+        if llm_result['success']:
+            # Parse LLM response
+            parsed_analysis = llm_service.parse_llm_response(llm_result['analysis'])
+            
+            return JsonResponse({
+                'success': True,
+                'licenses': unique_licenses,
+                'llm_analysis': parsed_analysis,
+                'raw_response': llm_result['analysis']
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': llm_result['error']
+            })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in LLM license analysis: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def repository_llm_license_verdict(request, repo_id):
+    """AJAX view for LLM license verdict"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        
+        # Get license analysis first
+        license_service = LicenseAnalysisService(repository.full_name)
+        analysis = license_service.analyze_commercial_compatibility()
+        
+        if not analysis['has_sbom']:
+            return JsonResponse({
+                'success': False,
+                'error': 'No SBOM found for this repository'
+            })
+        
+        # Extract unique licenses
+        unique_licenses = list(analysis['license_summary'].keys())
+        
+        if not unique_licenses:
+            return JsonResponse({
+                'success': False,
+                'error': 'No licenses found in SBOM'
+            })
+        
+        # Get LLM verdict
+        llm_service = LLMService()
+        verdict = llm_service.get_license_verdict(unique_licenses)
+        
+        return JsonResponse({
+            'success': True,
+            'verdict': verdict,
+            'analysis': analysis  # For fallback
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in LLM license verdict: {e}")
         return JsonResponse({
             'success': False,
             'error': str(e)

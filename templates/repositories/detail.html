@@ -1141,36 +1141,16 @@ function displayLicensingAnalysis(analysis) {
     
     content.innerHTML = `
         <div class="space-y-6">
-            <!-- Summary -->
-            <div class="bg-gray-50 rounded-lg p-4">
-                <h3 class="text-lg font-semibold text-gray-800 mb-3">Summary</h3>
-                <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <span class="text-gray-600">Total Components:</span>
-                        <span class="font-medium ml-2">${analysis.total_components}</span>
-                    </div>
-                    <div>
-                        <span class="text-gray-600">Commercial Compatible:</span>
-                        <span class="font-medium ml-2 ${analysis.compatible ? 'text-green-600' : 'text-red-600'}">
-                            ${analysis.compatible ? 'Yes' : 'No'}
-                        </span>
-                    </div>
-                    <div>
-                        <span class="text-gray-600">SBOM Generated:</span>
-                        <span class="font-medium ml-2">${new Date(analysis.sbom_generated_at).toLocaleDateString()}</span>
+            <!-- LLM Analysis -->
+            <div class="bg-purple-50 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-purple-800 mb-3">AI Analysis</h3>
+                <div id="llm-analysis-content">
+                    <div class="flex items-center justify-center py-4">
+                        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
+                        <span class="ml-2 text-purple-600">Analyzing licenses with AI...</span>
                     </div>
                 </div>
             </div>
-            
-            <!-- Recommendations -->
-            ${analysis.recommendations.length > 0 ? `
-                <div class="bg-blue-50 rounded-lg p-4">
-                    <h3 class="text-lg font-semibold text-blue-800 mb-3">Recommendations</h3>
-                    <ul class="space-y-2">
-                        ${analysis.recommendations.map(rec => `<li class="text-blue-700">• ${rec}</li>`).join('')}
-                    </ul>
-                </div>
-            ` : ''}
             
             <!-- Components Table -->
             <div>
@@ -1192,6 +1172,9 @@ function displayLicensingAnalysis(analysis) {
             </div>
         </div>
     `;
+    
+    // Load LLM analysis asynchronously
+    loadLLMAnalysis();
 }
 
 function updateLicensingStatus(analysis) {
@@ -1203,13 +1186,194 @@ function updateLicensingStatus(analysis) {
         return;
     }
     
-    if (analysis.compatible) {
-        statusElement.textContent = '✅ Compatible';
-        statusElement.className = 'text-2xl font-bold text-green-500';
-    } else {
-        statusElement.textContent = '⚠️ Review';
-        statusElement.className = 'text-2xl font-bold text-yellow-500';
+    // Load LLM verdict asynchronously
+    loadLLMVerdict();
+}
+
+function loadLLMVerdict() {
+    const statusElement = document.getElementById('licensing-status');
+    
+    // Show loading state
+    statusElement.textContent = '🤖 Analyzing...';
+    statusElement.className = 'text-2xl font-bold text-purple-500';
+    
+    fetch(`/repositories/api/{{ repository.id }}/llm-license-verdict/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const verdict = data.verdict;
+                if (verdict === 'Compatible') {
+                    statusElement.textContent = '✅ Compatible';
+                    statusElement.className = 'text-2xl font-bold text-green-500';
+                } else if (verdict === 'Caution') {
+                    statusElement.textContent = '⚠️ Caution';
+                    statusElement.className = 'text-2xl font-bold text-yellow-500';
+                } else {
+                    statusElement.textContent = '❌ Not Compatible';
+                    statusElement.className = 'text-2xl font-bold text-red-500';
+                }
+            } else {
+                // Fallback to original logic
+                const analysis = data.analysis;
+                if (analysis && analysis.compatible) {
+                    statusElement.textContent = '✅ Compatible';
+                    statusElement.className = 'text-2xl font-bold text-green-500';
+                } else {
+                    statusElement.textContent = '⚠️ Review';
+                    statusElement.className = 'text-2xl font-bold text-yellow-500';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading LLM verdict:', error);
+            // Fallback to original logic
+            statusElement.textContent = '⚠️ Review';
+            statusElement.className = 'text-2xl font-bold text-yellow-500';
+        });
+}
+
+function loadLLMAnalysis() {
+    const llmContent = document.getElementById('llm-analysis-content');
+    if (!llmContent) return;
+    
+    fetch(`/repositories/api/{{ repository.id }}/llm-license-analysis/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayLLMAnalysis(data.llm_analysis, data.licenses);
+            } else {
+                llmContent.innerHTML = `
+                    <div class="text-center p-4">
+                        <div class="text-red-500 text-2xl mb-2">❌</div>
+                        <p class="text-red-600">${data.error || 'Failed to analyze licenses'}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading LLM analysis:', error);
+            llmContent.innerHTML = `
+                <div class="text-center p-4">
+                    <div class="text-red-500 text-2xl mb-2">❌</div>
+                    <p class="text-red-600">Failed to load AI analysis</p>
+                </div>
+            `;
+        });
+}
+
+function displayLLMAnalysis(analysis, licenses) {
+    const llmContent = document.getElementById('llm-analysis-content');
+    if (!llmContent) return;
+    
+    // Handle parsing errors
+    if (analysis.error) {
+        llmContent.innerHTML = `
+            <div class="text-center p-4">
+                <div class="text-yellow-500 text-2xl mb-2">⚠️</div>
+                <p class="text-yellow-600">AI response parsing error</p>
+                <details class="mt-2 text-xs text-gray-500">
+                    <summary>Raw response</summary>
+                    <pre class="mt-2 p-2 bg-gray-100 rounded text-left">${analysis.raw_response || 'No response'}</pre>
+                </details>
+            </div>
+        `;
+        return;
     }
+    
+    // Display structured analysis
+    let commercialStatus = analysis.commercial_compatibility || 'UNKNOWN';
+    
+    // Handle case where commercial_compatibility is an object
+    if (typeof commercialStatus === 'object') {
+        const values = Object.values(commercialStatus);
+        const yesCount = values.filter(v => v === 'YES').length;
+        const noCount = values.filter(v => v === 'NO').length;
+        const cautionCount = values.filter(v => v === 'CAUTION').length;
+        const total = values.length;
+        
+        // More nuanced logic based on proportions
+        if (noCount > 0 && noCount / total > 0.3) {
+            commercialStatus = 'NO';
+        } else if (cautionCount > 0 && cautionCount / total > 0.5) {
+            commercialStatus = 'CAUTION';
+        } else if (yesCount / total > 0.7) {
+            commercialStatus = 'YES';
+        } else {
+            commercialStatus = 'CAUTION';
+        }
+    }
+    
+    const statusColor = commercialStatus === 'YES' ? 'text-green-600' : 
+                       commercialStatus === 'NO' ? 'text-red-600' : 'text-yellow-600';
+    
+    llmContent.innerHTML = `
+        <div class="space-y-4">
+            <!-- Commercial Compatibility -->
+            <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <span class="font-medium text-purple-800">Commercial Use:</span>
+                <span class="font-bold text-lg ${statusColor}">${commercialStatus}</span>
+            </div>
+            
+            <!-- Summary -->
+            ${analysis.summary ? `
+                <div class="p-3 bg-purple-50 rounded-lg">
+                    <h4 class="font-medium text-purple-800 mb-2">Summary</h4>
+                    <p class="text-sm text-purple-700">${analysis.summary}</p>
+                </div>
+            ` : ''}
+            
+            <!-- Key Obligations -->
+            ${analysis.key_obligations && analysis.key_obligations.length > 0 ? `
+                <div>
+                    <h4 class="font-medium text-purple-800 mb-2">Key Obligations</h4>
+                    <ul class="text-sm text-purple-700 space-y-1">
+                        ${analysis.key_obligations.map(obligation => `<li>• ${obligation}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+            
+            <!-- Key Restrictions -->
+            ${analysis.key_restrictions && analysis.key_restrictions.length > 0 ? `
+                <div>
+                    <h4 class="font-medium text-purple-800 mb-2">Key Restrictions</h4>
+                    <ul class="text-sm text-purple-700 space-y-1">
+                        ${analysis.key_restrictions.map(restriction => `<li>• ${restriction}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+            
+            <!-- Recommendations -->
+            ${analysis.recommendations && analysis.recommendations.length > 0 ? `
+                <div class="p-3 bg-purple-50 rounded-lg">
+                    <h4 class="font-medium text-purple-800 mb-2">Recommendations</h4>
+                    <ul class="text-sm text-purple-700 space-y-1">
+                        ${analysis.recommendations.map(rec => `<li>• ${rec}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+            
+            <!-- Licenses analyzed -->
+            <div class="text-xs text-purple-500 mt-4 pt-4 border-t border-purple-200">
+                <span class="font-medium">Licenses analyzed:</span> ${licenses.join(', ')}
+            </div>
+            
+            <!-- Legal Disclaimer -->
+            <div class="mt-4 p-3 bg-purple-100 rounded-lg border-l-4 border-purple-400">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-purple-700">
+                            <strong>Disclaimer:</strong> This AI analysis is for informational purposes only and should not replace professional legal advice. GitPulse may contain errors and does not guarantee accuracy. The responsibility for license compliance remains with the code owner. Always consult qualified legal professionals for definitive guidance.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 // Vulnerabilities Analysis Slide-over
