@@ -57,7 +57,9 @@ GitPulse uses a modern but focused tech stack:
 
 ## 🚀 Quick Start
 
-### Option 1: Docker (Recommended)
+### Option 1: Docker 
+⚠️ GitPulse is still in early development. The code and Docker setup are subject to change.
+If you’re looking for a stable deployment method, please wait for the first official release.
 
 ```bash
 git clone https://github.com/assiadialeb/gitpulse.git
