@@ -19,13 +19,13 @@ I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs
 
 ## ✨ Key Features
 
-•	🧩 Project-Level Aggregation: Group multiple repositories into a single product or initiative to track contributions, trends, and metrics across an entire software unit — not just per repo.
-•	📊 Comprehensive Analytics: Track commits, pull requests, reviews, merges, and contributor activity.
-•	👥 Developer Insights: Understand individual and team-level behaviors over time.
-•	📈 Trend Analysis: Spot slowdowns, bottlenecks, or productivity shifts through contribution trends.
-•	🔍 Repository Analytics: Dive into activity metrics and code quality signals per repository.
-•	⚡ Live GitHub Sync: Realtime updates powered by the GitHub API, no manual refresh.
-•	🎯 Custom KPIs: Define and visualize your own contribution or quality indicators.
+- 🧩 Project-Level Aggregation: Group multiple repositories into a single product or initiative to track contributions, trends, and metrics across an entire software unit — not just per repo.
+- 📊 Comprehensive Analytics: Track commits, pull requests, reviews, merges, and contributor activity.
+- 👥 Developer Insights: Understand individual and team-level behaviors over time.
+- 📈 Trend Analysis: Spot slowdowns, bottlenecks, or productivity shifts through contribution trends.
+- 🔍 Repository Analytics: Dive into activity metrics and code quality signals per repository.
+- ⚡ Live GitHub Sync: Realtime updates powered by the GitHub API, no manual refresh.
+- 🎯 Custom KPIs: Define and visualize your own contribution or quality indicators.
 
 ---
 
