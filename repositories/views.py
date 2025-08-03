@@ -807,74 +807,146 @@ def repository_llm_license_verdict(request, repo_id):
 
 @login_required
 def repository_vulnerabilities_analysis(request, repo_id):
-    """
-    Get SBOM vulnerabilities analysis for a repository
-    """
+    """AJAX view for vulnerabilities analysis"""
     if request.method != 'GET':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
         repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
         
-        # Get the latest SBOM for this repository
-        from analytics.models import SBOM
-        sbom = SBOM.objects(repository_full_name=repository.full_name).order_by('-created_at').first()
+        # Get SBOM analysis
+        from analytics.sbom_service import SBOMService
+        sbom_service = SBOMService()
         
+        # Check if SBOM exists
+        sbom = sbom_service.get_sbom(repository.full_name)
         if not sbom:
             return JsonResponse({
-                'status': 'no_sbom',
-                'message': 'No SBOM found for this repository'
+                'success': False,
+                'error': 'No SBOM found for this repository'
             })
         
-        # Get vulnerabilities from the SBOM
-        from analytics.models import SBOMVulnerability
-        vulnerabilities = SBOMVulnerability.objects(sbom_id=sbom)
-        
-        # Format vulnerabilities for display
-        vuln_list = []
-        for vuln in vulnerabilities:
-            vuln_data = {
-                'id': vuln.vuln_id,
-                'title': vuln.title,
-                'description': vuln.description,
-                'severity': vuln.severity,
-                'cvss_score': vuln.cvss_score,
-                'cvss_vector': vuln.cvss_vector,
-                'source_name': vuln.source_name,
-                'affected_component': {
-                    'name': vuln.affected_component_name,
-                    'version': vuln.affected_component_version,
-                    'purl': vuln.affected_component_purl
-                },
-                'published_date': vuln.published_date.isoformat() if vuln.published_date else None,
-                'updated_date': vuln.updated_date.isoformat() if vuln.updated_date else None,
-                'references': vuln.references or []
-            }
-            vuln_list.append(vuln_data)
-        
-        # Group vulnerabilities by severity
-        severity_counts = {}
-        for vuln in vuln_list:
-            severity = vuln['severity'] or 'unknown'
-            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+        # Get vulnerabilities
+        vulnerabilities = sbom_service.get_vulnerabilities(repository.full_name)
         
         return JsonResponse({
-            'status': 'success',
-            'total_vulnerabilities': len(vuln_list),
-            'severity_counts': severity_counts,
-            'vulnerabilities': vuln_list
+            'success': True,
+            'vulnerabilities': vulnerabilities,
+            'total_vulnerabilities': len(vulnerabilities),
+            'sbom_generated': sbom.generated_at.isoformat() if sbom.generated_at else None
         })
         
-    except Repository.DoesNotExist:
-        return JsonResponse({
-            'status': 'error',
-            'message': 'Repository not found'
-        }, status=404)
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Error in vulnerabilities analysis: {e}")
         return JsonResponse({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def repository_commits_list(request, repo_id):
+    """AJAX view for commits list with pagination and date filtering"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        
+        # Get pagination parameters
+        page = int(request.GET.get('page', 1))
+        per_page = int(request.GET.get('per_page', 20))
+        
+        # Get date range parameters
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        
+        # Import analytics models
+        from analytics.models import Commit
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        
+        # Build query
+        commits_query = Commit.objects.filter(repository_full_name=repository.full_name)
+        
+        # Apply date filtering if provided
+        if start_date and end_date:
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                # Add one day to end_date to include the full day
+                end_dt = end_dt + timedelta(days=1)
+                
+                # Check if this is "All Time" (very old start date)
+                is_all_time = start_dt.year < 2010
+                
+                if not is_all_time:
+                    commits_query = commits_query.filter(
+                        authored_date__gte=start_dt,
+                        authored_date__lt=end_dt
+                    )
+            except ValueError:
+                # Invalid date format, ignore date filtering
+                pass
+        
+        # Get total count
+        total_commits = commits_query.count()
+        
+        # Apply pagination
+        offset = (page - 1) * per_page
+        commits = commits_query.order_by('-authored_date')[offset:offset + per_page]
+        
+        # Serialize commits
+        commits_data = []
+        for commit in commits:
+            commits_data.append({
+                'sha': commit.sha,
+                'message': commit.message,
+                'author_name': commit.author_name,
+                'author_email': commit.author_email,
+                'authored_date': commit.authored_date.isoformat() if commit.authored_date else None,
+                'committed_date': commit.committed_date.isoformat() if commit.committed_date else None,
+                'additions': commit.additions,
+                'deletions': commit.deletions,
+                'total_changes': commit.total_changes,
+                'files_changed': len(commit.files_changed) if commit.files_changed else 0,
+                'commit_type': commit.commit_type,
+                'url': commit.url,
+                'pull_request_number': commit.pull_request_number,
+                'pull_request_url': commit.pull_request_url
+            })
+        
+        # Calculate pagination info
+        total_pages = (total_commits + per_page - 1) // per_page
+        has_next = page < total_pages
+        has_previous = page > 1
+        
+        return JsonResponse({
+            'success': True,
+            'commits': commits_data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total_commits': total_commits,
+                'total_pages': total_pages,
+                'has_next': has_next,
+                'has_previous': has_previous,
+                'next_page': page + 1 if has_next else None,
+                'previous_page': page - 1 if has_previous else None
+            },
+            'filters': {
+                'start_date': start_date,
+                'end_date': end_date
+            }
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in commits list: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
         }, status=500)
