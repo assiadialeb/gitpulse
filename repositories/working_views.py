@@ -134,6 +134,8 @@ def working_repository_detail(request, repo_id):
         # Build context
         context = {
             'repository': repository,
+            'start_date': start_date.strftime("%Y-%m-%d"),
+            'end_date': end_date.strftime("%Y-%m-%d"),
             'overall_stats': overall_stats,
             'developer_activity': developer_activity,
             'commit_frequency': commit_frequency,
@@ -167,6 +169,8 @@ def working_repository_detail(request, repo_id):
         # If metrics calculation fails, provide empty data
         context = {
             'repository': repository,
+            'start_date': start_date.strftime("%Y-%m-%d"),
+            'end_date': end_date.strftime("%Y-%m-%d"),
             'overall_stats': {'total_commits': 0, 'total_authors': 0, 'total_additions': 0, 'total_deletions': 0, 'net_lines': 0},
             'developer_activity': {'developers': []},
             'commit_frequency': {'avg_commits_per_day': 0, 'recent_activity_score': 0, 'consistency_score': 0, 'overall_frequency_score': 0, 'commits_last_30_days': 0, 'commits_last_90_days': 0, 'days_since_last_commit': None, 'active_days': 0, 'total_days': 0},

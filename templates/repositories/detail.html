@@ -844,20 +844,20 @@ function setDateRange(days) {
         start.setDate(end.getDate() - days + 1);
     }
     
+    // Update form fields first
     const startDateField = document.getElementById('start-date');
     const endDateField = document.getElementById('end-date');
     
     startDateField.value = start.toISOString().slice(0, 10);
     endDateField.value = end.toISOString().slice(0, 10);
     
-    // Trigger change event to ensure the fields are properly updated
-    startDateField.dispatchEvent(new Event('change', { bubbles: true }));
-    endDateField.dispatchEvent(new Event('change', { bubbles: true }));
+    // Build URL with the new dates
+    const url = new URL(window.location.href);
+    url.searchParams.set('start', start.toISOString().slice(0, 10));
+    url.searchParams.set('end', end.toISOString().slice(0, 10));
     
-    // Add a small delay to ensure the DOM is updated before calling updateDateRange
-    setTimeout(() => {
-        updateDateRange();
-    }, 50);
+    // Navigate to the new URL immediately
+    window.location.href = url.toString();
 }
 
 // Set default dates if not provided
