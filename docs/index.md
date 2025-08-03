@@ -71,9 +71,11 @@ docker-compose up -d --build
 ### Option 2: Local Installation
 
 #### Requirements
+- Python >= 3.12
 - PostgreSQL
 - MongoDB
 - Ollama
+- NPM
 
 
 ```bash
@@ -82,6 +84,7 @@ cd GitPulse
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
+npm install
 cp env.example .env
 python manage.py migrate
 python manage.py runserver
