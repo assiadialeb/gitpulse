@@ -9,7 +9,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  logo:assets/gitpulse.png
+  logo: assets/gitpulse.png
   language: en
   features:
     - navigation.expand
