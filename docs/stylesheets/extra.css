@@ -31,6 +31,6 @@
 
 
   /*Masquage du nom du site, redondant avec le logo*/
-  .md-header__title {
+  .md-ellipsis {
     display: none !important;
   }
