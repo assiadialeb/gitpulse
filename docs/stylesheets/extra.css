@@ -28,9 +28,3 @@
     color: #888;
     text-align: center;
   }
-
-
-  /*Masquage du nom du site, redondant avec le logo*/
-  .md-ellipsis {
-    display: none !important;
-  }
