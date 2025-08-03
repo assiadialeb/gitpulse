@@ -28,3 +28,8 @@
     color: #888;
     text-align: center;
   }
+
+  
+  .md-header__topic {
+    display: none !important;
+  }
