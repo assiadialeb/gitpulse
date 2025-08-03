@@ -51,20 +51,14 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 ### Key Sections
 
 1. **Dashboard**: Overview of key metrics
-2. **Projects**: Repository management and analysis
-3. **Developers**: Individual and team analytics
-4. **Analytics**: Detailed metrics and reports
+2. **Repositories**: Repository management and analysis
+3. **Projects**: Group repositories 
+4. **Developers**: Individual analytics
 5. **Settings**: Configuration and preferences
 
 
 ## 🚀 Getting Started
 
-### Quick Setup
-
-1. **Install GitPulse**: Follow the [installation guide](../getting-started/installation.md)
-2. **Configure GitHub**: Set up OAuth integration
-3. **Add Repositories**: Connect your GitHub repositories
-4. **Start Analyzing**: Begin collecting and analyzing data
 
 ### First Steps
 
@@ -102,40 +96,3 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 - **User Consent**: Explicit permission required
 - **Data Minimization**: Only collects necessary data
 - **Secure Storage**: Encrypted data storage
-
-## 🎯 Use Cases
-
-### For CTOs
-
-- **Team Productivity**: Understand overall team performance
-- **Project Health**: Monitor project status and trends
-- **Resource Allocation**: Identify areas needing resources
-- **Strategic Planning**: Data-driven decision making
-
-### For Tech Leads
-
-- **Team Management**: Monitor individual and team performance
-- **Code Quality**: Track quality metrics and trends
-- **Process Optimization**: Identify bottlenecks and improvements
-- **Mentoring**: Guide team members based on data
-
-### For Developers
-
-- **Self-assessment**: Understand your own contribution patterns
-- **Team Collaboration**: See how you work with others
-- **Skill Development**: Identify areas for growth
-- **Project Understanding**: Better understand project dynamics
-
-### For Project Managers
-
-- **Progress Tracking**: Monitor project milestones
-- **Team Coordination**: Understand team dynamics
-- **Risk Assessment**: Identify potential issues early
-- **Performance Evaluation**: Data-driven performance reviews
-
-## 📚 Next Steps
-
-- **[GitHub Setup](github-setup.md)** - Configure GitHub integration
-- **[Projects Guide](projects.md)** - Manage and analyze repositories
-- **[Analytics Guide](analytics.md)** - Understand metrics and reports
-- **[Developers Guide](developers.md)** - Manage team and individual analytics 
