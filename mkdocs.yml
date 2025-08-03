@@ -9,19 +9,35 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  logo: assets/gitpulse.png
+  logo: null
+  icon:
+    logo: material/git
   language: en
   features:
     - navigation.expand
-    - navigation.top
+    #- navigation.top
     - search.highlight
     - search.suggest
     - content.code.annotate
     - content.tabs.link
     - toc.integrate
-    - header.autohide
+    #- header.autohide
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
 extra_css:
-  - stylesheets/extra.css
+#  - stylesheets/extra.css
 # Important: disables pretty URLs for GitHub Pages compatibility
 use_directory_urls: false
 

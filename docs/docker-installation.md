@@ -1,37 +1,37 @@
-# Installation GitPulse avec Docker
+# GitPulse Installation with Docker
 
-Ce guide vous explique comment installer et configurer GitPulse en utilisant Docker avec PostgreSQL, MongoDB, Redis et Ollama.
+This guide explains how to install and configure GitPulse using Docker with PostgreSQL, MongoDB, Redis, and Ollama.
 
-## Prérequis
+## Prerequisites
 
-- Docker et Docker Compose installés
-- Git installé
-- Au moins 4GB de RAM disponible
-- 10GB d'espace disque libre
+- Docker and Docker Compose installed
+- Git installed
+- At least 4GB of RAM available
+- 10GB of free disk space
 
 ## Installation
 
-### 1. Cloner le repository
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/votre-username/gitpulse.git
+git clone https://github.com/your-username/gitpulse.git
 cd gitpulse
 ```
 
-### 2. Configuration de l'environnement
+### 2. Environment configuration
 
-Créez un fichier `.env` à la racine du projet :
+Create a `.env` file at the project root:
 
 ```bash
 cp env.example .env
 ```
 
-Modifiez le fichier `.env` selon vos besoins :
+Modify the `.env` file according to your needs:
 
 ```env
 # Django Settings
 DEBUG=True
-SECRET_KEY=votre-secret-key-ici
+SECRET_KEY=your-secret-key-here
 ALLOWED_HOSTS=localhost,127.0.0.1
 
 # Database Settings
@@ -54,129 +54,129 @@ REDIS_PORT=6379
 OLLAMA_HOST=ollama
 OLLAMA_PORT=11434
 
-# GitHub OAuth (optionnel pour le développement)
-GITHUB_CLIENT_ID=votre-github-client-id
-GITHUB_CLIENT_SECRET=votre-github-client-secret
+# GitHub OAuth (optional for development)
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
 ```
 
-### 3. Démarrer les services
+### 3. Start the services
 
 ```bash
-# Construire et démarrer tous les services
+# Build and start all services
 docker-compose up -d --build
 ```
 
-Cette commande va :
-- Construire l'image Docker de l'application
-- Démarrer PostgreSQL (base de données Django)
-- Démarrer MongoDB (base de données analytics)
-- Démarrer Redis (cache)
-- Démarrer Ollama (IA pour la classification des commits)
-- Démarrer l'application Django
+This command will:
+- Build the Docker image of the application
+- Start PostgreSQL (Django database)
+- Start MongoDB (analytics database)
+- Start Redis (cache)
+- Start Ollama (AI for commit classification)
+- Start the Django application
 
-### 4. Vérifier que tous les services sont démarrés
+### 4. Verify that all services are started
 
 ```bash
 docker-compose ps
 ```
 
-Vous devriez voir tous les services avec le statut "Up".
+You should see all services with "Up" status.
 
-### 5. Initialiser la base de données
+### 5. Initialize the database
 
 ```bash
-# Créer les migrations Django
+# Create Django migrations
 docker-compose exec web python manage.py makemigrations
 
-# Appliquer les migrations
+# Apply migrations
 docker-compose exec web python manage.py migrate
 
-# Créer un superutilisateur
+# Create a superuser
 docker-compose exec web python manage.py createsuperuser
 ```
 
-### 6. Collecter les fichiers statiques
+### 6. Collect static files
 
 ```bash
 docker-compose exec web python manage.py collectstatic --noinput
 ```
 
-## Accès à l'application
+## Access to the application
 
-- **Application web** : http://localhost:8000
-- **Admin Django** : http://localhost:8000/admin
-- **PostgreSQL** : localhost:5432
-- **MongoDB** : localhost:27017
-- **Redis** : localhost:6379
-- **Ollama** : http://localhost:11434
+- **Web application**: http://localhost:8000
+- **Django Admin**: http://localhost:8000/admin
+- **PostgreSQL**: localhost:5432
+- **MongoDB**: localhost:27017
+- **Redis**: localhost:6379
+- **Ollama**: http://localhost:11434
 
-## Configuration GitHub OAuth (optionnel)
+## GitHub OAuth Configuration (optional)
 
-Pour utiliser l'authentification GitHub :
+To use GitHub authentication:
 
-1. Créez une application OAuth sur GitHub :
-   - Allez sur https://github.com/settings/developers
-   - Cliquez sur "New OAuth App"
-   - Remplissez les informations :
+1. Create an OAuth application on GitHub:
+   - Go to https://github.com/settings/developers
+   - Click "New OAuth App"
+   - Fill in the information:
      - Application name: GitPulse
      - Homepage URL: http://localhost:8000
      - Authorization callback URL: http://localhost:8000/accounts/github/login/callback/
 
-2. Ajoutez les credentials dans votre `.env` :
+2. Add the credentials to your `.env`:
    ```env
-   GITHUB_CLIENT_ID=votre-client-id
-   GITHUB_CLIENT_SECRET=votre-client-secret
+   GITHUB_CLIENT_ID=your-client-id
+   GITHUB_CLIENT_SECRET=your-client-secret
    ```
 
-3. Redémarrez les services :
+3. Restart the services:
    ```bash
    docker-compose restart web
    ```
 
-## Commandes utiles
+## Useful Commands
 
-### Gestion des services
+### Service Management
 
 ```bash
-# Démarrer les services
+# Start services
 docker-compose up -d
 
-# Arrêter les services
+# Stop services
 docker-compose down
 
-# Voir les logs
+# View logs
 docker-compose logs -f
 
-# Voir les logs d'un service spécifique
+# View logs for a specific service
 docker-compose logs -f web
 
-# Redémarrer un service
+# Restart a service
 docker-compose restart web
 ```
 
-### Base de données
+### Database
 
 ```bash
-# Accéder au shell PostgreSQL
+# Access PostgreSQL shell
 docker-compose exec postgres psql -U gitpulse -d gitpulse
 
-# Accéder au shell MongoDB
+# Access MongoDB shell
 docker-compose exec mongodb mongosh
 
-# Accéder au shell Redis
+# Access Redis shell
 docker-compose exec redis redis-cli
 ```
 
-### Application Django
+### Django Application
 
 ```bash
-# Accéder au shell Django
+# Access Django shell
 docker-compose exec web python manage.py shell
 
-# Créer un superutilisateur
+# Create a superuser
 docker-compose exec web python manage.py createsuperuser
 
-# Voir les tâches en cours
+# View running tasks
 docker-compose exec web python manage.py shell
 # >>> from django_q.models import Schedule
 # >>> Schedule.objects.all()
@@ -185,163 +185,163 @@ docker-compose exec web python manage.py shell
 ### Ollama
 
 ```bash
-# Voir les modèles disponibles
+# View available models
 docker-compose exec ollama ollama list
 
-# Tester Ollama
+# Test Ollama
 curl http://localhost:11434/api/generate -d '{
   "model": "gemma3:1b",
   "prompt": "Hello, how are you?"
 }'
 ```
 
-## Structure des données
+## Data Structure
 
 ### PostgreSQL (Django)
-- **Users** : Utilisateurs et authentification
-- **Projects** : Projets et leurs repositories
-- **Repositories** : Repositories GitHub
-- **Developers** : Informations sur les développeurs
+- **Users**: Users and authentication
+- **Projects**: Projects and their repositories
+- **Repositories**: GitHub repositories
+- **Developers**: Developer information
 
 ### MongoDB (Analytics)
-- **Commits** : Données des commits avec classification
-- **PullRequests** : Données des pull requests
-- **Releases** : Données des releases
-- **Deployments** : Données des déploiements
-- **Developers** : Groupement des identités développeur
+- **Commits**: Commit data with classification
+- **PullRequests**: Pull request data
+- **Releases**: Release data
+- **Deployments**: Deployment data
+- **Developers**: Developer identity grouping
 
-## Monitoring et logs
+## Monitoring and Logs
 
-### Logs de l'application
+### Application Logs
 ```bash
 docker-compose logs -f web
 ```
 
-### Logs de la base de données
+### Database Logs
 ```bash
 docker-compose logs -f postgres
 docker-compose logs -f mongodb
 ```
 
-### Logs d'Ollama
+### Ollama Logs
 ```bash
 docker-compose logs -f ollama
 ```
 
-## Sauvegarde et restauration
+## Backup and Restoration
 
-### Sauvegarde PostgreSQL
+### PostgreSQL Backup
 ```bash
 docker-compose exec postgres pg_dump -U gitpulse gitpulse > backup_postgres.sql
 ```
 
-### Sauvegarde MongoDB
+### MongoDB Backup
 ```bash
 docker-compose exec mongodb mongodump --db gitpulse --out /data/backup
 docker cp gitpulse_mongodb_1:/data/backup ./backup_mongodb
 ```
 
-### Restauration PostgreSQL
+### PostgreSQL Restoration
 ```bash
 docker-compose exec -T postgres psql -U gitpulse gitpulse < backup_postgres.sql
 ```
 
-### Restauration MongoDB
+### MongoDB Restoration
 ```bash
 docker cp ./backup_mongodb gitpulse_mongodb_1:/data/backup
 docker-compose exec mongodb mongorestore --db gitpulse /data/backup/gitpulse
 ```
 
-## Dépannage
+## Troubleshooting
 
-### Problèmes courants
+### Common Issues
 
-1. **Ports déjà utilisés**
+1. **Ports already in use**
    ```bash
-   # Vérifier les ports utilisés
+   # Check used ports
    lsof -i :8000
    lsof -i :5432
    lsof -i :27017
    ```
 
-2. **Services qui ne démarrent pas**
+2. **Services not starting**
    ```bash
-   # Voir les logs détaillés
+   # View detailed logs
    docker-compose logs
    
-   # Redémarrer tous les services
+   # Restart all services
    docker-compose down
    docker-compose up -d
    ```
 
-3. **Problèmes de permissions**
+3. **Permission issues**
    ```bash
-   # Donner les bonnes permissions aux volumes
+   # Give proper permissions to volumes
    sudo chown -R $USER:$USER ./data
    sudo chown -R $USER:$USER ./logs
    ```
 
-4. **Ollama qui ne répond pas**
+4. **Ollama not responding**
    ```bash
-   # Vérifier que le modèle est téléchargé
+   # Check if the model is downloaded
    docker-compose exec ollama ollama list
    
-   # Télécharger le modèle manuellement
+   # Download the model manually
    docker-compose exec ollama ollama pull gemma3:1b
    ```
 
-### Nettoyage complet
+### Complete Cleanup
 
 ```bash
-# Arrêter et supprimer tous les conteneurs et volumes
+# Stop and remove all containers and volumes
 docker-compose down -v
 
-# Supprimer les images
+# Remove images
 docker-compose down --rmi all
 
-# Nettoyer les volumes Docker non utilisés
+# Clean unused Docker volumes
 docker volume prune
 ```
 
 ## Performance
 
-### Optimisations recommandées
+### Recommended Optimizations
 
-1. **Mémoire** : Allouez au moins 4GB de RAM
-2. **CPU** : Au moins 2 cœurs pour de bonnes performances
-3. **Disque** : SSD recommandé pour les bases de données
+1. **Memory**: Allocate at least 4GB of RAM
+2. **CPU**: At least 2 cores for good performance
+3. **Disk**: SSD recommended for databases
 
-### Monitoring des ressources
+### Resource Monitoring
 
 ```bash
-# Voir l'utilisation des ressources
+# View resource usage
 docker stats
 
-# Voir l'espace disque utilisé
+# View disk space used
 docker system df
 ```
 
 ## Support
 
-Pour obtenir de l'aide :
-- Consultez les logs : `docker-compose logs`
-- Vérifiez la documentation : `/docs`
-- Ouvrez une issue sur GitHub
+For help:
+- Check logs: `docker-compose logs`
+- Review documentation: `/docs`
+- Open an issue on GitHub
 
-## Mise à jour
+## Updates
 
-Pour mettre à jour GitPulse :
+To update GitPulse:
 
 ```bash
-# Arrêter les services
+# Stop services
 docker-compose down
 
-# Récupérer les dernières modifications
+# Get latest changes
 git pull
 
-# Reconstruire et redémarrer
+# Rebuild and restart
 docker-compose up -d --build
 
-# Appliquer les migrations
+# Apply migrations
 docker-compose exec web python manage.py migrate
 ``` 

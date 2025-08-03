@@ -1,70 +1,70 @@
-# Démarrage rapide avec Docker
+# Quick Start with Docker
 
-## Installation en 5 minutes
+## Installation in 5 minutes
 
-### 1. Cloner et configurer
+### 1. Clone and configure
 
 ```bash
-git clone https://github.com/votre-username/gitpulse.git
+git clone https://github.com/your-username/gitpulse.git
 cd gitpulse
 cp env.example .env
 ```
 
-### 2. Démarrer
+### 2. Start
 
 ```bash
 docker-compose up -d --build
 ```
 
-### 3. Initialiser
+### 3. Initialize
 
 ```bash
 docker-compose exec web python manage.py migrate
 docker-compose exec web python manage.py createsuperuser
 ```
 
-### 4. Accéder
+### 4. Access
 
-- **Application** : http://localhost:8000
-- **Admin** : http://localhost:8000/admin
+- **Application**: http://localhost:8000
+- **Admin**: http://localhost:8000/admin
 
-## Services inclus
+## Included Services
 
-- **PostgreSQL** : Base de données Django
-- **MongoDB** : Base de données analytics
-- **Redis** : Cache et file d'attente
-- **Ollama** : IA pour classification des commits
-- **Django** : Application web
+- **PostgreSQL**: Django database
+- **MongoDB**: Analytics database
+- **Redis**: Cache and queue
+- **Ollama**: AI for commit classification
+- **Django**: Web application
 
-## Commandes essentielles
+## Essential Commands
 
 ```bash
-# Démarrer
+# Start
 docker-compose up -d
 
-# Arrêter
+# Stop
 docker-compose down
 
 # Logs
 docker-compose logs -f
 
-# Shell Django
+# Django shell
 docker-compose exec web python manage.py shell
 
-# Shell PostgreSQL
+# PostgreSQL shell
 docker-compose exec postgres psql -U gitpulse -d gitpulse
 ```
 
-## Configuration GitHub
+## GitHub Configuration
 
-1. Créez une app OAuth sur GitHub
-2. Ajoutez les credentials dans `.env`
-3. Redémarrez : `docker-compose restart web`
+1. Create an OAuth app on GitHub
+2. Add credentials to `.env`
+3. Restart: `docker-compose restart web`
 
-## Problèmes ?
+## Problems?
 
-- **Ports occupés** : `lsof -i :8000`
-- **Logs** : `docker-compose logs`
-- **Nettoyage** : `docker-compose down -v`
+- **Ports in use**: `lsof -i :8000`
+- **Logs**: `docker-compose logs`
+- **Cleanup**: `docker-compose down -v`
 
-Voir la [documentation complète](docker-installation.md) pour plus de détails. 
+See the [complete documentation](docker-installation.md) for more details. 
