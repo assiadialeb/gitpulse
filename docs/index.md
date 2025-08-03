@@ -11,6 +11,7 @@
 **GitPulse** is an open-source dashboard designed to analyze developer activity and contribution trends within a GitHub organization.
 
 I started building it as a **CTO** because I couldn't find a tool that was simple and reliable enough to track the activity of my teams and products. GitPulse is a **personal project**, developed during my free time. It will evolve based on my availability and interests.
+Most GitHub/Git analytics tools focus on repository-level data. GitPulse lets you group multiple repositories into a single logical project — reflecting how real software is built and delivered. Perfect for tracking large apps, microservices, or monorepo-like architectures.
 
 I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs or unexpected behavior, **contributions are welcome**—as long as they stay aligned with the spirit of the project: useful, readable, and not overengineered.
 
@@ -18,12 +19,13 @@ I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs
 
 ## ✨ Key Features
 
-- 📊 **Comprehensive Analytics**: Track commits, pull requests, reviews, and more
-- 👥 **Developer Insights**: Understand individual and team activity patterns
-- 📈 **Trend Analysis**: Visualize contribution trends and detect slowdowns
-- 🔍 **Repository Analytics**: Detailed view of code activity and quality
-- ⚡ **Real-time Updates**: Live data pulled from GitHub APIs
-- 🎯 **Custom Metrics**: Define and track your own KPIs
+•	🧩 Project-Level Aggregation: Group multiple repositories into a single product or initiative to track contributions, trends, and metrics across an entire software unit — not just per repo.
+•	📊 Comprehensive Analytics: Track commits, pull requests, reviews, merges, and contributor activity.
+•	👥 Developer Insights: Understand individual and team-level behaviors over time.
+•	📈 Trend Analysis: Spot slowdowns, bottlenecks, or productivity shifts through contribution trends.
+•	🔍 Repository Analytics: Dive into activity metrics and code quality signals per repository.
+•	⚡ Live GitHub Sync: Realtime updates powered by the GitHub API, no manual refresh.
+•	🎯 Custom KPIs: Define and visualize your own contribution or quality indicators.
 
 ---
 
