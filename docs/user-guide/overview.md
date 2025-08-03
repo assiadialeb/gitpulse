@@ -32,11 +32,10 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 - **Code Quality Metrics**: Track code quality indicators
 - **Commit Classification**: AI-powered commit categorization
 - **Trend Analysis**: Identify patterns over time
-- **Custom Metrics**: Define your own KPIs
+- **Compliance**: License compliance, dependency vulnerabilities, and code quality
 
 ### ⚡ Real-time Updates
 
-- **Live Data**: Real-time updates from GitHub APIs
 - **Background Processing**: Automated data collection
 - **Scheduled Indexing**: Regular repository updates
 - **Cache Management**: Optimized performance
@@ -46,7 +45,6 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 ### Modern Design
 
 - **Responsive Layout**: Works on desktop, tablet, and mobile
-- **Dark/Light Mode**: Toggle between themes
 - **Intuitive Navigation**: Easy-to-use interface
 - **Interactive Charts**: Dynamic data visualization
 
@@ -58,28 +56,6 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 4. **Analytics**: Detailed metrics and reports
 5. **Settings**: Configuration and preferences
 
-## 🔧 Technical Architecture
-
-### Backend
-
-- **Django 5.2+**: Modern Python web framework
-- **MongoDB**: Analytics data storage
-- **PostgreSQL**: User and application data
-- **Django-Q**: Background task processing
-
-### Frontend
-
-- **DaisyUI**: Modern CSS framework
-- **Responsive Design**: Mobile-first approach
-- **Interactive Charts**: Data visualization
-- **Real-time Updates**: Live data feeds
-
-### Integrations
-
-- **GitHub API**: Repository and user data
-- **OAuth2**: Secure authentication
-- **Ollama**: AI-powered commit classification
-- **REST APIs**: Extensible architecture
 
 ## 🚀 Getting Started
 
@@ -113,21 +89,12 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 - **Team Collaboration**: Cross-team contributions
 - **Release Cycles**: Deployment and release patterns
 
-### Team Metrics
-
-- **Team Performance**: Group productivity analysis
-- **Cross-team Collaboration**: Inter-team contributions
-- **Knowledge Distribution**: Expertise spread across teams
-- **Bottleneck Identification**: Areas needing attention
 
 ## 🔐 Security & Privacy
 
 ### Data Protection
 
-- **OAuth2 Authentication**: Secure GitHub integration
-- **Data Encryption**: Encrypted data storage
-- **Access Control**: Role-based permissions
-- **Privacy Compliance**: GDPR and privacy standards
+- All your data stored in your datacenter
 
 ### GitHub Integration
 
