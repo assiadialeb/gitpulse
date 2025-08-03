@@ -29,6 +29,11 @@ GitPulse analyzes your GitHub repositories to provide insights into:
 
 ### 🔍 Repository Analysis
 
+<figure markdown="span">
+![Licence Compliance](../images/GitPulse-Repo-Stats.png){ width="200" }
+<figcaption>Repository Overview</figcaption>
+</figure>
+
 - **Code Quality Metrics**: Track code quality indicators
 - **Commit Classification**: AI-powered commit categorization
 - **Trend Analysis**: Identify patterns over time
