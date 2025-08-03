@@ -28,3 +28,9 @@
     color: #888;
     text-align: center;
   }
+
+
+  /*Masquage du nom du site, redondant avec le logo*/
+  .md-header__title {
+    display: none !important;
+  }
