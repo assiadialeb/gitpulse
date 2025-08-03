@@ -70,6 +70,12 @@ docker-compose up -d --build
 
 ### Option 2: Local Installation
 
+- Requirements
+-- PostgreSQL 
+-- MongoDB
+-- Ollama
+
+
 ```bash
 git clone https://github.com/assiadialeb/gitpulse.git
 cd GitPulse
