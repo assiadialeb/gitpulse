@@ -86,6 +86,7 @@ cp env.example .env
 python manage.py migrate
 python manage.py runserver
 ```
+Note: Don’t forget to review and adapt the .env file to match your local environment (e.g., database settings, GitHub token, debug mode, etc.).
 
 ## 📚 Documentation
 
