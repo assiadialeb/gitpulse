@@ -147,7 +147,7 @@
                 </div>
             </div>
             <!-- Total Releases -->
-            <div class="bg-white p-6 rounded-xl shadow-lg">
+            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" onclick="openReleasesList()">
                 <div class="flex items-center">
                     <div class="p-3 bg-yellow-500 bg-opacity-10 rounded-xl mr-4">
                         <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,7 +254,7 @@
                 </div>
             </div>
             <!-- Deployment Frequency -->
-            <div class="bg-white p-6 rounded-xl shadow-lg">
+            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" onclick="openDeploymentsList()">
                 <div class="flex items-start">
                     <div class="p-3 bg-pink-500 bg-opacity-10 rounded-xl mr-4">
                         <svg class="w-8 h-8 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1770,7 +1770,7 @@ function displayCommitsList(data) {
                     </div>
                     <div>
                         <span class="text-gray-600">Date Range:</span>
-                        <span class="font-medium ml-2">${filters.start_date || 'All Time'} - ${filters.end_date || 'Now'}</span>
+                        <span class="font-medium ml-2">${filters.start_date ? filters.start_date + ' - ' + filters.end_date : 'Last 30 days'}</span>
                     </div>
                 </div>
             </div>
@@ -1792,6 +1792,410 @@ function displayCommitsList(data) {
                         </thead>
                         <tbody class="divide-y divide-gray-200">
                             ${commitRows}
+                        </tbody>
+                    </table>
+                </div>
+                ${paginationControls}
+            </div>
+        </div>
+    `;
+}
+
+// Releases List Functions
+function openReleasesList() {
+    const slideOver = document.getElementById('releases-slide-over');
+    const slidePanel = document.getElementById('releases-slide-panel');
+    
+    slideOver.classList.remove('hidden');
+    setTimeout(() => {
+        slidePanel.classList.remove('translate-x-full');
+    }, 10);
+    
+    loadReleasesList();
+}
+
+function closeReleasesList() {
+    const slideOver = document.getElementById('releases-slide-over');
+    const slidePanel = document.getElementById('releases-slide-panel');
+    
+    slidePanel.classList.add('translate-x-full');
+    setTimeout(() => {
+        slideOver.classList.add('hidden');
+    }, 300);
+}
+
+function loadReleasesList(page = 1) {
+    const content = document.getElementById('releases-content');
+    
+    // Show loading state
+    content.innerHTML = `
+        <div class="flex items-center justify-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+            <span class="ml-3 text-gray-600">Loading releases...</span>
+        </div>
+    `;
+    
+    // Get current date filters from URL parameters (more reliable than form fields)
+    const urlParams = new URLSearchParams(window.location.search);
+    const startDate = urlParams.get('start') || '';
+    const endDate = urlParams.get('end') || '';
+    
+    // Build URL with parameters
+    const params = new URLSearchParams({
+        page: page,
+        per_page: 20
+    });
+    
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    
+    fetch(`/repositories/api/{{ repository.id }}/releases/?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayReleasesList(data);
+            } else {
+                content.innerHTML = `
+                    <div class="text-center p-8">
+                        <div class="text-red-500 text-6xl mb-4">❌</div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Error Loading Releases</h3>
+                        <p class="text-gray-600">${data.error || 'Failed to load releases'}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading releases:', error);
+            content.innerHTML = `
+                <div class="text-center p-8">
+                    <div class="text-red-500 text-6xl mb-4">❌</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Error Loading Releases</h3>
+                    <p class="text-gray-600">Failed to load releases</p>
+                </div>
+            `;
+        });
+}
+
+function displayReleasesList(data) {
+    const content = document.getElementById('releases-content');
+    const { releases, pagination, filters } = data;
+    
+    if (releases.length === 0) {
+        content.innerHTML = `
+            <div class="text-center p-8">
+                <div class="text-gray-400 text-6xl mb-4">📦</div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">No Releases Found</h3>
+                <p class="text-gray-600">No releases found for the selected date range.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Format releases
+    const releaseRows = releases.map(release => {
+        const date = new Date(release.published_at).toLocaleDateString();
+        const time = new Date(release.published_at).toLocaleTimeString();
+        
+        // Get release status badges
+        const statusBadges = [];
+        if (release.draft) statusBadges.push('<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Draft</span>');
+        if (release.prerelease) statusBadges.push('<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pre-release</span>');
+        if (!release.draft && !release.prerelease) statusBadges.push('<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Released</span>');
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <div class="flex items-center">
+                        <div class="w-2 h-2 rounded-full bg-yellow-500 mr-3"></div>
+                        <div>
+                            <div class="text-sm font-medium text-gray-900 truncate max-w-xs">${release.name || release.tag_name}</div>
+                            <div class="text-xs text-gray-500">${release.tag_name}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="text-sm text-gray-900">${release.author || 'Unknown'}</div>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="text-sm text-gray-900">${date}</div>
+                    <div class="text-xs text-gray-500">${time}</div>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="text-sm text-gray-900">${release.assets_count}</div>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="flex flex-wrap gap-1">
+                        ${statusBadges.join('')}
+                    </div>
+                </td>
+                <td class="py-3 px-4">
+                    <a href="${release.html_url}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+                        View
+                    </a>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    // Pagination controls
+    const paginationControls = `
+        <div class="flex items-center justify-between mt-6">
+            <div class="text-sm text-gray-700">
+                Showing ${(pagination.page - 1) * pagination.per_page + 1} to ${Math.min(pagination.page * pagination.per_page, pagination.total_releases)} of ${pagination.total_releases} releases
+            </div>
+            <div class="flex space-x-2">
+                ${pagination.has_previous ? `
+                    <button onclick="loadReleasesList(${pagination.previous_page})" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                        Previous
+                    </button>
+                ` : ''}
+                ${pagination.has_next ? `
+                    <button onclick="loadReleasesList(${pagination.next_page})" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                        Next
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = `
+        <div class="space-y-6">
+            <!-- Summary -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Releases Summary</h3>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="text-gray-600">Total Releases:</span>
+                        <span class="font-medium ml-2">${pagination.total_releases}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-600">Date Range:</span>
+                        <span class="font-medium ml-2">${filters.start_date ? filters.start_date + ' - ' + filters.end_date : 'Last 30 days'}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Releases Table -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Recent Releases</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Release</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assets</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            ${releaseRows}
+                        </tbody>
+                    </table>
+                </div>
+                ${paginationControls}
+            </div>
+        </div>
+    `;
+}
+
+// Deployments List Functions
+function openDeploymentsList() {
+    const slideOver = document.getElementById('deployments-slide-over');
+    const slidePanel = document.getElementById('deployments-slide-panel');
+    
+    slideOver.classList.remove('hidden');
+    setTimeout(() => {
+        slidePanel.classList.remove('translate-x-full');
+    }, 10);
+    
+    loadDeploymentsList();
+}
+
+function closeDeploymentsList() {
+    const slideOver = document.getElementById('deployments-slide-over');
+    const slidePanel = document.getElementById('deployments-slide-panel');
+    
+    slidePanel.classList.add('translate-x-full');
+    setTimeout(() => {
+        slideOver.classList.add('hidden');
+    }, 300);
+}
+
+function loadDeploymentsList(page = 1) {
+    const content = document.getElementById('deployments-content');
+    
+    // Show loading state
+    content.innerHTML = `
+        <div class="flex items-center justify-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+            <span class="ml-3 text-gray-600">Loading deployments...</span>
+        </div>
+    `;
+    
+    // Get current date filters from URL parameters (more reliable than form fields)
+    const urlParams = new URLSearchParams(window.location.search);
+    const startDate = urlParams.get('start') || '';
+    const endDate = urlParams.get('end') || '';
+    
+    // Build URL with parameters
+    const params = new URLSearchParams({
+        page: page,
+        per_page: 20
+    });
+    
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    
+    fetch(`/repositories/api/{{ repository.id }}/deployments/?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayDeploymentsList(data);
+            } else {
+                content.innerHTML = `
+                    <div class="text-center p-8">
+                        <div class="text-red-500 text-6xl mb-4">❌</div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Error Loading Deployments</h3>
+                        <p class="text-gray-600">${data.error || 'Failed to load deployments'}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading deployments:', error);
+            content.innerHTML = `
+                <div class="text-center p-8">
+                    <div class="text-red-500 text-6xl mb-4">❌</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Error Loading Deployments</h3>
+                    <p class="text-gray-600">Failed to load deployments</p>
+                </div>
+            `;
+        });
+}
+
+function displayDeploymentsList(data) {
+    const content = document.getElementById('deployments-content');
+    const { deployments, pagination, filters } = data;
+    
+    if (deployments.length === 0) {
+        content.innerHTML = `
+            <div class="text-center p-8">
+                <div class="text-gray-400 text-6xl mb-4">🚀</div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">No Deployments Found</h3>
+                <p class="text-gray-600">No deployments found for the selected date range.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Format deployments
+    const deploymentRows = deployments.map(deployment => {
+        const date = new Date(deployment.created_at).toLocaleDateString();
+        const time = new Date(deployment.created_at).toLocaleTimeString();
+        
+        // Get status badge color
+        let statusColor = 'bg-gray-100 text-gray-800';
+        if (deployment.status === 'success') {
+            statusColor = 'bg-green-100 text-green-800';
+        } else if (deployment.status === 'failure') {
+            statusColor = 'bg-red-100 text-red-800';
+        } else if (deployment.status === 'pending') {
+            statusColor = 'bg-yellow-100 text-yellow-800';
+        } else if (deployment.status === 'in_progress') {
+            statusColor = 'bg-blue-100 text-blue-800';
+        }
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <div class="flex items-center">
+                        <div class="w-2 h-2 rounded-full bg-pink-500 mr-3"></div>
+                        <div>
+                            <div class="text-sm font-medium text-gray-900 truncate max-w-xs">${deployment.environment || 'Unknown'}</div>
+                            <div class="text-xs text-gray-500">${deployment.deployment_id}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="text-sm text-gray-900">${deployment.creator || 'Unknown'}</div>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="text-sm text-gray-900">${date}</div>
+                    <div class="text-xs text-gray-500">${time}</div>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="text-sm text-gray-900">${deployment.status_count}</div>
+                </td>
+                <td class="py-3 px-4">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}">
+                        ${deployment.status}
+                    </span>
+                </td>
+                <td class="py-3 px-4">
+                    ${deployment.url ? `<a href="${deployment.url}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">View</a>` : '<span class="text-gray-400 text-sm">N/A</span>'}
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    // Pagination controls
+    const paginationControls = `
+        <div class="flex items-center justify-between mt-6">
+            <div class="text-sm text-gray-700">
+                Showing ${(pagination.page - 1) * pagination.per_page + 1} to ${Math.min(pagination.page * pagination.per_page, pagination.total_deployments)} of ${pagination.total_deployments} deployments
+            </div>
+            <div class="flex space-x-2">
+                ${pagination.has_previous ? `
+                    <button onclick="loadDeploymentsList(${pagination.previous_page})" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                        Previous
+                    </button>
+                ` : ''}
+                ${pagination.has_next ? `
+                    <button onclick="loadDeploymentsList(${pagination.next_page})" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                        Next
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = `
+        <div class="space-y-6">
+            <!-- Summary -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Deployments Summary</h3>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="text-gray-600">Total Deployments:</span>
+                        <span class="font-medium ml-2">${pagination.total_deployments}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-600">Date Range:</span>
+                        <span class="font-medium ml-2">${filters.start_date ? filters.start_date + ' - ' + filters.end_date : 'Last 30 days'}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Deployments Table -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Recent Deployments</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Environment</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Count</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            ${deploymentRows}
                         </tbody>
                     </table>
                 </div>
@@ -1883,6 +2287,66 @@ function displayCommitsList(data) {
                         
                         <!-- Content -->
                         <div id="commits-content" class="mt-6">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Releases Slide-over Panel -->
+<div id="releases-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
+    <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeReleasesList()"></div>
+        
+        <div class="fixed inset-y-0 right-0 flex justify-end">
+            <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="releases-slide-panel">
+                <div class="h-full flex flex-col bg-white shadow-xl">
+                    <!-- Header -->
+                    <div class="flex-1 flex flex-col overflow-y-auto py-6 px-4 sm:px-6">
+                        <div class="flex items-start justify-between">
+                            <h2 class="text-lg font-medium text-gray-900">Repository Releases</h2>
+                            <button onclick="closeReleasesList()" class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div id="releases-content" class="mt-6">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Deployments Slide-over Panel -->
+<div id="deployments-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
+    <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeDeploymentsList()"></div>
+        
+        <div class="fixed inset-y-0 right-0 flex justify-end">
+            <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="deployments-slide-panel">
+                <div class="h-full flex flex-col bg-white shadow-xl">
+                    <!-- Header -->
+                    <div class="flex-1 flex flex-col overflow-y-auto py-6 px-4 sm:px-6">
+                        <div class="flex items-start justify-between">
+                            <h2 class="text-lg font-medium text-gray-900">Repository Deployments</h2>
+                            <button onclick="closeDeploymentsList()" class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div id="deployments-content" class="mt-6">
                             <!-- Content will be loaded here -->
                         </div>
                     </div>

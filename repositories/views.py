@@ -871,7 +871,7 @@ def repository_commits_list(request, repo_id):
         # Build query
         commits_query = Commit.objects.filter(repository_full_name=repository.full_name)
         
-        # Apply date filtering if provided
+        # Apply date filtering
         if start_date and end_date:
             try:
                 start_dt = datetime.strptime(start_date, "%Y-%m-%d")
@@ -888,8 +888,17 @@ def repository_commits_list(request, repo_id):
                         authored_date__lt=end_dt
                     )
             except ValueError:
-                # Invalid date format, ignore date filtering
+                # Invalid date format, apply default 30 days filter
                 pass
+        
+        # If no date parameters provided, apply default 30 days filter
+        if not start_date or not end_date:
+            end_dt = timezone.now()
+            start_dt = end_dt - timedelta(days=30)
+            commits_query = commits_query.filter(
+                authored_date__gte=start_dt,
+                authored_date__lt=end_dt
+            )
         
         # Get total count
         total_commits = commits_query.count()
@@ -946,6 +955,233 @@ def repository_commits_list(request, repo_id):
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Error in commits list: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def repository_releases_list(request, repo_id):
+    """AJAX view for releases list with pagination and date filtering"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        
+        # Get pagination parameters
+        page = int(request.GET.get('page', 1))
+        per_page = int(request.GET.get('per_page', 20))
+        
+        # Get date range parameters
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        
+        # Import analytics models
+        from analytics.models import Release
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        
+        # Build query
+        releases_query = Release.objects.filter(repository_full_name=repository.full_name)
+        
+        # Apply date filtering
+        if start_date and end_date:
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                # Add one day to end_date to include the full day
+                end_dt = end_dt + timedelta(days=1)
+                
+                # Check if this is "All Time" (very old start date)
+                is_all_time = start_dt.year < 2010
+                
+                if not is_all_time:
+                    releases_query = releases_query.filter(
+                        published_at__gte=start_dt,
+                        published_at__lt=end_dt
+                    )
+            except ValueError:
+                # Invalid date format, apply default 30 days filter
+                pass
+        
+        # If no date parameters provided, apply default 30 days filter
+        if not start_date or not end_date:
+            end_dt = timezone.now()
+            start_dt = end_dt - timedelta(days=30)
+            releases_query = releases_query.filter(
+                published_at__gte=start_dt,
+                published_at__lt=end_dt
+            )
+        
+        # Get total count
+        total_releases = releases_query.count()
+        
+        # Apply pagination
+        offset = (page - 1) * per_page
+        releases = releases_query.order_by('-published_at')[offset:offset + per_page]
+        
+        # Serialize releases
+        releases_data = []
+        for release in releases:
+            releases_data.append({
+                'release_id': release.release_id,
+                'tag_name': release.tag_name,
+                'name': release.name,
+                'author': release.author,
+                'published_at': release.published_at.isoformat() if release.published_at else None,
+                'draft': release.draft,
+                'prerelease': release.prerelease,
+                'body': release.body,
+                'html_url': release.html_url,
+                'assets_count': len(release.assets) if release.assets else 0,
+                'url': release.html_url,
+            })
+        
+        # Calculate pagination info
+        total_pages = (total_releases + per_page - 1) // per_page
+        has_next = page < total_pages
+        has_previous = page > 1
+        
+        return JsonResponse({
+            'success': True,
+            'releases': releases_data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total_releases': total_releases,
+                'total_pages': total_pages,
+                'has_next': has_next,
+                'has_previous': has_previous,
+                'next_page': page + 1 if has_next else None,
+                'previous_page': page - 1 if has_previous else None
+            },
+            'filters': {
+                'start_date': start_date,
+                'end_date': end_date
+            }
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in releases list: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def repository_deployments_list(request, repo_id):
+    """AJAX view for deployments list with pagination and date filtering"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        
+        # Get pagination parameters
+        page = int(request.GET.get('page', 1))
+        per_page = int(request.GET.get('per_page', 20))
+        
+        # Get date range parameters
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        
+        # Import analytics models
+        from analytics.models import Deployment
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        
+        # Build query
+        deployments_query = Deployment.objects.filter(repository_full_name=repository.full_name)
+        
+        # Apply date filtering
+        if start_date and end_date:
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                # Add one day to end_date to include the full day
+                end_dt = end_dt + timedelta(days=1)
+                
+                # Check if this is "All Time" (very old start date)
+                is_all_time = start_dt.year < 2010
+                
+                if not is_all_time:
+                    deployments_query = deployments_query.filter(
+                        created_at__gte=start_dt,
+                        created_at__lt=end_dt
+                    )
+            except ValueError:
+                # Invalid date format, apply default 30 days filter
+                pass
+        
+        # If no date parameters provided, apply default 30 days filter
+        if not start_date or not end_date:
+            end_dt = timezone.now()
+            start_dt = end_dt - timedelta(days=30)
+            deployments_query = deployments_query.filter(
+                created_at__gte=start_dt,
+                created_at__lt=end_dt
+            )
+        
+        # Get total count
+        total_deployments = deployments_query.count()
+        
+        # Apply pagination
+        offset = (page - 1) * per_page
+        deployments = deployments_query.order_by('-created_at')[offset:offset + per_page]
+        
+        # Serialize deployments
+        deployments_data = []
+        for deployment in deployments:
+            # Get latest status
+            latest_status = None
+            if deployment.statuses:
+                latest_status = deployment.statuses[-1]  # Last status is the most recent
+            
+            deployments_data.append({
+                'deployment_id': deployment.deployment_id,
+                'environment': deployment.environment,
+                'creator': deployment.creator,
+                'created_at': deployment.created_at.isoformat() if deployment.created_at else None,
+                'updated_at': deployment.updated_at.isoformat() if deployment.updated_at else None,
+                'status': latest_status.get('state', 'unknown') if latest_status else 'unknown',
+                'status_description': latest_status.get('description', '') if latest_status else '',
+                'status_count': len(deployment.statuses) if deployment.statuses else 0,
+                'url': latest_status.get('target_url', '') if latest_status else '',
+            })
+        
+        # Calculate pagination info
+        total_pages = (total_deployments + per_page - 1) // per_page
+        has_next = page < total_pages
+        has_previous = page > 1
+        
+        return JsonResponse({
+            'success': True,
+            'deployments': deployments_data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total_deployments': total_deployments,
+                'total_pages': total_pages,
+                'has_next': has_next,
+                'has_previous': has_previous,
+                'next_page': page + 1 if has_next else None,
+                'previous_page': page - 1 if has_previous else None
+            },
+            'filters': {
+                'start_date': start_date,
+                'end_date': end_date
+            }
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in deployments list: {e}")
         return JsonResponse({
             'success': False,
             'error': str(e)
