@@ -64,25 +64,32 @@ class LLMService:
             Simple verdict: "Compatible", "Caution", or "Not compatible"
         """
         try:
+            logger.info(f"Starting license verdict analysis for {len(licenses)} licenses")
+            
             # Prepare the simple prompt
             prompt = self._create_verdict_prompt(licenses)
+            logger.debug(f"Created prompt for verdict analysis")
             
             # Call Ollama
+            logger.info(f"Calling Ollama for verdict")
             response = self._call_ollama(prompt)
             
             if response:
+                logger.info(f"Received response from Ollama: {response[:100]}...")
                 # Clean the response to get just the verdict
-                verdict = response.strip().upper()
-                if 'COMPATIBLE' in verdict:
-                    return 'Compatible'
-                elif 'CAUTION' in verdict:
-                    return 'Caution'
-                elif 'NOT COMPATIBLE' in verdict or 'INCOMPATIBLE' in verdict:
-                    return 'Not compatible'
+                verdict = response.strip()
+                
+                # Validate the response is exactly what we expect
+                valid_responses = ["✅ Compatible", "⚠️ Caution", "❌ Not Compatible"]
+                if verdict in valid_responses:
+                    logger.info(f"Valid verdict: {verdict}")
+                    return verdict
                 else:
+                    logger.warning(f"Invalid verdict response: '{verdict}', using fallback")
                     # Fallback based on license types
                     return self._fallback_verdict(licenses)
             else:
+                logger.warning("No response from Ollama, using fallback")
                 return self._fallback_verdict(licenses)
                 
         except Exception as e:
@@ -91,23 +98,29 @@ class LLMService:
     
     def _fallback_verdict(self, licenses: List[str]) -> str:
         """Fallback verdict based on license analysis"""
-        permissive_licenses = ['MIT', 'APACHE', 'BSD', 'ISC', 'UNLICENSE', '0BSD']
-        restrictive_licenses = ['GPL', 'AGPL', 'LGPL', 'MPL']
-        
-        permissive_count = sum(1 for license in licenses if any(perm in license.upper() for perm in permissive_licenses))
-        restrictive_count = sum(1 for license in licenses if any(rest in license.upper() for rest in restrictive_licenses))
-        
-        total = len(licenses)
-        if total == 0:
+        if not licenses:
             return 'Caution'
         
-        permissive_ratio = permissive_count / total
-        restrictive_ratio = restrictive_count / total
+        # Contaminating licenses that can require open-sourcing
+        contaminating_licenses = ['AGPL', 'GPL', 'LGPL', 'MPL', 'EPL', 'CDDL']
         
-        if permissive_ratio >= 0.7:
+        # Permissive licenses that allow commercial use
+        permissive_licenses = ['MIT', 'APACHE', 'BSD', 'ISC', 'UNLICENSE', '0BSD', 'CC0', 'WTFPL']
+        
+        # Check for contaminating licenses first
+        for license in licenses:
+            license_upper = license.upper()
+            if any(contaminating in license_upper for contaminating in contaminating_licenses):
+                return 'Not compatible'
+        
+        # Check if all licenses are permissive
+        all_permissive = all(
+            any(permissive in license.upper() for permissive in permissive_licenses)
+            for license in licenses
+        )
+        
+        if all_permissive:
             return 'Compatible'
-        elif restrictive_ratio >= 0.3:
-            return 'Not compatible'
         else:
             return 'Caution'
     
@@ -115,23 +128,31 @@ class LLMService:
         """Create a prompt for license analysis"""
         license_list = ', '.join(licenses)
         
-        prompt = f"""Analyze these open source licenses: {license_list}
+        prompt = f"""You are an expert software licensing attorney specializing in open source licenses and commercial software development.
 
-Provide a concise analysis in JSON format:
+Analyze these open source licenses for commercial compatibility: {license_list}
+
+IMPORTANT: Respond with ONLY valid JSON. No text before or after the JSON.
+
 {{
     "commercial_compatibility": "YES/NO/CAUTION",
-    "summary": "2-3 sentence summary",
-    "key_obligations": ["3-5 main obligations"],
-    "key_restrictions": ["3-5 main restrictions"],
-    "recommendations": ["3-5 actionable recommendations"]
+    "summary": "2-3 sentence summary of the legal implications",
+    "key_obligations": ["3-5 main legal obligations"],
+    "key_restrictions": ["3-5 main legal restrictions"],
+    "recommendations": ["3-5 actionable legal recommendations"]
 }}
 
-Rules for commercial_compatibility:
-- YES: If 70%+ licenses are permissive (MIT, Apache, BSD, ISC)
-- CAUTION: If significant copyleft licenses (GPL, LGPL) or patent issues
-- NO: If 30%+ restrictive licenses that prevent commercial use
+Legal Analysis Rules:
+- YES: All licenses are permissive and allow commercial use (MIT, Apache, BSD, ISC, etc.)
+- NO: Any contaminating license present (AGPL, GPL, LGPL, or other copyleft licenses that require source code disclosure)
+- CAUTION: Mixed licenses with potential conflicts or unclear commercial implications
 
-Keep responses brief and actionable. Focus on practical implications for commercial use."""
+Key Legal Principles:
+- A single contaminating license (like AGPL) can require the entire project to be open-sourced
+- Copyleft licenses can impose significant restrictions on commercial use
+- Patent clauses and attribution requirements must be carefully considered
+
+Respond with ONLY the JSON object, no additional text."""
         
         return prompt
     
@@ -139,16 +160,18 @@ Keep responses brief and actionable. Focus on practical implications for commerc
         """Create a prompt for simple verdict"""
         license_list = ', '.join(licenses)
         
-        prompt = f"""Analyze these open source licenses: {license_list}
+        prompt = f"""You are an expert software licensing attorney specializing in open source licenses and commercial software development.
 
-Respond with ONLY ONE WORD: "Compatible", "Caution", or "Not compatible"
+Analyze these open source licenses for commercial compatibility: {license_list}
 
-Rules:
-- "Compatible": If 70%+ licenses are permissive (MIT, Apache, BSD, ISC)
-- "Caution": If significant copyleft licenses (GPL, LGPL) or patent issues
-- "Not compatible": If 30%+ restrictive licenses that prevent commercial use
+Respond with ONLY ONE of these exact responses:
+- "✅ Compatible"
+- "⚠️ Caution" 
+- "❌ Not Compatible"
 
-Respond with only the verdict word, nothing else."""
+Consider the legal implications of each license and their combined effect on commercial use.
+
+Respond with only the exact verdict with emoji, no explanation."""
 
         return prompt
     
@@ -156,23 +179,28 @@ Respond with only the verdict word, nothing else."""
         """Call Ollama API"""
         try:
             url = f"{self.ollama_url}/api/generate"
+            logger.info(f"Calling Ollama at {url}")
             
             payload = {
                 "model": self.model,
                 "prompt": prompt,
                 "stream": False,
                 "options": {
-                    "temperature": 0.3,
-                    "top_p": 0.9,
-                    "max_tokens": 1000
+                    "temperature": 0.0,  # Zero temperature for deterministic responses
+                    "top_p": 0.8,
+                    "max_tokens": 800,
+                    "stop": ["\n\n", "```", "---"]  # Stop at common formatting markers
                 }
             }
             
+            logger.info(f"Making request to Ollama with model {self.model}")
             response = requests.post(url, json=payload, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
-                return result.get('response', '').strip()
+                response_text = result.get('response', '').strip()
+                logger.info(f"Ollama response received successfully, length: {len(response_text)}")
+                return response_text
             else:
                 logger.error(f"Ollama API error: {response.status_code} - {response.text}")
                 return None
@@ -187,26 +215,47 @@ Respond with only the verdict word, nothing else."""
     def parse_llm_response(self, response: str) -> Dict:
         """Parse LLM response and extract JSON"""
         try:
+            # Clean the response
+            response = response.strip()
+            
             # Try to extract JSON from response
             start_idx = response.find('{')
             end_idx = response.rfind('}') + 1
             
             if start_idx != -1 and end_idx > start_idx:
                 json_str = response[start_idx:end_idx]
-                return json.loads(json_str)
+                
+                # Try to parse the JSON
+                try:
+                    parsed = json.loads(json_str)
+                    
+                    # Validate the expected structure
+                    if isinstance(parsed, dict):
+                        return parsed
+                    else:
+                        return {
+                            'raw_response': response,
+                            'error': 'Response is not a valid JSON object'
+                        }
+                        
+                except json.JSONDecodeError as e:
+                    # Try to clean up common JSON formatting issues
+                    cleaned_json = json_str.replace('\n', ' ').replace('\t', ' ')
+                    try:
+                        parsed = json.loads(cleaned_json)
+                        return parsed
+                    except json.JSONDecodeError:
+                        return {
+                            'raw_response': response,
+                            'error': f'JSON parsing error: {str(e)}'
+                        }
             else:
-                # Fallback: return raw response
+                # No JSON found in response
                 return {
                     'raw_response': response,
-                    'error': 'Could not parse JSON from response'
+                    'error': 'No JSON object found in response'
                 }
                 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            return {
-                'raw_response': response,
-                'error': f'JSON parsing error: {str(e)}'
-            }
         except Exception as e:
             logger.error(f"Error parsing LLM response: {e}")
             return {

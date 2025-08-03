@@ -763,14 +763,21 @@ def repository_llm_license_verdict(request, repo_id):
     if request.method != 'GET':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"Starting LLM license verdict for repository {repo_id}")
+        
         repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
         
         # Get license analysis first
+        logger.info(f"Getting license analysis for {repository.full_name}")
         license_service = LicenseAnalysisService(repository.full_name)
         analysis = license_service.analyze_commercial_compatibility()
         
         if not analysis['has_sbom']:
+            logger.warning(f"No SBOM found for {repository.full_name}")
             return JsonResponse({
                 'success': False,
                 'error': 'No SBOM found for this repository'
@@ -778,16 +785,20 @@ def repository_llm_license_verdict(request, repo_id):
         
         # Extract unique licenses
         unique_licenses = list(analysis['license_summary'].keys())
+        logger.info(f"Found {len(unique_licenses)} unique licenses: {unique_licenses}")
         
         if not unique_licenses:
+            logger.warning(f"No licenses found in SBOM for {repository.full_name}")
             return JsonResponse({
                 'success': False,
                 'error': 'No licenses found in SBOM'
             })
         
         # Get LLM verdict
+        logger.info(f"Calling LLM service for verdict")
         llm_service = LLMService()
         verdict = llm_service.get_license_verdict(unique_licenses)
+        logger.info(f"LLM verdict: {verdict}")
         
         return JsonResponse({
             'success': True,
@@ -796,9 +807,7 @@ def repository_llm_license_verdict(request, repo_id):
         })
         
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error in LLM license verdict: {e}")
+        logger.error(f"Error in LLM license verdict for repo {repo_id}: {e}")
         return JsonResponse({
             'success': False,
             'error': str(e)
