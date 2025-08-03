@@ -39,6 +39,15 @@ class SBOMService:
         
         # Prepare environment variables
         env = os.environ.copy()
+        
+        # Enable license fetching
+        env['FETCH_LICENSE'] = 'true'
+        
+        # Add GitHub token if available to avoid rate limiting
+        github_token = os.getenv('GITHUB_TOKEN')
+        if github_token:
+            env['GITHUB_TOKEN'] = github_token
+        
         if self.oss_config.email:
             env['OSSINDEX_USERNAME'] = self.oss_config.email
         if self.oss_config.api_token:
