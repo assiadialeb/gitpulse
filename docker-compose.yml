@@ -1,5 +1,5 @@
-# Pour Compose V2, tu peux ajouter en haut :
-# name: gitpulse
+# GitPulse Docker Compose Configuration
+name: gitpulse
 version: '3.8'
 
 services:
