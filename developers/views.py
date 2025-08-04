@@ -153,8 +153,8 @@ def list_aliases(request):
         name_lower = name.lower()
         email_lower = email.lower() if email else None
         
-        # Check if we already have this name or email in our current list
-        if name_lower in seen_names or (email_lower and email_lower in seen_emails):
+        # Check if we already have this email in our current list (email-only deduplication)
+        if email_lower and email_lower in seen_emails:
             continue
         
         # Check if this exact name+email combination already exists in developer_aliases
@@ -174,7 +174,7 @@ def list_aliases(request):
             if email_in_aliases or email_in_developers:
                 continue
         
-        seen_names.add(name_lower)
+        # Only track emails, not names (allow multiple identities with same name but different emails)
         if email_lower:
             seen_emails.add(email_lower)
         

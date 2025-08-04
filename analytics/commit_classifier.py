@@ -189,20 +189,22 @@ def classify_commit_ollama(message: str) -> str:
     Returns:
         Category: 'fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other'
     """
-    # Ollama configuration from environment variables
-    import os
     from django.conf import settings
+    import ollama
     
-    # Configure Ollama host
-    ollama_host = settings.OLLAMA_HOST
-    if ollama_host.startswith('http://'):
-        ollama_host = ollama_host.replace('http://', '')
-    elif ollama_host.startswith('https://'):
-        ollama_host = ollama_host.replace('https://', '')
+    # Configure Ollama client properly
+    def normalize_host(host: str) -> str:
+        """Normalize the host URL for Ollama"""
+        if host.startswith('http://'):
+            return host
+        elif host.startswith('https://'):
+            return host.replace('https://', 'http://')
+        else:
+            return f"http://{host}"
     
-    # Set the host for the Ollama client
-    os.environ['OLLAMA_HOST'] = f"http://{ollama_host}"
-    
+    # Create Ollama client with proper host configuration
+    host = normalize_host(settings.OLLAMA_HOST)
+    client = ollama.Client(host=host)
     MODEL_NAME = settings.OLLAMA_MODEL
     
     prompt = f"""Classify this git commit message:
@@ -214,10 +216,8 @@ Categories: test, fix, feature, docs, refactor, style, perf, ci, chore, other
 Answer with only one word:"""
 
     try:
-        # Use the official Ollama library
-        import ollama
-        
-        response = ollama.generate(
+        # Use the client instance to call generate
+        response = client.generate(
             model=MODEL_NAME,
             prompt=prompt,
             options={

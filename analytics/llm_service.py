@@ -14,19 +14,20 @@ class LLMService:
     """Service for interacting with Ollama LLM using the official Python library"""
     
     def __init__(self):
-        # Configure Ollama client
         self.model = settings.OLLAMA_MODEL
-        # Set the host for the Ollama client
-        ollama_host = settings.OLLAMA_HOST
-        if ollama_host.startswith('http://'):
-            ollama_host = ollama_host.replace('http://', '')
-        elif ollama_host.startswith('https://'):
-            ollama_host = ollama_host.replace('https://', '')
-        
-        # Configure the Ollama client by setting the host environment variable
-        import os
-        os.environ['OLLAMA_HOST'] = f"http://{ollama_host}"
-        logger.info(f"Ollama client configured with host: http://{ollama_host}, model: {self.model}")
+        self.host = self._normalize_host(settings.OLLAMA_HOST)
+        # Create a proper Ollama client instance
+        self.client = ollama.Client(host=self.host)
+        logger.info(f"Ollama client configured with host: {self.host}, model: {self.model}")
+    
+    def _normalize_host(self, host: str) -> str:
+        """Normalize the host URL for Ollama"""
+        if host.startswith('http://'):
+            return host
+        elif host.startswith('https://'):
+            return host.replace('https://', 'http://')
+        else:
+            return f"http://{host}"
     
     def analyze_licenses(self, licenses: List[str]) -> Dict:
         """
@@ -201,12 +202,12 @@ Respond with only the exact verdict with emoji, no explanation."""
         try:
             logger.info(f"Calling Ollama with model {self.model}")
             
-            # Use the official Ollama library
-            response = ollama.generate(
+            # Use the client instance to call generate
+            response = self.client.generate(
                 model=self.model,
                 prompt=prompt,
                 options={
-                    'temperature': 0.0,  # Zero temperature for deterministic responses
+                    'temperature': 0.0,
                     'top_p': 0.8,
                     'num_predict': 2000,
                 }
