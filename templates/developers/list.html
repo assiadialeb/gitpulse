@@ -1,7 +1,7 @@
-{% extends 'base/base.html' %}
+{% extends "base/base.html" %}
 {% load static %}
 
-{% block title %}Developers - GitPulse{% endblock %}
+{% block title %}Developers - GitPulse{% endblock title %}
 
 {% block content %}
 {% csrf_token %}
@@ -12,7 +12,26 @@
         <p class="text-gray-600">Manage and view all developers in the system</p>
     </div>
 
-    <!-- Merge Actions -->
+    <!-- Tabs -->
+    <div class="mb-6">
+        <div class="tabs tabs-boxed">
+            <a 
+                href="?tab=developers{% if search_query %}&search={{ search_query }}{% endif %}" 
+                class="tab {% if active_tab == 'developers' %}tab-active{% endif %}"
+            >
+                Developers
+            </a>
+            <a 
+                href="?tab=aliases{% if search_query %}&search={{ search_query }}{% endif %}" 
+                class="tab {% if active_tab == 'aliases' %}tab-active{% endif %}"
+            >
+                Aliases
+            </a>
+        </div>
+    </div>
+
+    <!-- Merge Actions (only for developers tab) -->
+    {% if active_tab == 'developers' %}
     <div id="mergeActions" class="hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-lg">
             <div class="flex items-center justify-between">
@@ -37,6 +56,35 @@
             </div>
         </div>
     </div>
+    {% endif %}
+
+    <!-- Create Developer Actions (only for aliases tab) -->
+    {% if active_tab == 'aliases' %}
+    <div id="createDeveloperActions" class="hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-lg">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <span class="text-blue-800 font-medium">
+                        <span id="selectedAliasCount">0</span> alias(es) selected
+                    </span>
+                    <button 
+                        id="createDeveloperButton"
+                        class="btn btn-primary btn-sm"
+                        onclick="showCreateDeveloperModal()"
+                    >
+                        Create or Add Developer
+                    </button>
+                </div>
+                <button 
+                    onclick="clearAliasSelection()"
+                    class="text-blue-600 hover:text-blue-800 text-sm"
+                >
+                    Clear Selection
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Inline Search Bar -->
     <div class="mb-6">
@@ -44,7 +92,8 @@
             <input 
                 type="text" 
                 id="searchInput"
-                placeholder="Search developers by name or email..."
+                placeholder="{% if active_tab == 'developers' %}Search developers by name or email...{% else %}Search aliases by name or email...{% endif %}"
+                value="{{ search_query }}"
                 class="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
             >
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -64,88 +113,184 @@
     <!-- Results Info -->
     <div class="mb-6">
         <p id="resultsInfo" class="text-gray-600">
-            Showing <span id="totalCount">{{ total_count }}</span> developer<span id="pluralSuffix">{{ total_count|pluralize }}</span> in total
+            {% if active_tab == 'developers' %}
+                Showing <span id="totalCount">{{ total_count }}</span> developer<span id="pluralSuffix">{{ total_count|pluralize }}</span> in total
+            {% else %}
+                Showing <span id="totalCount">{{ total_count }}</span> alias<span id="pluralSuffix">{{ total_count|pluralize }}</span> in total
+            {% endif %}
         </p>
     </div>
 
-    <!-- Developers List -->
-    <div class="bg-white rounded-lg shadow">
-        <div id="developersTable" class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            <input 
-                                type="checkbox" 
-                                id="selectAll"
-                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                onchange="toggleSelectAll(this)"
-                            >
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Name
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Email
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Aliases
-                        </th>
-                    </tr>
-                </thead>
-                <tbody id="developersTableBody" class="bg-white divide-y divide-gray-200">
-                    {% for developer in developers %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap">
+    <!-- Content based on active tab -->
+    {% if active_tab == 'developers' %}
+        <!-- Developers List -->
+        <div class="bg-white rounded-lg shadow">
+            <div id="developersTable" class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 <input 
                                     type="checkbox" 
-                                    class="developer-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                    value="{{ developer.id }}"
-                                    onchange="updateSelection()"
+                                    id="selectAll"
+                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    onchange="toggleSelectAll(this)"
                                 >
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <a 
-                                    href="{% url 'developers:detail' developer.id %}" 
-                                    class="text-blue-600 hover:text-blue-800 font-medium"
-                                >
-                                    {{ developer.primary_name|default:"Unknown" }}
-                                </a>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ developer.primary_email|default:"No email" }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-900">
-                                {% if developer.aliases_list %}
-                                    {{ developer.aliases_list|join:", " }}
-                                {% else %}
-                                    <span class="text-gray-400">No aliases</span>
-                                {% endif %}
-                            </td>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Name
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Email
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Aliases
+                            </th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Empty State -->
-        <div id="emptyState" class="text-center py-12 hidden">
-            <div class="text-gray-400 mb-4">
-                <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
+                    </thead>
+                    <tbody id="developersTableBody" class="bg-white divide-y divide-gray-200">
+                        {% for developer in developers %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input 
+                                        type="checkbox" 
+                                        class="developer-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        value="{{ developer.id }}"
+                                        onchange="updateSelection()"
+                                    >
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <a 
+                                        href="{% url 'developers:detail' developer.id %}" 
+                                        class="text-blue-600 hover:text-blue-800 font-medium"
+                                    >
+                                        {{ developer.primary_name|default:"Unknown" }}
+                                    </a>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ developer.primary_email|default:"No email" }}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    {% if developer.aliases_list %}
+                                        {{ developer.aliases_list|join:", " }}
+                                    {% else %}
+                                        <span class="text-gray-400">No aliases</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">
-                No developers found
-            </h3>
-            <p class="text-gray-500">
-                Try adjusting your search terms
-            </p>
+            
+            <!-- Empty State -->
+            <div id="emptyState" class="text-center py-12 hidden">
+                <div class="text-gray-400 mb-4">
+                    <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">
+                    No developers found
+                </h3>
+                <p class="text-gray-500">
+                    Try adjusting your search terms
+                </p>
+            </div>
         </div>
-    </div>
+    {% else %}
+        <!-- Aliases List -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <input 
+                                    type="checkbox" 
+                                    id="selectAllAliases"
+                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    onchange="toggleSelectAllAliases(this)"
+                                >
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Name
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Email
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Source
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for alias in aliases %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input 
+                                        type="checkbox" 
+                                        class="alias-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        value="{{ forloop.counter0 }}"
+                                        data-name="{{ alias.name }}"
+                                        data-email="{{ alias.email }}"
+                                        data-source="{{ alias.source }}"
+                                        onchange="updateAliasSelection()"
+                                    >
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-gray-900 font-medium">
+                                            {{ alias.name }}
+                                        </span>
+                                        <button 
+                                            onclick="debugIdentity('{{ alias.name }}', '{{ alias.email }}')"
+                                            class="text-xs text-blue-600 hover:text-blue-800"
+                                            title="Debug this identity"
+                                        >
+                                            🔍
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ alias.email }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                        {% if alias.source == 'Commit' %}bg-green-100 text-green-800
+                                        {% elif alias.source == 'Release' %}bg-blue-100 text-blue-800
+                                        {% elif alias.source == 'Deployment' %}bg-purple-100 text-purple-800
+                                        {% else %}bg-orange-100 text-orange-800{% endif %}">
+                                        {{ alias.source }}
+                                    </span>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="px-6 py-12 text-center">
+                                    <div class="text-gray-400 mb-4">
+                                        <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                                        </svg>
+                                    </div>
+                                    <h3 class="text-lg font-medium text-gray-900 mb-2">
+                                        No aliases found
+                                    </h3>
+                                    <p class="text-gray-500">
+                                        Try adjusting your search terms
+                                    </p>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
 </div>
 
-<!-- Merge Modal -->
+<!-- Merge Modal (only for developers tab) -->
+{% if active_tab == 'developers' %}
 <dialog id="mergeModal" class="modal">
     <div class="modal-box">
         <h3 class="font-bold text-lg mb-4">Merge Developers</h3>
@@ -166,6 +311,62 @@
         <button onclick="closeMergeModal()">close</button>
     </form>
 </dialog>
+{% endif %}
+
+<!-- Create Developer Modal (only for aliases tab) -->
+{% if active_tab == 'aliases' %}
+<dialog id="createDeveloperModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Create or Add Developer</h3>
+        <p class="text-gray-600 mb-4">
+            Search for an existing developer or create a new one. The selected aliases will be added as aliases to this developer.
+        </p>
+        
+                <div class="mb-6">
+            <label class="label">
+                <span class="label-text">Developer Name</span>
+            </label>
+            <div class="relative">
+                <input 
+                    type="text" 
+                    id="developerSearchInput"
+                    placeholder="Search existing developers or enter a new name..."
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                <div id="developerSearchResults" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg hidden max-h-60 overflow-y-auto">
+                    <!-- Search results will be populated here -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="mb-6">
+            <label class="label">
+                <span class="label-text">Primary Email (select one)</span>
+            </label>
+            <div id="primaryEmailOptions" class="space-y-2 max-h-40 overflow-y-auto">
+                <!-- Primary email options will be populated here -->
+            </div>
+        </div>
+        
+        <div class="mb-6">
+            <label class="label">
+                <span class="label-text">Selected Aliases</span>
+            </label>
+            <div id="selectedAliasesList" class="space-y-2 max-h-40 overflow-y-auto">
+                <!-- Selected aliases will be shown here -->
+            </div>
+        </div>
+        
+                    <div class="modal-action">
+                <button class="btn btn-outline" onclick="closeCreateDeveloperModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="performCreateDeveloper()">Create Developer</button>
+            </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button onclick="closeCreateDeveloperModal()">close</button>
+    </form>
+</dialog>
+{% endif %}
 
 <script>
 let selectedDevelopers = [];
@@ -180,6 +381,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalCount = document.getElementById('totalCount');
     const pluralSuffix = document.getElementById('pluralSuffix');
     
+    // Only initialize search functionality for developers tab
+    {% if active_tab == 'developers' %}
     let searchTimeout;
     
     searchInput.addEventListener('input', function() {
@@ -289,8 +492,394 @@ document.addEventListener('DOMContentLoaded', function() {
             emptyState.classList.remove('hidden');
         }
     }
+    {% else %}
+    // For aliases tab, handle search by form submission
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const query = this.value.trim();
+            const currentUrl = new URL(window.location);
+            if (query) {
+                currentUrl.searchParams.set('search', query);
+            } else {
+                currentUrl.searchParams.delete('search');
+            }
+            currentUrl.searchParams.set('tab', 'aliases');
+            window.location.href = currentUrl.toString();
+        }
+    });
+    {% endif %}
 });
 
+// Global variables for aliases functionality
+let selectedAliases = [];
+let aliasesData = [
+    {% for alias in aliases %}
+    {
+        index: {{ forloop.counter0 }},
+        name: "{{ alias.name }}",
+        email: "{{ alias.email }}",
+        source: "{{ alias.source }}"
+    },
+    {% endfor %}
+];
+
+{% if active_tab == 'aliases' %}
+function updateAliasSelection() {
+    const checkboxes = document.querySelectorAll('.alias-checkbox:checked');
+    selectedAliases = Array.from(checkboxes).map(cb => cb.value);
+    
+    const createDeveloperActions = document.getElementById('createDeveloperActions');
+    const selectedAliasCount = document.getElementById('selectedAliasCount');
+    
+    if (selectedAliases.length > 0) {
+        createDeveloperActions.classList.remove('hidden');
+        selectedAliasCount.textContent = selectedAliases.length;
+    } else {
+        createDeveloperActions.classList.add('hidden');
+    }
+}
+
+function toggleSelectAllAliases(checkbox) {
+    const aliasCheckboxes = document.querySelectorAll('.alias-checkbox');
+    aliasCheckboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateAliasSelection();
+}
+
+function clearAliasSelection() {
+    const checkboxes = document.querySelectorAll('.alias-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = false;
+    });
+    document.getElementById('selectAllAliases').checked = false;
+    updateAliasSelection();
+}
+
+function showCreateDeveloperModal() {
+    if (selectedAliases.length === 0) {
+        alert('Please select at least one alias to create a developer.');
+        return;
+    }
+    
+    // Populate selected aliases list
+    const selectedAliasesList = document.getElementById('selectedAliasesList');
+    selectedAliasesList.innerHTML = '';
+    
+    selectedAliases.forEach(index => {
+        const alias = aliasesData[index];
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-2 bg-gray-50 rounded';
+        div.innerHTML = `
+            <div>
+                <div class="font-medium">${alias.name}</div>
+                <div class="text-sm text-gray-500">${alias.email}</div>
+            </div>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                ${alias.source === 'Commit' ? 'bg-green-100 text-green-800' :
+                  alias.source === 'Release' ? 'bg-blue-100 text-blue-800' :
+                  alias.source === 'Deployment' ? 'bg-purple-100 text-purple-800' :
+                  'bg-orange-100 text-orange-800'}">
+                ${alias.source}
+            </span>
+        `;
+        selectedAliasesList.appendChild(div);
+    });
+    
+    // Setup developer search functionality
+    const developerSearchInput = document.getElementById('developerSearchInput');
+    const developerSearchResults = document.getElementById('developerSearchResults');
+    let searchTimeout;
+    
+    developerSearchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        // Clear previous timeout
+        clearTimeout(searchTimeout);
+        
+        // Hide results if query is empty
+        if (!query) {
+            developerSearchResults.classList.add('hidden');
+            return;
+        }
+        
+        // Set timeout to avoid too many requests
+        searchTimeout = setTimeout(() => {
+            searchExistingDevelopers(query);
+        }, 300);
+    });
+    
+    // Hide results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!developerSearchInput.contains(e.target) && !developerSearchResults.contains(e.target)) {
+            developerSearchResults.classList.add('hidden');
+        }
+    });
+    
+    // Populate primary email options
+    const primaryEmailOptions = document.getElementById('primaryEmailOptions');
+    primaryEmailOptions.innerHTML = '';
+    
+    // Get unique emails from selected aliases
+    const uniqueEmails = new Set();
+    selectedAliases.forEach(index => {
+        const alias = aliasesData[index];
+        if (alias.email && !alias.email.startsWith('No email')) {
+            uniqueEmails.add(alias.email);
+        }
+    });
+    
+    // Add email options
+    uniqueEmails.forEach(email => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center space-x-3 p-3 border rounded-lg';
+        div.innerHTML = `
+            <input 
+                type="radio" 
+                name="primaryEmail" 
+                value="${email}"
+                id="email_${email.replace(/[^a-zA-Z0-9]/g, '_')}"
+                class="radio radio-primary"
+                ${Array.from(uniqueEmails)[0] === email ? 'checked' : ''}
+            >
+            <label for="email_${email.replace(/[^a-zA-Z0-9]/g, '_')}" class="flex-1 cursor-pointer">
+                <div class="font-medium">${email}</div>
+            </label>
+        `;
+        primaryEmailOptions.appendChild(div);
+    });
+    
+    // If no real emails, add a placeholder option
+    if (uniqueEmails.size === 0) {
+        const div = document.createElement('div');
+        div.className = 'flex items-center space-x-3 p-3 border rounded-lg';
+        div.innerHTML = `
+            <input 
+                type="radio" 
+                name="primaryEmail" 
+                value=""
+                id="email_none"
+                class="radio radio-primary"
+                checked
+            >
+            <label for="email_none" class="flex-1 cursor-pointer">
+                <div class="font-medium text-gray-500">No email available</div>
+            </label>
+        `;
+        primaryEmailOptions.appendChild(div);
+    }
+    
+    // Show modal
+    const modal = document.getElementById('createDeveloperModal');
+    modal.showModal();
+}
+
+function searchExistingDevelopers(query) {
+    const developerSearchResults = document.getElementById('developerSearchResults');
+    
+    // Use the existing search endpoint
+    const url = new URL('{% url "developers:search_ajax" %}', window.location.origin);
+    url.searchParams.set('q', query);
+    
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 401) {
+                    window.location.href = '/users/login/?next=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data && !data.error) {
+                displayDeveloperSearchResults(data.developers, query);
+            } else {
+                console.error('Search error:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Search error:', error);
+        });
+}
+
+function displayDeveloperSearchResults(developers, query) {
+    const developerSearchResults = document.getElementById('developerSearchResults');
+    const developerSearchInput = document.getElementById('developerSearchInput');
+    
+    if (developers.length === 0) {
+        developerSearchResults.classList.add('hidden');
+        return;
+    }
+    
+    // Clear previous results
+    developerSearchResults.innerHTML = '';
+    
+    // Add results
+    developers.forEach(developer => {
+        const div = document.createElement('div');
+        div.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0';
+        div.innerHTML = `
+            <div class="font-medium text-blue-600">${developer.name}</div>
+            <div class="text-sm text-gray-500">${developer.email}</div>
+            <div class="text-xs text-gray-400">${developer.aliases}</div>
+        `;
+        
+        div.addEventListener('click', function() {
+            developerSearchInput.value = developer.name;
+            developerSearchResults.classList.add('hidden');
+            
+            // Show warning that this developer already exists
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm';
+            warningDiv.innerHTML = `
+                <strong>Warning:</strong> Developer "${developer.name}" already exists. 
+                The selected aliases will be added to this existing developer.
+            `;
+            
+            // Remove any existing warning
+            const existingWarning = document.querySelector('.developer-warning');
+            if (existingWarning) {
+                existingWarning.remove();
+            }
+            
+            warningDiv.classList.add('developer-warning');
+            developerSearchInput.parentNode.appendChild(warningDiv);
+        });
+        
+        developerSearchResults.appendChild(div);
+    });
+    
+    developerSearchResults.classList.remove('hidden');
+}
+
+function debugIdentity(name, email) {
+    const url = new URL('{% url "developers:debug_identity" %}', window.location.origin);
+    url.searchParams.set('name', name);
+    url.searchParams.set('email', email);
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Debug info for identity:', data);
+            
+            let message = `Debug info for "${name}":\n\n`;
+            message += `Found in collections:\n`;
+            message += `- Commits: ${data.found_in_collections.commits}\n`;
+            message += `- Releases: ${data.found_in_collections.releases}\n`;
+            message += `- Deployments: ${data.found_in_collections.deployments}\n`;
+            message += `- Pull Requests: ${data.found_in_collections.pull_requests}\n\n`;
+            
+            if (data.existing_developer.exists) {
+                message += `⚠️ Developer already exists:\n`;
+                message += `- Name: ${data.existing_developer.name}\n`;
+                message += `- Email: ${data.existing_developer.email}\n\n`;
+            }
+            
+            if (data.existing_alias.exists) {
+                message += `⚠️ Alias already exists:\n`;
+                message += `- Name: ${data.existing_alias.name}\n`;
+                message += `- Email: ${data.existing_alias.email}\n`;
+                message += `- Developer ID: ${data.existing_alias.developer}\n\n`;
+            }
+            
+            if (data.email_matches.length > 0) {
+                message += `⚠️ Email matches:\n`;
+                data.email_matches.forEach(match => {
+                    message += `- ${match.name} (${match.email}) -> Developer ${match.developer}\n`;
+                });
+            }
+            
+            alert(message);
+        })
+        .catch(error => {
+            console.error('Debug error:', error);
+            alert('Error getting debug info');
+        });
+}
+
+function closeCreateDeveloperModal() {
+    const modal = document.getElementById('createDeveloperModal');
+    modal.close();
+}
+
+function performCreateDeveloper() {
+    const developerName = document.getElementById('developerSearchInput').value.trim();
+    const primaryEmail = document.querySelector('input[name="primaryEmail"]:checked').value;
+    
+    if (!developerName) {
+        alert('Please enter a developer name.');
+        return;
+    }
+    
+    // Check if this is an existing developer
+    const existingWarning = document.querySelector('.developer-warning');
+    const isExistingDeveloper = existingWarning !== null;
+    
+    // Get CSRF token
+    let csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') {
+                csrfToken = { value: value };
+                break;
+            }
+        }
+    }
+    
+    if (!csrfToken) {
+        console.error('CSRF token not found');
+        alert('Security token not found. Please refresh the page and try again.');
+        return;
+    }
+    
+    // Prepare data
+    const selectedAliasesData = selectedAliases.map(index => aliasesData[index]);
+    
+    console.log('Sending create developer request with:', {
+        developer_name: developerName,
+        primary_email: primaryEmail,
+        aliases: selectedAliasesData,
+        is_existing: isExistingDeveloper,
+        csrf_token: csrfToken.value
+    });
+    
+    // Send request
+    fetch('{% url "developers:create_from_aliases" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken.value,
+        },
+        body: JSON.stringify({
+            developer_name: developerName,
+            primary_email: primaryEmail,
+            aliases: selectedAliasesData,
+            is_existing: isExistingDeveloper
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeCreateDeveloperModal();
+            clearAliasSelection();
+            // Reload page to show updated data
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Create developer error:', error);
+        alert('An error occurred while creating the developer.');
+    });
+}
+{% endif %}
+
+{% if active_tab == 'developers' %}
 function updateSelection() {
     const checkboxes = document.querySelectorAll('.developer-checkbox:checked');
     selectedDevelopers = Array.from(checkboxes).map(cb => cb.value);
@@ -430,5 +1019,6 @@ function performMerge() {
         alert('An error occurred while merging developers.');
     });
 }
+{% endif %}
 </script>
-{% endblock %} 
+{% endblock content %} 

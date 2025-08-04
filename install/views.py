@@ -87,7 +87,7 @@ def setup_scheduled_tasks():
     # Daily tasks (run once per day at specific hours)
     daily_tasks = [
         # ('analytics.tasks.daily_indexing_all_repos_task', 0),   # 00:00 - Daily indexing for all repos (DISABLED - using specialized tasks instead)
-        ('analytics.tasks.group_developer_identities_task', 1), # 01:00 - Group developer identities
+        # ('analytics.tasks.group_developer_identities_task', 1), # 01:00 - Group developer identities (DISABLED - manual control)
         ('analytics.tasks.index_all_commits_task', 2),          # 02:00 - Index all commits
         ('analytics.tasks.index_all_pullrequests_task', 3),     # 03:00 - Index all PRs
         ('analytics.tasks.index_all_releases_task', 4),         # 04:00 - Index all releases

@@ -19,7 +19,13 @@ from analytics.commit_classifier import get_commit_type_stats
 
 @login_required
 def list_developers(request):
-    """List all developers with simple search functionality"""
+    """List all developers with simple search functionality and tabs"""
+    # Get tab parameter
+    active_tab = request.GET.get('tab', 'developers')
+    
+    if active_tab == 'aliases':
+        return list_aliases(request)
+    
     # Get all developers from MongoDB
     developers = Developer.objects.all().order_by('primary_name')
     
@@ -46,9 +52,233 @@ def list_developers(request):
         'developers': developers_list,
         'search_query': search_query,
         'total_count': len(developers_list),
+        'active_tab': active_tab,
     }
     
     return render(request, 'developers/list.html', context)
+
+
+@login_required
+def list_aliases(request):
+    """List all unique identities from commits, releases, deployments, and pull requests"""
+    from analytics.models import Commit, Release, Deployment, PullRequest
+    
+    # Get search query
+    search_query = request.GET.get('search', '').strip()
+    
+    # Collect all unique identities from different collections using aggregation
+    identities = set()
+    
+    # From Commits - use aggregation to get unique author combinations
+    if search_query:
+        # Use case-insensitive search in MongoDB
+        commits_aggregation = Commit.objects.aggregate([
+            {
+                '$match': {
+                    '$or': [
+                        {'author_name': {'$regex': search_query, '$options': 'i'}},
+                        {'author_email': {'$regex': search_query, '$options': 'i'}}
+                    ]
+                }
+            },
+            {
+                '$group': {
+                    '_id': {
+                        'name': '$author_name',
+                        'email': '$author_email'
+                    }
+                }
+            }
+        ])
+    else:
+        # Get all unique author combinations
+        commits_aggregation = Commit.objects.aggregate([
+            {
+                '$group': {
+                    '_id': {
+                        'name': '$author_name',
+                        'email': '$author_email'
+                    }
+                }
+            }
+        ])
+    
+    for commit_group in commits_aggregation:
+        author_data = commit_group['_id']
+        if author_data['name'] and author_data['email']:
+            identities.add((author_data['name'].lower(), author_data['email'].lower(), 'Commit'))
+    
+    # From Releases - use aggregation
+    if search_query:
+        releases_aggregation = Release.objects.aggregate([
+            {
+                '$match': {
+                    'author': {'$regex': search_query, '$options': 'i'}
+                }
+            },
+            {
+                '$group': {
+                    '_id': '$author'
+                }
+            }
+        ])
+    else:
+        releases_aggregation = Release.objects.aggregate([
+            {
+                '$group': {
+                    '_id': '$author'
+                }
+            }
+        ])
+    
+    for release_group in releases_aggregation:
+        author = release_group['_id']
+        if author:
+            identities.add((author.lower(), None, 'Release'))
+    
+    # From Deployments - use aggregation
+    if search_query:
+        deployments_aggregation = Deployment.objects.aggregate([
+            {
+                '$match': {
+                    'creator': {'$regex': search_query, '$options': 'i'}
+                }
+            },
+            {
+                '$group': {
+                    '_id': '$creator'
+                }
+            }
+        ])
+    else:
+        deployments_aggregation = Deployment.objects.aggregate([
+            {
+                '$group': {
+                    '_id': '$creator'
+                }
+            }
+        ])
+    
+    for deployment_group in deployments_aggregation:
+        creator = deployment_group['_id']
+        if creator:
+            identities.add((creator.lower(), None, 'Deployment'))
+    
+    # From Pull Requests - use aggregation
+    if search_query:
+        pull_requests_aggregation = PullRequest.objects.aggregate([
+            {
+                '$match': {
+                    'author': {'$regex': search_query, '$options': 'i'}
+                }
+            },
+            {
+                '$group': {
+                    '_id': '$author'
+                }
+            }
+        ])
+    else:
+        pull_requests_aggregation = PullRequest.objects.aggregate([
+            {
+                '$group': {
+                    '_id': '$author'
+                }
+            }
+        ])
+    
+    for pr_group in pull_requests_aggregation:
+        author = pr_group['_id']
+        if author:
+            identities.add((author.lower(), None, 'Pull Request'))
+    
+    # Convert to list and deduplicate
+    unique_identities = []
+    seen_names = set()
+    seen_emails = set()
+    
+    # Get existing aliases and developers using aggregation for better performance
+    existing_aliases_aggregation = DeveloperAlias.objects.aggregate([
+        {
+            '$group': {
+                '_id': {
+                    'name': '$name',
+                    'email': '$email'
+                }
+            }
+        }
+    ])
+    
+    existing_names = set()
+    existing_emails = set()
+    for alias_group in existing_aliases_aggregation:
+        alias_data = alias_group['_id']
+        if alias_data['name']:
+            existing_names.add(alias_data['name'].lower())
+        if alias_data['email']:
+            existing_emails.add(alias_data['email'].lower())
+    
+    # Get existing developers
+    existing_developers_aggregation = Developer.objects.aggregate([
+        {
+            '$group': {
+                '_id': {
+                    'name': '$primary_name',
+                    'email': '$primary_email'
+                }
+            }
+        }
+    ])
+    
+    existing_developer_names = set()
+    existing_developer_emails = set()
+    for dev_group in existing_developers_aggregation:
+        dev_data = dev_group['_id']
+        if dev_data['name']:
+            existing_developer_names.add(dev_data['name'].lower())
+        if dev_data['email']:
+            existing_developer_emails.add(dev_data['email'].lower())
+    
+    for name, email, source in identities:
+        name_lower = name.lower()
+        email_lower = email.lower() if email else None
+        
+        # Check if we already have this name or email in our current list
+        if name_lower in seen_names or (email_lower and email_lower in seen_emails):
+            continue
+        
+        # Check if this identity already exists in developer_aliases
+        if name_lower in existing_names or (email_lower and email_lower in existing_emails):
+            continue
+        
+        # Check if this identity matches an existing developer's primary identity
+        if name_lower in existing_developer_names or (email_lower and email_lower in existing_developer_emails):
+            continue
+        
+        seen_names.add(name_lower)
+        if email_lower:
+            seen_emails.add(email_lower)
+        
+        unique_identities.append({
+            'name': name.title(),  # Capitalize first letter
+            'email': email or f'No email ({source})',
+            'source': source
+        })
+    
+    # Sort by name
+    unique_identities.sort(key=lambda x: x['name'])
+    
+    context = {
+        'aliases': unique_identities,
+        'search_query': search_query,
+        'total_count': len(unique_identities),
+        'active_tab': 'aliases',
+    }
+    
+    return render(request, 'developers/list.html', context)
+
+
+
 
 
 def search_developers_ajax(request):
@@ -753,6 +983,139 @@ def remove_developer_alias(request, developer_id, alias_id):
         }, status=500)
 
 
+@login_required
+@require_http_methods(["POST"])
+def create_developer_from_aliases(request):
+    """Create a new developer from selected aliases"""
+    import json
+    
+    try:
+        # Check if request body is empty
+        if not request.body:
+            return JsonResponse({
+                'success': False,
+                'error': 'Empty request body'
+            }, status=400)
+        
+        data = json.loads(request.body)
+        developer_name = data.get('developer_name', '').strip()
+        primary_email = data.get('primary_email', '').strip()
+        aliases_data = data.get('aliases', [])
+        is_existing = data.get('is_existing', False)
+        
+        if not developer_name:
+            return JsonResponse({
+                'success': False,
+                'error': 'Developer name is required'
+            }, status=400)
+        
+        if not aliases_data:
+            return JsonResponse({
+                'success': False,
+                'error': 'At least one alias is required'
+            }, status=400)
+        
+        # Check if developer already exists
+        existing_developer = Developer.objects.filter(primary_name=developer_name).first()
+        
+        if existing_developer and not is_existing:
+            return JsonResponse({
+                'success': False,
+                'error': f'Developer "{developer_name}" already exists'
+            }, status=400)
+        
+        # Use the selected primary email or generate one if none selected
+        if not primary_email:
+            primary_email = f'{developer_name.lower()}@unknown'
+        
+        if existing_developer:
+            # Add aliases to existing developer
+            developer = existing_developer
+            action = 'updated'
+        else:
+            # Create new developer
+            developer = Developer(
+                primary_name=developer_name,
+                primary_email=primary_email or f'{developer_name.lower()}@unknown',
+                is_auto_grouped=False  # Manual creation
+            )
+            developer.save()
+            action = 'created'
+        
+        # Create aliases for all selected identities
+        aliases_created = 0
+        skipped_aliases = []
+        
+        for alias_data in aliases_data:
+            name = alias_data.get('name', '')
+            email = alias_data.get('email', '')
+            source = alias_data.get('source', '')
+            
+            # Normalize email for comparison
+            normalized_email = email if not email.startswith('No email') else f'{name.lower()}@{source.lower()}.unknown'
+            
+            # Skip if this is the primary identity (exact match)
+            if (name.lower() == developer_name.lower() and 
+                (normalized_email == primary_email or 
+                 (primary_email == '' and email.startswith('No email')))):
+                continue
+            
+            # Check if alias already exists for this developer (exact match)
+            existing_alias = DeveloperAlias.objects.filter(
+                developer=developer,
+                name=name,
+                email=normalized_email
+            ).first()
+            
+            if existing_alias:
+                skipped_aliases.append(f"{name} ({normalized_email})")
+                continue
+            
+            # Check if this alias exists for any other developer
+            global_existing_alias = DeveloperAlias.objects.filter(
+                name=name,
+                email=normalized_email
+            ).first()
+            
+            if global_existing_alias:
+                skipped_aliases.append(f"{name} ({normalized_email}) - already linked to another developer")
+                continue
+            
+            # Create alias
+            alias = DeveloperAlias(
+                developer=developer,
+                name=name,
+                email=normalized_email,
+                first_seen=datetime.now(timezone.utc),
+                last_seen=datetime.now(timezone.utc),
+                commit_count=0
+            )
+            alias.save()
+            aliases_created += 1
+        
+        # Prepare response message
+        message = f'Successfully {action} developer "{developer_name}" with {aliases_created} new aliases'
+        if skipped_aliases:
+            message += f'. Skipped {len(skipped_aliases)} existing aliases: {", ".join(skipped_aliases)}'
+        
+        return JsonResponse({
+            'success': True,
+            'message': message,
+            'developer_id': str(developer.id)
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Unexpected error: {str(e)}'
+        }, status=500)
+
+
 # Helper for legend colors
 def _get_commit_type_color(commit_type):
     colors = {
@@ -766,4 +1129,82 @@ def _get_commit_type_color(commit_type):
         'other': '#bdbdbd'
     }
     return colors.get(commit_type, '#bdbdbd')
+
+
+@login_required
+def debug_identity_issues(request):
+    """Debug endpoint to understand why certain identities cannot be added"""
+    from analytics.models import Commit, Release, Deployment, PullRequest
+    
+    # Get a specific identity to debug
+    identity_name = request.GET.get('name', '').strip()
+    identity_email = request.GET.get('email', '').strip()
+    
+    if not identity_name and not identity_email:
+        return JsonResponse({
+            'error': 'Please provide either name or email parameter'
+        }, status=400)
+    
+    # Check if this identity exists in our collections
+    found_in_commits = Commit.objects.filter(
+        author_name__icontains=identity_name
+    ).count() if identity_name else 0
+    
+    found_in_releases = Release.objects.filter(
+        author__icontains=identity_name
+    ).count() if identity_name else 0
+    
+    found_in_deployments = Deployment.objects.filter(
+        creator__icontains=identity_name
+    ).count() if identity_name else 0
+    
+    found_in_pull_requests = PullRequest.objects.filter(
+        author__icontains=identity_name
+    ).count() if identity_name else 0
+    
+    # Check if this identity already exists in developers or aliases
+    existing_developer = Developer.objects.filter(
+        primary_name__icontains=identity_name
+    ).first()
+    
+    existing_alias = DeveloperAlias.objects.filter(
+        name__icontains=identity_name
+    ).first()
+    
+    # Check email matches
+    email_matches = []
+    if identity_email:
+        email_matches = DeveloperAlias.objects.filter(
+            email__icontains=identity_email
+        )
+    
+    return JsonResponse({
+        'identity_name': identity_name,
+        'identity_email': identity_email,
+        'found_in_collections': {
+            'commits': found_in_commits,
+            'releases': found_in_releases,
+            'deployments': found_in_deployments,
+            'pull_requests': found_in_pull_requests
+        },
+        'existing_developer': {
+            'exists': existing_developer is not None,
+            'name': existing_developer.primary_name if existing_developer else None,
+            'email': existing_developer.primary_email if existing_developer else None
+        },
+        'existing_alias': {
+            'exists': existing_alias is not None,
+            'name': existing_alias.name if existing_alias else None,
+            'email': existing_alias.email if existing_alias else None,
+            'developer': str(existing_alias.developer.id) if existing_alias and existing_alias.developer else None
+        },
+        'email_matches': [
+            {
+                'name': match.name,
+                'email': match.email,
+                'developer': str(match.developer.id) if match.developer else None
+            }
+            for match in email_matches
+        ]
+    })
 
