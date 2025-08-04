@@ -191,10 +191,19 @@ def classify_commit_ollama(message: str) -> str:
     """
     # Ollama configuration from environment variables
     import os
-    OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'localhost')
-    OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
-    OLLAMA_URL = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}"
-    MODEL_NAME = "gemma3:4b"
+    from django.conf import settings
+    
+    # Configure Ollama host
+    ollama_host = settings.OLLAMA_HOST
+    if ollama_host.startswith('http://'):
+        ollama_host = ollama_host.replace('http://', '')
+    elif ollama_host.startswith('https://'):
+        ollama_host = ollama_host.replace('https://', '')
+    
+    # Set the host for the Ollama client
+    os.environ['OLLAMA_HOST'] = f"http://{ollama_host}"
+    
+    MODEL_NAME = settings.OLLAMA_MODEL
     
     prompt = f"""Classify this git commit message:
 
@@ -205,22 +214,19 @@ Categories: test, fix, feature, docs, refactor, style, perf, ci, chore, other
 Answer with only one word:"""
 
     try:
-        # Call Ollama API
-        payload = {
-            "model": MODEL_NAME,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.3,
-                "num_predict": 10
+        # Use the official Ollama library
+        import ollama
+        
+        response = ollama.generate(
+            model=MODEL_NAME,
+            prompt=prompt,
+            options={
+                'temperature': 0.3,
+                'num_predict': 10
             }
-        }
+        )
         
-        response = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=30)
-        response.raise_for_status()
-        
-        result = response.json()
-        llm_response = result.get('response', '').strip().lower()  # Normalize to lowercase
+        llm_response = response['response'].strip().lower()  # Normalize to lowercase
         
         # Extract the category from response - only use valid MongoDB choices
         valid_categories = ['fix', 'feature', 'docs', 'refactor', 'test', 'style', 'chore', 'other']

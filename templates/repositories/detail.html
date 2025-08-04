@@ -1199,19 +1199,12 @@ function displayLicensingAnalysis(analysis) {
         
         return `
             <tr class="border-b border-gray-200">
-                                <td class="py-3 px-4">
+                <td class="py-3 px-4">
                     <div class="font-medium">${component.name}${warningIcon}</div>
                     <div class="text-sm text-gray-500">${component.version}</div>
                 </td>
                 <td class="py-3 px-4">
                     ${licenseBadges}
-                </td>
-                <td class="py-3 px-4">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        component.commercial_compatible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }">
-                        ${component.commercial_compatible ? '✅ Compatible' : '❌ Incompatible'}
-                    </span>
                 </td>
             </tr>
         `;
@@ -1237,9 +1230,8 @@ function displayLicensingAnalysis(analysis) {
                     <table class="min-w-full bg-white border border-gray-200 rounded-lg">
                         <thead class="bg-gray-50">
                             <tr>
-                                                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Component</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Licenses</th>
-                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commercial</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Component</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Licenses</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200">

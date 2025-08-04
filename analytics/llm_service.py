@@ -1,21 +1,32 @@
 """
 LLM Service for license analysis using Ollama
 """
-import os
 import json
 import logging
-import requests
 from typing import Dict, List, Optional
+from django.conf import settings
+import ollama
 
 logger = logging.getLogger(__name__)
 
 
 class LLMService:
-    """Service for interacting with Ollama LLM"""
+    """Service for interacting with Ollama LLM using the official Python library"""
     
     def __init__(self):
-        self.ollama_url = os.getenv('OLLAMA_URL', 'http://localhost:11434')
-        self.model = os.getenv('OLLAMA_MODEL', 'llama3.2:latest')
+        # Configure Ollama client
+        self.model = settings.OLLAMA_MODEL
+        # Set the host for the Ollama client
+        ollama_host = settings.OLLAMA_HOST
+        if ollama_host.startswith('http://'):
+            ollama_host = ollama_host.replace('http://', '')
+        elif ollama_host.startswith('https://'):
+            ollama_host = ollama_host.replace('https://', '')
+        
+        # Configure the Ollama client by setting the host environment variable
+        import os
+        os.environ['OLLAMA_HOST'] = f"http://{ollama_host}"
+        logger.info(f"Ollama client configured with host: http://{ollama_host}, model: {self.model}")
     
     def analyze_licenses(self, licenses: List[str]) -> Dict:
         """
@@ -164,6 +175,16 @@ Respond with ONLY the JSON object, no additional text."""
 
 Analyze these open source licenses for commercial compatibility: {license_list}
 
+Legal Analysis Rules:
+- YES: All licenses are permissive and allow commercial use (MIT, Apache, BSD, ISC, etc.)
+- NO: Any contaminating license present (AGPL, GPL, LGPL, or other copyleft licenses that require source code disclosure)
+- CAUTION: Mixed licenses with potential conflicts or unclear commercial implications
+
+Key Legal Principles:
+- A single contaminating license (like AGPL) can require the entire project to be open-sourced
+- Copyleft licenses can impose significant restrictions on commercial use
+- Patent clauses and attribution requirements must be carefully considered
+
 Respond with ONLY ONE of these exact responses:
 - "✅ Compatible"
 - "⚠️ Caution" 
@@ -176,40 +197,27 @@ Respond with only the exact verdict with emoji, no explanation."""
         return prompt
     
     def _call_ollama(self, prompt: str) -> Optional[str]:
-        """Call Ollama API"""
+        """Call Ollama API using the official Python library"""
         try:
-            url = f"{self.ollama_url}/api/generate"
-            logger.info(f"Calling Ollama at {url}")
+            logger.info(f"Calling Ollama with model {self.model}")
             
-            payload = {
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.0,  # Zero temperature for deterministic responses
-                    "top_p": 0.8,
-                    "max_tokens": 800,
-                    "stop": ["\n\n", "```", "---"]  # Stop at common formatting markers
+            # Use the official Ollama library
+            response = ollama.generate(
+                model=self.model,
+                prompt=prompt,
+                options={
+                    'temperature': 0.0,  # Zero temperature for deterministic responses
+                    'top_p': 0.8,
+                    'num_predict': 2000,
                 }
-            }
+            )
             
-            logger.info(f"Making request to Ollama with model {self.model}")
-            response = requests.post(url, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                result = response.json()
-                response_text = result.get('response', '').strip()
-                logger.info(f"Ollama response received successfully, length: {len(response_text)}")
-                return response_text
-            else:
-                logger.error(f"Ollama API error: {response.status_code} - {response.text}")
-                return None
+            response_text = response['response'].strip()
+            logger.info(f"Ollama response received successfully, length: {len(response_text)}")
+            return response_text
                 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Request error calling Ollama: {e}")
-            return None
         except Exception as e:
-            logger.error(f"Unexpected error calling Ollama: {e}")
+            logger.error(f"Error calling Ollama: {e}")
             return None
     
     def parse_llm_response(self, response: str) -> Dict:
