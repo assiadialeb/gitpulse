@@ -730,9 +730,11 @@ function displayDeveloperSearchResults(developers, query) {
             developerSearchInput.value = developer.name;
             developerSearchResults.classList.add('hidden');
             
+            console.log('🔍 Developer selected:', developer.name);
+            
             // Show warning that this developer already exists
             const warningDiv = document.createElement('div');
-            warningDiv.className = 'mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm';
+            warningDiv.className = 'mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm developer-warning';
             warningDiv.innerHTML = `
                 <strong>Warning:</strong> Developer "${developer.name}" already exists. 
                 The selected aliases will be added to this existing developer.
@@ -741,11 +743,15 @@ function displayDeveloperSearchResults(developers, query) {
             // Remove any existing warning
             const existingWarning = document.querySelector('.developer-warning');
             if (existingWarning) {
+                console.log('🔍 Removing existing warning');
                 existingWarning.remove();
             }
             
-            warningDiv.classList.add('developer-warning');
+            console.log('🔍 Adding new warning element');
             developerSearchInput.parentNode.appendChild(warningDiv);
+            
+            console.log('🔍 Warning element added:', warningDiv);
+            console.log('🔍 All developer-warning elements:', document.querySelectorAll('.developer-warning').length);
         });
         
         developerSearchResults.appendChild(div);
@@ -817,6 +823,12 @@ function performCreateDeveloper() {
     const existingWarning = document.querySelector('.developer-warning');
     const isExistingDeveloper = existingWarning !== null;
     
+    console.log('🔍 Debug fusion detection:');
+    console.log('   Developer name:', developerName);
+    console.log('   Primary email:', primaryEmail);
+    console.log('   Existing warning element:', existingWarning);
+    console.log('   Is existing developer:', isExistingDeveloper);
+    
     // Get CSRF token
     let csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
     if (!csrfToken) {
@@ -839,9 +851,26 @@ function performCreateDeveloper() {
     // Prepare data
     const selectedAliasesData = selectedAliases.map(index => aliasesData[index]);
     
+    // If merging to existing developer, use the developer's existing email as primary_email
+    let finalPrimaryEmail = primaryEmail;
+    if (isExistingDeveloper) {
+        // Find the existing developer's email from the search results
+        const developerSearchResults = document.getElementById('developerSearchResults');
+        const developerElements = developerSearchResults.querySelectorAll('div');
+        for (let element of developerElements) {
+            const nameElement = element.querySelector('.font-medium');
+            const emailElement = element.querySelector('.text-sm');
+            if (nameElement && nameElement.textContent.trim() === developerName) {
+                finalPrimaryEmail = emailElement.textContent.trim();
+                console.log('🔍 Using existing developer email as primary_email:', finalPrimaryEmail);
+                break;
+            }
+        }
+    }
+    
     console.log('Sending create developer request with:', {
         developer_name: developerName,
-        primary_email: primaryEmail,
+        primary_email: finalPrimaryEmail,
         aliases: selectedAliasesData,
         is_existing: isExistingDeveloper,
         csrf_token: csrfToken.value
@@ -856,7 +885,7 @@ function performCreateDeveloper() {
         },
         body: JSON.stringify({
             developer_name: developerName,
-            primary_email: primaryEmail,
+            primary_email: finalPrimaryEmail,
             aliases: selectedAliasesData,
             is_existing: isExistingDeveloper
         })
