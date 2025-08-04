@@ -1,17 +1,11 @@
 from django.urls import path
 from . import views
-from . import debug_views
-from . import simple_views
-from . import working_views
 
 app_name = 'repositories'
 
 urlpatterns = [
     path('', views.repository_list, name='list'),
-    path('<int:repo_id>/', working_views.working_repository_detail, name='detail'),
-    path('<int:repo_id>/original/', views.repository_detail, name='detail_original'),
-    path('<int:repo_id>/simple/', simple_views.simple_repository_detail, name='detail_simple'),
-    path('<int:repo_id>/debug/', debug_views.repository_debug, name='debug'),
+    path('<int:repo_id>/', views.repository_detail, name='detail'),
     path('search/', views.search_repositories, name='search'),
     path('index/', views.index_repository, name='index'),
     path('index-batch/', views.index_repositories, name='index_batch'),

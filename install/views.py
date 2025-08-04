@@ -93,7 +93,7 @@ def setup_scheduled_tasks():
         ('analytics.tasks.index_all_releases_task', 4),         # 04:00 - Index all releases
         ('analytics.tasks.index_all_deployments_task', 5),      # 05:00 - Index all deployments
         ('analytics.tasks.check_new_releases_and_generate_sbom_task', 6), # 06:00 - Check new releases and generate SBOM
-        ('analytics.tasks.index_all_sonarcloud_metrics_task', 7), # 07:00 - Index all SonarCloud metrics
+        ('analytics.services.index_all_sonarcloud_metrics_task', 7), # 07:00 - Index all SonarCloud metrics
     ]
     
     # Periodic tasks (run every X minutes/hours)

@@ -8,6 +8,8 @@ from django.db.models import Q, Sum
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
+from datetime import datetime, timedelta
+from django.utils import timezone
 from .models import Repository
 from analytics.github_token_service import GitHubTokenService
 from analytics.unified_metrics_service import UnifiedMetricsService
@@ -123,71 +125,40 @@ def repository_list(request):
 
 @login_required
 def repository_detail(request, repo_id):
-    """Display repository details and analytics dashboard"""
+    start_str = request.GET.get('start')
+    end_str = request.GET.get('end')
+    if start_str and end_str:
+        try:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d")
+            end_date = datetime.strptime(end_str, "%Y-%m-%d")
+        except Exception:
+            start_date = timezone.now() - timedelta(days=29)
+            end_date = timezone.now()
+    else:
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=29)
+    # Passe la plage à UnifiedMetricsService
+    metrics_service = UnifiedMetricsService('repository', repo_id, start_date=start_date, end_date=end_date)
+    all_metrics = metrics_service.get_all_metrics()
+    
+    """Working repository detail view with proper charts"""
     try:
         repository = Repository.objects.get(id=repo_id)
     except Repository.DoesNotExist:
         messages.error(request, "Repository not found.")
         return redirect('repositories:list')
-
-    # Récupère la plage de dates depuis les paramètres GET
-    from datetime import datetime, timedelta
-    from django.utils import timezone
-    start_param = request.GET.get('start')
-    end_param = request.GET.get('end')
     
-    # Check if this is "All Time" (very old start date) or specific date range
-    is_all_time = False
-    if start_param and end_param:
-        try:
-            start_dt = datetime.strptime(start_param, "%Y-%m-%d")
-            end_dt = datetime.strptime(end_param, "%Y-%m-%d")
-            # Add one day to end_date to include the full day
-            end_dt = end_dt + timedelta(days=1)
-            
-            # Check if start date is very old (before 2010) - indicates "All Time"
-            # This covers all reasonable commit dates (Git was created in 2005)
-            if start_dt.year < 2010:
-                is_all_time = True
-        except Exception:
-            start_dt = timezone.now() - timedelta(days=29)
-            end_dt = timezone.now()
-    else:
-        end_dt = timezone.now()
-        start_dt = end_dt - timedelta(days=29)
+    if not repository.is_indexed:
+        context = {
+            'repository': repository,
+            'error_message': 'Repository is not indexed yet'
+        }
+        return render(request, 'repositories/detail.html', context)
     
-    # Convert the *calculated* datetime objects to strings for the template
-    # This ensures the date input fields are always populated by the server
-    start_date = start_dt.strftime("%Y-%m-%d")
-    end_date = end_dt.strftime("%Y-%m-%d")
-    
-    # Generate dynamic title for developer activity based on date filters
-    def get_developer_activity_title():
-        if start_dt and end_dt and not is_all_time:
-            # Custom date range - start_dt and end_dt are datetime objects
-            start_formatted = start_dt.strftime('%b %d, %Y')
-            end_formatted = end_dt.strftime('%b %d, %Y')
-            return f"Developer Activity ({start_formatted} - {end_formatted})"
-        elif is_all_time:
-            # All time
-            return "Developer Activity (All Time)"
-        else:
-            # Default 30 days
-            return "Developer Activity (Last 30 Days)"
-    
-    developer_activity_title = get_developer_activity_title()
-    
-    # Utilise la plage pour filtrer les stats
     try:
-        if is_all_time:
-            # "All Time" - don't pass date filters to UnifiedMetricsService
-            metrics_service = UnifiedMetricsService('repository', repo_id)
-        else:
-            # Specific date range - pass date filters
-            metrics_service = UnifiedMetricsService('repository', repo_id, start_date=start_dt, end_date=end_dt)
-        
-        # Get all metrics using the unified service
-        all_metrics = metrics_service.get_all_metrics()
+        # Get metrics using unified service
+        # metrics_service = UnifiedMetricsService('repository', repo_id)
+        # all_metrics = metrics_service.get_all_metrics()
         
         # Extract specific metrics for template
         overall_stats = {
@@ -202,34 +173,14 @@ def repository_detail(request, repo_id):
         commit_frequency = all_metrics['commit_frequency']
         release_frequency = all_metrics['release_frequency']
         total_releases = all_metrics['total_releases']
+        deployment_frequency = all_metrics['deployment_frequency']
+        total_deployments = all_metrics['total_deployments']
         pr_cycle_time = all_metrics['pr_cycle_time']
         commit_quality = all_metrics['commit_quality']
+        commit_types = all_metrics['commit_type_distribution']
         pr_health_metrics = all_metrics['pr_health_metrics']
         top_contributors = all_metrics['top_contributors']
         activity_heatmap = all_metrics['commit_activity_by_hour']
-        
-        # Calculate commit types manually from filtered commits to ensure date filtering is respected
-        from analytics.commit_classifier import get_commit_type_stats
-        from analytics.models import Commit
-        
-        # Get commits for this repository in the date range
-        if is_all_time:
-            # "All Time" - get all commits
-            repo_commits = Commit.objects.filter(
-                repository_full_name=repository.full_name,
-                authored_date__ne=None
-            )
-        else:
-            # Specific date range - filter commits
-            repo_commits = Commit.objects.filter(
-                repository_full_name=repository.full_name,
-                authored_date__gte=start_dt,
-                authored_date__lt=end_dt,
-                authored_date__ne=None
-            )
-        
-        # Calculate commit types from filtered commits
-        commit_types = get_commit_type_stats(repo_commits)
         
         # Calculate PR cycle time statistics for template
         pr_cycle_time_median = pr_cycle_time.get('median_cycle_time_hours', 0)
@@ -263,21 +214,57 @@ def repository_detail(request, repo_id):
         hourly_data = activity_heatmap.get('hourly_data', {})
         activity_heatmap_data = json.dumps([int(hourly_data.get(str(hour), 0)) for hour in range(24)])
         
+        # Bubble chart data
+        bubble_chart = metrics_service.get_bubble_chart_data(days=30)
+        bubble_chart_data = json.dumps(bubble_chart.get('datasets', []))
+        
         # Ajout stats changements commit (calcul et conversion explicite)
         commit_change_stats = all_metrics['commit_change_stats']
         avg_total_changes = round(float(commit_change_stats.get('avg_total_changes', 0)), 2)
         avg_files_changed = round(float(commit_change_stats.get('avg_files_changed', 0)), 2)
         nb_commits = int(commit_change_stats.get('nb_commits', 0))
         
-        # Prepare context
+        # Get SBOM vulnerability data
+        from analytics.models import SBOM, SBOMVulnerability
+        sbom = SBOM.objects(repository_full_name=repository.full_name).order_by('-created_at').first()
+        vulnerability_stats = {
+            'total_vulnerabilities': 0,
+            'severity_counts': {},
+            'has_sbom': False
+        }
+        
+        if sbom:
+            vulnerabilities = SBOMVulnerability.objects(sbom_id=sbom)
+            vulnerability_stats['has_sbom'] = True
+            vulnerability_stats['total_vulnerabilities'] = len(vulnerabilities)
+            
+            # Count by severity
+            severity_counts = {}
+            for vuln in vulnerabilities:
+                severity = vuln.severity or 'unknown'
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            vulnerability_stats['severity_counts'] = severity_counts
+        
+        # Get SonarCloud metrics
+        from repositories.views import _get_sonarcloud_metrics
+        sonarcloud_metrics = _get_sonarcloud_metrics(repository.id)
+        print(f"DEBUG: sonarcloud_metrics = {sonarcloud_metrics}")
+        print(f"DEBUG: sonarcloud_metrics type = {type(sonarcloud_metrics)}")
+        if sonarcloud_metrics:
+            print(f"DEBUG: sonarcloud_metrics.quality_gate = {sonarcloud_metrics.quality_gate}")
+        
+        # Build context
         context = {
             'repository': repository,
+            'start_date': start_date.strftime("%Y-%m-%d"),
+            'end_date': end_date.strftime("%Y-%m-%d"),
             'overall_stats': overall_stats,
             'developer_activity': developer_activity,
-            'developer_activity_title': developer_activity_title,
             'commit_frequency': commit_frequency,
             'release_frequency': release_frequency,
             'total_releases': total_releases,
+            'deployment_frequency': deployment_frequency,
+            'total_deployments': total_deployments,
             'pr_cycle_time_median': pr_cycle_time_median,
             'pr_cycle_time_avg': pr_cycle_time_avg,
             'pr_cycle_time_count': pr_cycle_time_count,
@@ -286,47 +273,29 @@ def repository_detail(request, repo_id):
             'pr_health_metrics': pr_health_metrics,
             'top_contributors': top_contributors,
             'activity_heatmap': activity_heatmap,
-            
-            # Chart data
             'commit_type_labels': commit_type_labels,
             'commit_type_values': commit_type_values,
             'commit_type_legend': legend_data,
             'doughnut_colors': doughnut_colors,
             'activity_heatmap_data': activity_heatmap_data,
-            # Ajout stats changements commit (valeurs converties)
+            'bubble_chart_data': bubble_chart_data,
             'commit_change_stats': {
                 'avg_total_changes': avg_total_changes,
                 'avg_files_changed': avg_files_changed,
                 'nb_commits': nb_commits,
             },
-            # Date range for template
-            'start_date': start_date,
-            'end_date': end_date,
-            
-            # SonarCloud metrics
-            'sonarcloud_metrics': _get_sonarcloud_metrics(repository.id),
+            'vulnerability_stats': vulnerability_stats,
+            'sonarcloud_metrics': sonarcloud_metrics,
         }
         
     except Exception as e:
-        # If metrics calculation fails, provide empty data and log the error
-        import logging
-        import traceback
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error getting metrics for repository {repo_id}: {e}")
-        logger.error(f"Exception type: {type(e)}")
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-        
-        # Ensure developer_activity_title is defined even in case of error
-        try:
-            developer_activity_title = get_developer_activity_title()
-        except:
-            developer_activity_title = "Developer Activity (Last 30 Days)"
-        
+        # If metrics calculation fails, provide empty data
         context = {
             'repository': repository,
+            'start_date': start_date.strftime("%Y-%m-%d"),
+            'end_date': end_date.strftime("%Y-%m-%d"),
             'overall_stats': {'total_commits': 0, 'total_authors': 0, 'total_additions': 0, 'total_deletions': 0, 'net_lines': 0},
             'developer_activity': {'developers': []},
-            'developer_activity_title': developer_activity_title,
             'commit_frequency': {'avg_commits_per_day': 0, 'recent_activity_score': 0, 'consistency_score': 0, 'overall_frequency_score': 0, 'commits_last_30_days': 0, 'commits_last_90_days': 0, 'days_since_last_commit': None, 'active_days': 0, 'total_days': 0},
             'release_frequency': {'releases_per_month': 0, 'releases_per_week': 0, 'total_releases': 0, 'period_days': 90},
             'total_releases': 0,
@@ -343,12 +312,9 @@ def repository_detail(request, repo_id):
             'commit_type_legend': [],
             'doughnut_colors': {},
             'activity_heatmap_data': json.dumps([0] * 24),
+            'sonarcloud_metrics': None,
             'error': str(e),
-            'debug_error': True,
-            # Date range for template
-            'start_date': start_date,
-            'end_date': end_date,
-
+            'debug_error': True
         }
     
     return render(request, 'repositories/detail.html', context)
@@ -446,8 +412,7 @@ def index_repository(request):
         
         # Check if repository already exists
         existing_repo = Repository.objects.filter(
-            github_id=repository_data['id'],
-            owner=request.user
+            github_id=repository_data['id']
         ).first()
         
         if existing_repo:
@@ -469,7 +434,7 @@ def index_repository(request):
             html_url=repository_data['html_url'],
             clone_url=repository_data['clone_url'],
             ssh_url=repository_data['ssh_url'],
-            owner=request.user
+            owner=request.user  # Keep owner for tracking who added it
         )
         
         # Just add to database, don't start indexing yet
@@ -589,7 +554,7 @@ def delete_repository(request, repo_id):
 def api_repository_pr_health_metrics(request, repo_id):
     """API endpoint to get PR health metrics for a repository asynchronously"""
     try:
-        repository = Repository.objects.get(id=repo_id, owner=request.user)
+        repository = Repository.objects.get(id=repo_id)
         
         # Use unified metrics service
         metrics_service = UnifiedMetricsService('repository', repo_id)
@@ -611,7 +576,7 @@ def api_repository_pr_health_metrics(request, repo_id):
 def api_repository_developer_activity(request, repo_id):
     """API endpoint for repository developer activity data"""
     try:
-        repository = Repository.objects.get(id=repo_id, owner=request.user)
+        repository = Repository.objects.get(id=repo_id)
         
         # Get period from query params
         days = int(request.GET.get('days', 30))
@@ -632,7 +597,7 @@ def api_repository_developer_activity(request, repo_id):
 def api_repository_commit_quality(request, repo_id):
     """API endpoint for repository commit quality metrics"""
     try:
-        repository = Repository.objects.get(id=repo_id, owner=request.user)
+        repository = Repository.objects.get(id=repo_id)
         
         metrics_service = UnifiedMetricsService('repository', repo_id)
         data = metrics_service.get_commit_quality()
@@ -650,7 +615,7 @@ def api_repository_commit_quality(request, repo_id):
 def api_repository_commit_types(request, repo_id):
     """API endpoint for repository commit type distribution"""
     try:
-        repository = Repository.objects.get(id=repo_id, owner=request.user)
+        repository = Repository.objects.get(id=repo_id)
         
         metrics_service = UnifiedMetricsService('repository', repo_id)
         data = metrics_service.get_commit_type_distribution()
@@ -692,7 +657,7 @@ def index_repositories(request):
                 html_url=repository_data['html_url'],
                 clone_url=repository_data['clone_url'],
                 ssh_url=repository_data['ssh_url'],
-                owner=request.user,
+                owner=request.user,  # Keep owner for tracking who added it
                 is_indexed=False
             )
             added += 1
@@ -708,7 +673,7 @@ def repository_licensing_analysis(request, repo_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        repository = get_object_or_404(Repository, id=repo_id)
         
         # Analyze licensing
         license_service = LicenseAnalysisService(repository.full_name)
@@ -736,7 +701,7 @@ def repository_llm_license_analysis(request, repo_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        repository = get_object_or_404(Repository, id=repo_id)
         
         # Get license analysis first
         license_service = LicenseAnalysisService(repository.full_name)
@@ -799,7 +764,7 @@ def repository_llm_license_verdict(request, repo_id):
     try:
         logger.info(f"Starting LLM license verdict for repository {repo_id}")
         
-        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        repository = get_object_or_404(Repository, id=repo_id)
         
         # Get license analysis first
         logger.info(f"Getting license analysis for {repository.full_name}")
@@ -851,7 +816,7 @@ def repository_vulnerabilities_analysis(request, repo_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        repository = get_object_or_404(Repository, id=repo_id)
         
         # Get SBOM analysis
         from analytics.sbom_service import SBOMService
@@ -892,7 +857,7 @@ def repository_commits_list(request, repo_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        repository = get_object_or_404(Repository, id=repo_id)
         
         # Get pagination parameters
         page = int(request.GET.get('page', 1))
@@ -1007,7 +972,7 @@ def repository_releases_list(request, repo_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        repository = get_object_or_404(Repository, id=repo_id)
         
         # Get pagination parameters
         page = int(request.GET.get('page', 1))
@@ -1119,7 +1084,7 @@ def repository_deployments_list(request, repo_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        repository = get_object_or_404(Repository, id=repo_id, owner=request.user)
+        repository = get_object_or_404(Repository, id=repo_id)
         
         # Get pagination parameters
         page = int(request.GET.get('page', 1))

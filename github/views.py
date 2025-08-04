@@ -152,7 +152,7 @@ def test_github_access(request):
         
         # Application model no longer exists, test with repositories directly
         from repositories.models import Repository
-        repos = Repository.objects.filter(owner=request.user)[:5]
+        repos = Repository.objects.all()[:5]
         for repo in repos:
             total_repos += 1
             repo_name = repo.full_name
