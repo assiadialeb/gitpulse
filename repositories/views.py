@@ -13,6 +13,32 @@ from analytics.github_token_service import GitHubTokenService
 from analytics.unified_metrics_service import UnifiedMetricsService
 from analytics.license_analysis_service import LicenseAnalysisService
 from analytics.llm_service import LLMService
+from analytics.sonarcloud_service import SonarCloudService
+
+
+def _get_sonarcloud_metrics(repository_id: int):
+    """Get latest SonarCloud metrics for a repository"""
+    try:
+        sonar_service = SonarCloudService()
+        return sonar_service.get_latest_metrics(repository_id)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error getting SonarCloud metrics for repository {repository_id}: {e}")
+        return None
+
+
+def _is_sonarcloud_configured():
+    """Check if SonarCloud is configured (token exists)"""
+    try:
+        from sonarcloud.models import SonarCloudConfig
+        config = SonarCloudConfig.get_config()
+        return bool(config.access_token)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error checking SonarCloud configuration: {e}")
+        return False
 
 
 @login_required
@@ -34,8 +60,8 @@ def repository_list(request):
     if order == 'desc':
         sort_by = f'-{sort_by}'
     
-    # Filter repositories and sort
-    repositories = Repository.objects.filter(owner=request.user).order_by(sort_by)
+    # Filter repositories and sort (all repositories visible to all users)
+    repositories = Repository.objects.all().order_by(sort_by)
     
     if search_query:
         repositories = repositories.filter(
@@ -99,7 +125,7 @@ def repository_list(request):
 def repository_detail(request, repo_id):
     """Display repository details and analytics dashboard"""
     try:
-        repository = Repository.objects.get(id=repo_id, owner=request.user)
+        repository = Repository.objects.get(id=repo_id)
     except Repository.DoesNotExist:
         messages.error(request, "Repository not found.")
         return redirect('repositories:list')
@@ -276,6 +302,9 @@ def repository_detail(request, repo_id):
             # Date range for template
             'start_date': start_date,
             'end_date': end_date,
+            
+            # SonarCloud metrics
+            'sonarcloud_metrics': _get_sonarcloud_metrics(repository.id),
         }
         
     except Exception as e:
@@ -319,6 +348,7 @@ def repository_detail(request, repo_id):
             # Date range for template
             'start_date': start_date,
             'end_date': end_date,
+
         }
     
     return render(request, 'repositories/detail.html', context)
@@ -364,7 +394,7 @@ def search_repositories(request):
         
         # Récupère les github_id déjà indexés pour cet utilisateur
         from .models import Repository
-        existing_github_ids = set(Repository.objects.filter(owner=request.user).values_list('github_id', flat=True))
+        existing_github_ids = set(Repository.objects.all().values_list('github_id', flat=True))
         # Filter repositories based on query and exclude already indexed
         filtered_repos = []
         for repo in all_repos:
@@ -462,7 +492,7 @@ def index_repository(request):
 def start_indexing(request, repo_id):
     """Start indexing for a specific repository"""
     try:
-        repository = Repository.objects.get(id=repo_id, owner=request.user)
+        repository = Repository.objects.get(id=repo_id)
     except Repository.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Repository not found'})
     
@@ -494,7 +524,7 @@ def start_indexing(request, repo_id):
 def delete_repository(request, repo_id):
     """Delete a repository and all its associated data"""
     try:
-        repository = Repository.objects.get(id=repo_id, owner=request.user)
+        repository = Repository.objects.get(id=repo_id)
     except Repository.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Repository not found'})
     
@@ -644,7 +674,7 @@ def index_repositories(request):
         added = 0
         skipped = 0
         for repository_data in repositories_data:
-            if Repository.objects.filter(github_id=repository_data['id'], owner=request.user).exists():
+            if Repository.objects.filter(github_id=repository_data['id']).exists():
                 skipped += 1
                 continue
             Repository.objects.create(

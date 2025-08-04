@@ -197,7 +197,7 @@ GITHUB_API_TIMEOUT = int(config('GITHUB_API_TIMEOUT', default=30))
 
 # Ollama Configuration
 OLLAMA_HOST = config('OLLAMA_HOST', default='http://localhost:11434')
-OLLAMA_MODEL = config('OLLAMA_MODEL', default='llama3.2:3b')
+OLLAMA_MODEL = config('OLLAMA_MODEL', default='gemma3:4b')
 
 SITE_ID = 1
 

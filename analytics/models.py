@@ -626,3 +626,73 @@ class SBOMVulnerability(Document):
     
     def __str__(self):
         return f"{self.vuln_id} - {self.affected_component_name}@{self.affected_component_version}" 
+
+
+class SonarCloudMetrics(Document):
+    """SonarCloud quality metrics for repositories"""
+    
+    # Repository reference
+    repository_id = fields.IntField(required=True)
+    repository_full_name = fields.StringField(required=True)
+    
+    # Timestamp
+    timestamp = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    
+    # Quality Gate
+    quality_gate = fields.StringField(choices=['PASS', 'FAIL'], default='FAIL')
+    
+    # Ratings (A, B, C, D, E)
+    maintainability_rating = fields.StringField(choices=['A', 'B', 'C', 'D', 'E'])
+    reliability_rating = fields.StringField(choices=['A', 'B', 'C', 'D', 'E'])
+    security_rating = fields.StringField(choices=['A', 'B', 'C', 'D', 'E'])
+    
+    # Quantitative metrics
+    bugs = fields.IntField(default=0)
+    vulnerabilities = fields.IntField(default=0)
+    code_smells = fields.IntField(default=0)
+    duplicated_lines_density = fields.FloatField(default=0.0)  # %
+    coverage = fields.FloatField()  # %
+    technical_debt = fields.FloatField()  # hours
+    
+    # Issues by severity
+    issues_blocker = fields.IntField(default=0)
+    issues_critical = fields.IntField(default=0)
+    issues_major = fields.IntField(default=0)
+    issues_minor = fields.IntField(default=0)
+    issues_info = fields.IntField(default=0)
+    
+    # SonarCloud metadata
+    sonarcloud_project_key = fields.StringField(required=True)
+    sonarcloud_organization = fields.StringField(required=True)
+    last_analysis_date = fields.DateTimeField()
+    
+    # Indexes for efficient queries
+    meta = {
+        'indexes': [
+            ('repository_id', '-timestamp'),
+            ('repository_full_name', '-timestamp'),
+            ('timestamp',),
+            ('quality_gate',),
+            ('sonarcloud_project_key',),
+        ],
+        'collection': 'sonarcloud_metrics'
+    }
+    
+    def total_issues(self):
+        """Calculate total open issues"""
+        return (self.issues_blocker + self.issues_critical + 
+                self.issues_major + self.issues_minor + self.issues_info)
+    
+    def get_rating_color(self, rating):
+        """Get color for rating display"""
+        colors = {
+            'A': 'green',
+            'B': 'blue', 
+            'C': 'yellow',
+            'D': 'orange',
+            'E': 'red'
+        }
+        return colors.get(rating, 'gray')
+    
+    def __str__(self):
+        return f"SonarCloud Metrics for {self.repository_full_name} at {self.timestamp}" 

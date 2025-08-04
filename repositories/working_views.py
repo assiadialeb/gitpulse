@@ -131,6 +131,14 @@ def working_repository_detail(request, repo_id):
                 severity_counts[severity] = severity_counts.get(severity, 0) + 1
             vulnerability_stats['severity_counts'] = severity_counts
         
+        # Get SonarCloud metrics
+        from repositories.views import _get_sonarcloud_metrics
+        sonarcloud_metrics = _get_sonarcloud_metrics(repository.id)
+        print(f"DEBUG: sonarcloud_metrics = {sonarcloud_metrics}")
+        print(f"DEBUG: sonarcloud_metrics type = {type(sonarcloud_metrics)}")
+        if sonarcloud_metrics:
+            print(f"DEBUG: sonarcloud_metrics.quality_gate = {sonarcloud_metrics.quality_gate}")
+        
         # Build context
         context = {
             'repository': repository,
@@ -163,6 +171,7 @@ def working_repository_detail(request, repo_id):
                 'nb_commits': nb_commits,
             },
             'vulnerability_stats': vulnerability_stats,
+            'sonarcloud_metrics': sonarcloud_metrics,
         }
         
     except Exception as e:
@@ -189,6 +198,7 @@ def working_repository_detail(request, repo_id):
             'commit_type_legend': [],
             'doughnut_colors': {},
             'activity_heatmap_data': json.dumps([0] * 24),
+            'sonarcloud_metrics': None,
             'error': str(e),
             'debug_error': True
         }
