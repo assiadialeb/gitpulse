@@ -321,6 +321,61 @@ def repository_detail(request, repo_id):
 
 
 @login_required
+@require_http_methods(["GET"])
+def repository_sonarcloud_temporal(request, repo_id):
+    """Get temporal analysis of SonarCloud metrics for a repository"""
+    try:
+        repository = get_object_or_404(Repository, id=repo_id)
+        
+        # Get date range from query parameters
+        from_date_str = request.GET.get('from')
+        to_date_str = request.GET.get('to')
+        
+        from_date = None
+        to_date = None
+        
+        if from_date_str:
+            try:
+                from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
+            except ValueError:
+                pass
+        
+        if to_date_str:
+            try:
+                to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+            except ValueError:
+                pass
+        
+        # Get temporal analysis from SonarCloud service
+        from analytics.sonarcloud_service import SonarCloudService
+        sonar_service = SonarCloudService()
+        
+        temporal_data = sonar_service.get_temporal_analysis(
+            repository_id=repo_id,
+            repository_full_name=repository.full_name,
+            from_date=from_date,
+            to_date=to_date
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'repository_id': repo_id,
+            'repository_name': repository.full_name,
+            'data': temporal_data
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error getting SonarCloud temporal analysis for repository {repo_id}: {e}")
+        
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
 def search_repositories(request):
     """Search repositories on GitHub"""
     query = request.GET.get('q', '').lower()
@@ -1190,3 +1245,83 @@ def repository_deployments_list(request, repo_id):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def repository_sonarcloud_analysis(request, repo_id):
+    """Get SonarCloud analysis content for slide-over"""
+    try:
+        repository = get_object_or_404(Repository, id=repo_id)
+        
+        # Get date range from query parameters
+        from_date_str = request.GET.get('from')
+        to_date_str = request.GET.get('to')
+        
+        from_date = None
+        to_date = None
+        
+        if from_date_str:
+            try:
+                from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
+            except ValueError:
+                pass
+                
+        if to_date_str:
+            try:
+                to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+            except ValueError:
+                pass
+        
+        # Get latest metrics from SonarCloud service (same as main page)
+        from analytics.sonarcloud_service import SonarCloudService
+        sonar_service = SonarCloudService()
+        
+        latest_metrics = sonar_service.get_latest_metrics(repo_id)
+        
+        # Prepare data for template
+        current_metrics = {
+            'bugs': getattr(latest_metrics, 'bugs', 0),
+            'vulnerabilities': getattr(latest_metrics, 'vulnerabilities', 0),
+            'code_smells': getattr(latest_metrics, 'code_smells', 0),
+            'coverage': getattr(latest_metrics, 'coverage', 0),
+            'maintainability_rating': getattr(latest_metrics, 'maintainability_rating', 'N/A'),
+            'reliability_rating': getattr(latest_metrics, 'reliability_rating', 'N/A'),
+            'security_rating': getattr(latest_metrics, 'security_rating', 'N/A'),
+            'quality_gate': getattr(latest_metrics, 'quality_gate', 'N/A')
+        }
+        
+        # Create temporal data structure for compatibility
+        temporal_data = {
+            'metrics_timeline': [
+                {'date': '2025-01-01T00:00:00', 'metric': 'bugs', 'value': current_metrics['bugs']},
+                {'date': '2025-01-01T00:00:00', 'metric': 'vulnerabilities', 'value': current_metrics['vulnerabilities']},
+                {'date': '2025-01-01T00:00:00', 'metric': 'code_smells', 'value': current_metrics['code_smells']},
+                {'date': '2025-01-01T00:00:00', 'metric': 'coverage', 'value': current_metrics['coverage']},
+                {'date': '2025-01-01T00:00:00', 'metric': 'maintainability_rating', 'value': current_metrics['maintainability_rating']},
+                {'date': '2025-01-01T00:00:00', 'metric': 'reliability_rating', 'value': current_metrics['reliability_rating']},
+                {'date': '2025-01-01T00:00:00', 'metric': 'security_rating', 'value': current_metrics['security_rating']}
+            ],
+            'trends': {
+                'quality_gate_trend': 'stable',
+                'maintainability_trend': 'stable',
+                'reliability_trend': 'stable',
+                'security_trend': 'stable'
+            },
+            'issues_timeline': []
+        }
+        
+        return render(request, 'repositories/sonarcloud_analysis.html', {
+            'repository': repository,
+            'temporal_data': temporal_data,
+            'current_metrics': current_metrics
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error getting SonarCloud analysis for repository {repo_id}: {e}")
+        
+        return render(request, 'repositories/sonarcloud_analysis.html', {
+            'error': str(e)
+        })

@@ -322,4 +322,473 @@ class SonarCloudService:
             ).order_by('-timestamp').first()
         except Exception as e:
             logger.error(f"Error getting latest metrics for repository {repository_id}: {e}")
-            return None 
+            return None
+    
+    def _fetch_historical_metrics(self, project_key: str, repository_full_name: str = None,
+                                  from_date: datetime = None, to_date: datetime = None) -> List[Dict]:
+        """Fetch historical metrics from SonarCloud API"""
+        try:
+            org = self._get_organization(repository_full_name)
+            if not org:
+                return []
+            
+            url = "https://sonarcloud.io/api/measures/search_history"
+            params = {
+                'component': project_key,
+                'organization': org,
+                'metrics': 'bugs,vulnerabilities,code_smells,duplicated_lines_density,coverage,sqale_rating,reliability_rating,security_rating',
+                'ps': 100  # Page size
+            }
+            
+            # Add date filters if provided
+            if from_date:
+                params['from'] = from_date.strftime('%Y-%m-%d')
+            if to_date:
+                params['to'] = to_date.strftime('%Y-%m-%d')
+            
+            logger.info(f"Fetching historical metrics for {project_key} with params: {params}")
+            response = requests.get(url, headers=self.headers, params=params, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                measures = data.get('measures', [])
+                logger.info(f"Found {len(measures)} historical measures for {project_key}")
+                return measures
+            else:
+                logger.error(f"Failed to fetch historical metrics: {response.status_code} - {response.text}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error fetching historical metrics: {e}")
+            return []
+    
+    def _fetch_historical_issues(self, project_key: str, repository_full_name: str = None,
+                                from_date: datetime = None, to_date: datetime = None) -> List[Dict]:
+        """Fetch historical issues from SonarCloud API"""
+        try:
+            org = self._get_organization(repository_full_name)
+            if not org:
+                return []
+            
+            url = "https://sonarcloud.io/api/issues/search"
+            params = {
+                'componentKeys': project_key,
+                'organization': org,
+                'ps': 100,
+                'facets': 'severities,types'
+            }
+            
+            # Add date filters if provided
+            if from_date:
+                params['createdAfter'] = from_date.strftime('%Y-%m-%d')
+            if to_date:
+                params['createdBefore'] = to_date.strftime('%Y-%m-%d')
+            
+            response = requests.get(url, headers=self.headers, params=params, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get('issues', [])
+            else:
+                logger.error(f"Failed to fetch historical issues: {response.status_code} - {response.text}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error fetching historical issues: {e}")
+            return []
+    
+    def get_temporal_analysis(self, repository_id: int, repository_full_name: str,
+                             from_date: datetime = None, to_date: datetime = None) -> Dict:
+        """Get temporal analysis of SonarCloud metrics"""
+        try:
+            # First, try to get backfilled data from database
+            backfilled_data = self._get_backfilled_data(repository_id, from_date, to_date)
+            
+            if backfilled_data:
+                logger.info(f"Using backfilled data for repository {repository_id}")
+                return self._process_backfilled_data(backfilled_data, from_date, to_date)
+            
+            # Fallback to API calls if no backfilled data
+            logger.info(f"No backfilled data found, using API for repository {repository_id}")
+            project_key = self._get_project_key(repository_full_name)
+            
+            # Fetch historical data from API
+            historical_metrics = self._fetch_historical_metrics(project_key, repository_full_name, from_date, to_date)
+            historical_issues = self._fetch_historical_issues(project_key, repository_full_name, from_date, to_date)
+            
+            # Process historical metrics
+            metrics_timeline = []
+            for measure in historical_metrics:
+                if 'history' in measure:
+                    for point in measure['history']:
+                        metrics_timeline.append({
+                            'date': point.get('date'),
+                            'metric': measure.get('metric'),
+                            'value': point.get('value')
+                        })
+            
+            # Process historical issues
+            issues_timeline = []
+            for issue in historical_issues:
+                issues_timeline.append({
+                    'date': issue.get('creationDate'),
+                    'type': issue.get('type'),
+                    'severity': issue.get('severity'),
+                    'status': issue.get('status'),
+                    'resolution': issue.get('resolution')
+                })
+            
+            # Calculate trends
+            trends = self._calculate_trends(metrics_timeline, issues_timeline)
+            
+            return {
+                'metrics_timeline': metrics_timeline,
+                'issues_timeline': issues_timeline,
+                'trends': trends,
+                'period': {
+                    'from': from_date.isoformat() if from_date else None,
+                    'to': to_date.isoformat() if to_date else None
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting temporal analysis for repository {repository_id}: {e}")
+            return {
+                'metrics_timeline': [],
+                'issues_timeline': [],
+                'trends': {},
+                'error': str(e)
+            }
+    
+    def _get_backfilled_data(self, repository_id: int, from_date: datetime = None, to_date: datetime = None) -> List[SonarCloudMetrics]:
+        """Get backfilled data from database"""
+        try:
+            query = SonarCloudMetrics.objects.filter(repository_id=repository_id)
+            
+            if from_date:
+                query = query.filter(last_analysis_date__gte=from_date)
+            if to_date:
+                query = query.filter(last_analysis_date__lte=to_date)
+            
+            return list(query.order_by('last_analysis_date'))
+            
+        except Exception as e:
+            logger.error(f"Error getting backfilled data: {e}")
+            return []
+    
+    def _process_backfilled_data(self, backfilled_data: List[SonarCloudMetrics], 
+                                from_date: datetime = None, to_date: datetime = None) -> Dict:
+        """Process backfilled data into timeline format"""
+        try:
+            # Convert to timeline format
+            metrics_timeline = []
+            
+            for metrics in backfilled_data:
+                # Add maintainability rating
+                if metrics.maintainability_rating:
+                    metrics_timeline.append({
+                        'date': metrics.last_analysis_date.isoformat(),
+                        'metric': 'maintainability_rating',
+                        'value': metrics.maintainability_rating
+                    })
+                
+                # Add reliability rating
+                if metrics.reliability_rating:
+                    metrics_timeline.append({
+                        'date': metrics.last_analysis_date.isoformat(),
+                        'metric': 'reliability_rating',
+                        'value': metrics.reliability_rating
+                    })
+                
+                # Add security rating
+                if metrics.security_rating:
+                    metrics_timeline.append({
+                        'date': metrics.last_analysis_date.isoformat(),
+                        'metric': 'security_rating',
+                        'value': metrics.security_rating
+                    })
+                
+                # Add bugs count
+                metrics_timeline.append({
+                    'date': metrics.last_analysis_date.isoformat(),
+                    'metric': 'bugs',
+                    'value': metrics.bugs
+                })
+                
+                # Add vulnerabilities count
+                metrics_timeline.append({
+                    'date': metrics.last_analysis_date.isoformat(),
+                    'metric': 'vulnerabilities',
+                    'value': metrics.vulnerabilities
+                })
+                
+                # Add code smells count
+                metrics_timeline.append({
+                    'date': metrics.last_analysis_date.isoformat(),
+                    'metric': 'code_smells',
+                    'value': metrics.code_smells
+                })
+                
+                # Add coverage
+                if metrics.coverage is not None:
+                    metrics_timeline.append({
+                        'date': metrics.last_analysis_date.isoformat(),
+                        'metric': 'coverage',
+                        'value': metrics.coverage
+                    })
+            
+            # Calculate trends from backfilled data
+            trends = self._calculate_trends(metrics_timeline, [])
+            
+            return {
+                'metrics_timeline': metrics_timeline,
+                'issues_timeline': [],  # We don't have historical issues data
+                'trends': trends,
+                'period': {
+                    'from': from_date.isoformat() if from_date else None,
+                    'to': to_date.isoformat() if to_date else None
+                },
+                'data_source': 'backfilled'
+            }
+            
+            return {
+                'metrics_timeline': metrics_timeline,
+                'issues_timeline': [],  # We don't have historical issues data
+                'trends': trends,
+                'period': {
+                    'from': from_date.isoformat() if from_date else None,
+                    'to': to_date.isoformat() if to_date else None
+                },
+                'data_source': 'backfilled'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing backfilled data: {e}")
+            return {
+                'metrics_timeline': [],
+                'issues_timeline': [],
+                'trends': {},
+                'error': str(e)
+            }
+    
+    def _calculate_trends(self, metrics_timeline: List[Dict], issues_timeline: List[Dict]) -> Dict:
+        """Calculate trends from timeline data"""
+        trends = {
+            'quality_gate_trend': 'stable',
+            'maintainability_trend': 'stable',
+            'reliability_trend': 'stable',
+            'security_trend': 'stable',
+            'issues_trend': 'stable',
+            'coverage_trend': 'stable'
+        }
+        
+        # Simple trend calculation (can be enhanced)
+        if metrics_timeline:
+            # Group by metric and calculate trend
+            metrics_by_type = {}
+            for point in metrics_timeline:
+                metric = point['metric']
+                if metric not in metrics_by_type:
+                    metrics_by_type[metric] = []
+                metrics_by_type[metric].append(point)
+            
+            # Calculate trends for each metric type
+            for metric, points in metrics_by_type.items():
+                if len(points) >= 2:
+                    # Sort by date
+                    sorted_points = sorted(points, key=lambda x: x['date'])
+                    first_value = sorted_points[0]['value']
+                    last_value = sorted_points[-1]['value']
+                    
+                    # Handle different metric types
+                    if metric in ['maintainability_rating', 'reliability_rating', 'security_rating']:
+                        # For ratings (A=1, B=2, C=3, D=4, E=5)
+                        rating_to_num = {'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5}
+                        first_num = rating_to_num.get(first_value, 3)
+                        last_num = rating_to_num.get(last_value, 3)
+                        
+                        if last_num < first_num:  # Lower number = better rating
+                            trends[f'{metric}_trend'] = 'improving'
+                        elif last_num > first_num:
+                            trends[f'{metric}_trend'] = 'degrading'
+                        else:
+                            trends[f'{metric}_trend'] = 'stable'
+                    else:
+                        # For numeric metrics
+                        try:
+                            first_num = float(first_value) if first_value else 0
+                            last_num = float(last_value) if last_value else 0
+                            
+                            # Determine trend
+                            if last_num > first_num * 1.1:  # 10% improvement
+                                trends[f'{metric}_trend'] = 'improving'
+                            elif last_num < first_num * 0.9:  # 10% degradation
+                                trends[f'{metric}_trend'] = 'degrading'
+                            else:
+                                trends[f'{metric}_trend'] = 'stable'
+                        except (ValueError, TypeError):
+                            trends[f'{metric}_trend'] = 'stable'
+        
+        return trends 
+
+    def _fetch_project_analyses(self, project_key: str, repository_full_name: str = None, 
+                               from_date: datetime = None, to_date: datetime = None) -> List[Dict]:
+        """Fetch historical project analyses from SonarCloud API"""
+        try:
+            org = self._get_organization(repository_full_name)
+            if not org:
+                return []
+            
+            url = "https://sonarcloud.io/api/project_analyses/search"
+            params = {
+                'project': project_key,
+                'organization': org,
+                'ps': 100  # Page size
+            }
+            
+            # Add date filters if provided
+            if from_date:
+                params['from'] = from_date.strftime('%Y-%m-%d')
+            if to_date:
+                params['to'] = to_date.strftime('%Y-%m-%d')
+            
+            response = requests.get(url, headers=self.headers, params=params, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get('analyses', [])
+            else:
+                logger.error(f"Failed to fetch project analyses: {response.status_code} - {response.text}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error fetching project analyses: {e}")
+            return []
+    
+    def backfill_historical_data(self, repository_id: int, repository_full_name: str,
+                               from_date: datetime = None, to_date: datetime = None) -> Dict:
+        """Backfill historical SonarCloud data for a repository"""
+        try:
+            logger.info(f"Starting backfill for repository {repository_full_name}")
+            
+            project_key = self._get_project_key(repository_full_name)
+            
+            # Fetch historical analyses
+            analyses = self._fetch_project_analyses(project_key, repository_full_name, from_date, to_date)
+            
+            # Fetch historical metrics for each analysis
+            backfilled_data = []
+            
+            for analysis in analyses:
+                analysis_key = analysis.get('key')
+                analysis_date = analysis.get('date')
+                
+                if analysis_key and analysis_date:
+                    # Fetch metrics for this specific analysis
+                    metrics = self._fetch_metrics_for_analysis(project_key, analysis_key, repository_full_name)
+                    
+                    if metrics:
+                        backfilled_data.append({
+                            'analysis_key': analysis_key,
+                            'date': analysis_date,
+                            'metrics': metrics
+                        })
+            
+            # Store backfilled data in database
+            stored_count = self._store_backfilled_data(repository_id, backfilled_data, repository_full_name)
+            
+            return {
+                'success': True,
+                'analyses_found': len(analyses),
+                'data_points_stored': stored_count,
+                'period': {
+                    'from': from_date.isoformat() if from_date else None,
+                    'to': to_date.isoformat() if to_date else None
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error backfilling data for repository {repository_id}: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _fetch_metrics_for_analysis(self, project_key: str, analysis_key: str, 
+                                   repository_full_name: str = None) -> Optional[Dict]:
+        """Fetch metrics for a specific analysis"""
+        try:
+            org = self._get_organization(repository_full_name)
+            if not org:
+                return None
+            
+            url = "https://sonarcloud.io/api/measures/component"
+            params = {
+                'component': project_key,
+                'organization': org,
+                'analysis': analysis_key,
+                'metricKeys': 'bugs,vulnerabilities,code_smells,duplicated_lines_density,coverage,sqale_rating,reliability_rating,security_rating,maintainability_rating'
+            }
+            
+            response = requests.get(url, headers=self.headers, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get('component', {}).get('measures', [])
+            else:
+                logger.warning(f"Failed to fetch metrics for analysis {analysis_key}: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error fetching metrics for analysis {analysis_key}: {e}")
+            return None
+    
+    def _store_backfilled_data(self, repository_id: int, backfilled_data: List[Dict], repository_full_name: str) -> int:
+        """Store backfilled data in the database"""
+        stored_count = 0
+        
+        for data_point in backfilled_data:
+            try:
+                # Parse the analysis date
+                analysis_date = datetime.fromisoformat(data_point['date'].replace('Z', '+00:00'))
+                
+                # Extract metrics
+                metrics = data_point['metrics']
+                metrics_dict = {m.get('metric'): m.get('value') for m in metrics}
+                
+                # Get project key
+                project_key = self._get_project_key(repository_full_name)
+                
+                # Create SonarCloudMetrics document
+                metrics_doc = SonarCloudMetrics(
+                    repository_id=repository_id,
+                    repository_full_name=repository_full_name,
+                    sonarcloud_project_key=project_key,
+                    sonarcloud_organization=self._get_organization(repository_full_name),
+                    last_analysis_date=analysis_date,
+                    
+                    # Ratings
+                    maintainability_rating=self._convert_rating_to_letter(metrics_dict.get('sqale_rating')),
+                    reliability_rating=self._convert_rating_to_letter(metrics_dict.get('reliability_rating')),
+                    security_rating=self._convert_rating_to_letter(metrics_dict.get('security_rating')),
+                    
+                    # Quantitative metrics
+                    bugs=int(metrics_dict.get('bugs', 0)),
+                    vulnerabilities=int(metrics_dict.get('vulnerabilities', 0)),
+                    code_smells=int(metrics_dict.get('code_smells', 0)),
+                    duplicated_lines_density=float(metrics_dict.get('duplicated_lines_density', 0.0)),
+                    coverage=float(metrics_dict.get('coverage', 0.0)) if metrics_dict.get('coverage') else None,
+                    technical_debt=float(metrics_dict.get('technical_debt', 0.0)) if metrics_dict.get('technical_debt') else None,
+                    
+                    # Quality gate (we don't have historical quality gate data)
+                    quality_gate='UNKNOWN'
+                )
+                
+                metrics_doc.save()
+                stored_count += 1
+                
+            except Exception as e:
+                logger.error(f"Error storing backfilled data point: {e}")
+                continue
+        
+        return stored_count 

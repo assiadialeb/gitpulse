@@ -1,0 +1,205 @@
+{% if error %}
+    <div class="text-center p-8">
+        <div class="text-red-500 text-6xl mb-4">❌</div>
+        <h3 class="text-xl font-semibold text-gray-800 mb-2">Error Loading Analysis</h3>
+        <p class="text-gray-600">{{ error }}</p>
+    </div>
+{% else %}
+    <div class="space-y-6">
+        <!-- Overview Section -->
+        <div>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Overview</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center 
+                                {% if temporal_data.trends.quality_gate_trend == 'improving' %}bg-green-100
+                                {% elif temporal_data.trends.quality_gate_trend == 'degrading' %}bg-red-100
+                                {% else %}bg-gray-100{% endif %}">
+                                <span class="text-sm font-medium">QG</span>
+                            </div>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-900">Quality Gate</p>
+                            <p class="text-sm text-gray-500">{{ temporal_data.trends.quality_gate_trend|default:"stable" }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-900">Total Issues</p>
+                            <p class="text-sm text-gray-500">{{ temporal_data.issues_timeline|length|default:0 }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trends Section -->
+        <div>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Quality Ratings</h3>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-900">Maintainability</span>
+                        <span class="text-sm font-bold 
+                            {% if temporal_data.trends.maintainability_trend == 'improving' %}text-green-600
+                            {% elif temporal_data.trends.maintainability_trend == 'degrading' %}text-red-600
+                            {% else %}text-gray-600{% endif %}">
+                            {{ temporal_data.trends.maintainability_trend|default:"stable" }}
+                        </span>
+                    </div>
+                    <div class="text-2xl font-bold 
+                        {% if current_metrics.maintainability_rating == 'A' %}text-green-500
+                        {% elif current_metrics.maintainability_rating == 'B' %}text-blue-500
+                        {% elif current_metrics.maintainability_rating == 'C' %}text-yellow-500
+                        {% elif current_metrics.maintainability_rating == 'D' %}text-orange-500
+                        {% elif current_metrics.maintainability_rating == 'E' %}text-red-500
+                        {% else %}text-gray-400{% endif %}">
+                        {{ current_metrics.maintainability_rating|default:"N/A" }}
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-900">Reliability</span>
+                        <span class="text-sm font-bold 
+                            {% if temporal_data.trends.reliability_trend == 'improving' %}text-green-600
+                            {% elif temporal_data.trends.reliability_trend == 'degrading' %}text-red-600
+                            {% else %}text-gray-600{% endif %}">
+                            {{ temporal_data.trends.reliability_trend|default:"stable" }}
+                        </span>
+                    </div>
+                    <div class="text-2xl font-bold 
+                        {% if current_metrics.reliability_rating == 'A' %}text-green-500
+                        {% elif current_metrics.reliability_rating == 'B' %}text-blue-500
+                        {% elif current_metrics.reliability_rating == 'C' %}text-yellow-500
+                        {% elif current_metrics.reliability_rating == 'D' %}text-orange-500
+                        {% elif current_metrics.reliability_rating == 'E' %}text-red-500
+                        {% else %}text-gray-400{% endif %}">
+                        {{ current_metrics.reliability_rating|default:"N/A" }}
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-900">Security</span>
+                        <span class="text-sm font-bold 
+                            {% if temporal_data.trends.security_trend == 'improving' %}text-green-600
+                            {% elif temporal_data.trends.security_trend == 'degrading' %}text-red-600
+                            {% else %}text-gray-600{% endif %}">
+                            {{ temporal_data.trends.security_trend|default:"stable" }}
+                        </span>
+                    </div>
+                    <div class="text-2xl font-bold 
+                        {% if current_metrics.security_rating == 'A' %}text-green-500
+                        {% elif current_metrics.security_rating == 'B' %}text-blue-500
+                        {% elif current_metrics.security_rating == 'C' %}text-yellow-500
+                        {% elif current_metrics.security_rating == 'D' %}text-orange-500
+                        {% elif current_metrics.security_rating == 'E' %}text-red-500
+                        {% else %}text-gray-400{% endif %}">
+                        {{ current_metrics.security_rating|default:"N/A" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Metrics Section -->
+        <div>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Current Metrics</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-900">Bugs</span>
+                        <span class="text-2xl font-bold text-red-600" data-bugs="{{ current_metrics.bugs|default:0 }}">
+                            {{ current_metrics.bugs|default:"0" }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-900">Vulnerabilities</span>
+                        <span class="text-2xl font-bold text-orange-600" data-vulnerabilities="{{ current_metrics.vulnerabilities|default:0 }}">
+                            {{ current_metrics.vulnerabilities|default:"0" }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-900">Code Smells</span>
+                        <span class="text-2xl font-bold text-yellow-600" data-code-smells="{{ current_metrics.code_smells|default:0 }}">
+                            {{ current_metrics.code_smells|default:"0" }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-900">Coverage</span>
+                        <span class="text-2xl font-bold text-green-600" data-coverage="{{ current_metrics.coverage|default:0 }}">
+                            {{ current_metrics.coverage|floatformat:1|default:"0" }}%
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline Section -->
+        <div>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Metrics Timeline</h3>
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-600 mb-4">Timeline data: {{ temporal_data.metrics_timeline|length|default:0 }} data points</p>
+                
+                <!-- Chart Container -->
+                <div class="relative h-64 bg-gray-50 rounded p-2">
+                    <canvas id="sonarcloud-chart" style="width: 100%; height: 100%;"></canvas>
+                    <div id="chart-loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+                        <div class="text-sm text-gray-600">Loading chart...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Issues Analysis -->
+        <div>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Issues Analysis</h3>
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-600">Issues data: {{ temporal_data.issues_timeline|length|default:0 }} issues</p>
+                {% if temporal_data.issues_timeline %}
+                    <div class="mt-4 space-y-2 max-h-64 overflow-y-auto">
+                        {% for issue in temporal_data.issues_timeline|slice:":10" %}
+                            <div class="border-b border-gray-100 pb-2">
+                                <div class="text-xs font-medium text-gray-500 mb-1">{{ issue.date|slice:":10" }}</div>
+                                <div class="flex justify-between text-xs">
+                                    <span class="
+                                        {% if issue.severity == 'BLOCKER' %}text-red-600
+                                        {% elif issue.severity == 'CRITICAL' %}text-orange-600
+                                        {% elif issue.severity == 'MAJOR' %}text-yellow-600
+                                        {% elif issue.severity == 'MINOR' %}text-blue-600
+                                        {% elif issue.severity == 'INFO' %}text-green-600
+                                        {% else %}text-gray-600{% endif %}">{{ issue.severity|default:"Unknown" }}</span>
+                                    <span class="text-gray-600">{{ issue.type|default:"Unknown" }}</span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-sm text-gray-500 mt-2">No issues data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+        
+{% endif %} 

@@ -1,0 +1,284 @@
+{% extends "base/base.html" %}
+
+{% block title %}SonarCloud Analytics - {{ repository.name }}{% endblock title %}
+
+{% block content %}
+<div class="fixed inset-0 overflow-hidden z-50" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+    <div class="absolute inset-0 overflow-hidden">
+        <!-- Background overlay -->
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" id="sonarcloud-overlay"></div>
+
+        <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex sm:pl-16">
+            <div class="w-screen max-w-md">
+                <div class="h-full flex flex-col bg-white shadow-xl">
+                    <!-- Header -->
+                    <div class="px-4 py-6 bg-orange-500 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-lg font-medium text-white" id="slide-over-title">
+                                SonarCloud Analytics
+                            </h2>
+                            <div class="ml-3 h-7 flex items-center">
+                                <button type="button" class="bg-orange-500 rounded-md text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-white" id="close-sonarcloud-overlay">
+                                    <span class="sr-only">Close panel</span>
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-1">
+                            <p class="text-sm text-orange-100">
+                                {{ repository.full_name }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="relative flex-1 px-4 sm:px-6 overflow-y-auto">
+                        <!-- Loading state -->
+                        <div id="sonarcloud-loading" class="flex items-center justify-center py-8">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                            <span class="ml-2 text-gray-600">Loading SonarCloud data...</span>
+                        </div>
+
+                        <!-- Error state -->
+                        <div id="sonarcloud-error" class="hidden py-8">
+                            <div class="text-center">
+                                <svg class="mx-auto h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                                <h3 class="mt-2 text-sm font-medium text-gray-900">Error loading data</h3>
+                                <p class="mt-1 text-sm text-gray-500" id="sonarcloud-error-message"></p>
+                            </div>
+                        </div>
+
+                        <!-- Content sections -->
+                        <div id="sonarcloud-content" class="hidden">
+                            <!-- Overview Section -->
+                            <div class="mb-8">
+                                <h3 class="text-lg font-medium text-gray-900 mb-4">Overview</h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0">
+                                                <div id="quality-gate-icon" class="w-8 h-8 rounded-full flex items-center justify-center">
+                                                    <!-- Icon will be set dynamically -->
+                                                </div>
+                                            </div>
+                                            <div class="ml-3">
+                                                <p class="text-sm font-medium text-gray-900">Quality Gate</p>
+                                                <p class="text-sm text-gray-500" id="quality-gate-status">Loading...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0">
+                                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                            <div class="ml-3">
+                                                <p class="text-sm font-medium text-gray-900">Total Issues</p>
+                                                <p class="text-sm text-gray-500" id="total-issues">Loading...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Trends Section -->
+                            <div class="mb-8">
+                                <h3 class="text-lg font-medium text-gray-900 mb-4">Trends</h3>
+                                <div class="space-y-4">
+                                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-900">Maintainability</span>
+                                            <span id="maintainability-trend" class="text-sm text-gray-500">Loading...</span>
+                                        </div>
+                                        <div class="mt-2">
+                                            <div class="flex items-center">
+                                                <div id="maintainability-trend-icon" class="w-4 h-4 mr-2">
+                                                    <!-- Trend icon will be set dynamically -->
+                                                </div>
+                                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                                    <div id="maintainability-progress" class="bg-orange-500 h-2 rounded-full w-0"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-900">Reliability</span>
+                                            <span id="reliability-trend" class="text-sm text-gray-500">Loading...</span>
+                                        </div>
+                                        <div class="mt-2">
+                                            <div class="flex items-center">
+                                                <div id="reliability-trend-icon" class="w-4 h-4 mr-2">
+                                                    <!-- Trend icon will be set dynamically -->
+                                                </div>
+                                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                                    <div id="reliability-progress" class="bg-orange-500 h-2 rounded-full w-0"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-900">Security</span>
+                                            <span id="security-trend" class="text-sm text-gray-500">Loading...</span>
+                                        </div>
+                                        <div class="mt-2">
+                                            <div class="flex items-center">
+                                                <div id="security-trend-icon" class="w-4 h-4 mr-2">
+                                                    <!-- Trend icon will be set dynamically -->
+                                                </div>
+                                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                                    <div id="security-progress" class="bg-orange-500 h-2 rounded-full w-0"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Timeline Chart -->
+                            <div class="mb-8">
+                                <h3 class="text-lg font-medium text-gray-900 mb-4">Metrics Timeline</h3>
+                                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                    <canvas id="sonarcloud-timeline-chart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Issues Analysis -->
+                            <div class="mb-8">
+                                <h3 class="text-lg font-medium text-gray-900 mb-4">Issues Analysis</h3>
+                                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <h4 class="text-sm font-medium text-gray-900 mb-2">By Type</h4>
+                                            <div id="issues-by-type" class="space-y-2">
+                                                <!-- Issues by type will be populated dynamically -->
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-sm font-medium text-gray-900 mb-2">By Severity</h4>
+                                            <div id="issues-by-severity" class="space-y-2">
+                                                <!-- Issues by severity will be populated dynamically -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const repositoryId = {{ repository.id }};
+    const startDate = '{{ start_date }}';
+    const endDate = '{{ end_date }}';
+    
+    // Close overlay functionality
+    document.getElementById('close-sonarcloud-overlay').addEventListener('click', function() {
+        document.getElementById('sonarcloud-overlay').style.display = 'none';
+    });
+    
+    // Load SonarCloud temporal data
+    loadSonarCloudData();
+    
+    function loadSonarCloudData() {
+        const url = `/repositories/api/${repositoryId}/sonarcloud-temporal/?from=${startDate}&to=${endDate}`;
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displaySonarCloudData(data.data);
+                } else {
+                    showError(data.error || 'Failed to load SonarCloud data');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading SonarCloud data:', error);
+                showError('Network error while loading data');
+            });
+    }
+    
+    function displaySonarCloudData(data) {
+        // Hide loading, show content
+        document.getElementById('sonarcloud-loading').classList.add('hidden');
+        document.getElementById('sonarcloud-content').classList.remove('hidden');
+        
+        // Update overview
+        updateOverview(data);
+        
+        // Update trends
+        updateTrends(data.trends);
+        
+        // Update timeline chart
+        updateTimelineChart(data.metrics_timeline);
+        
+        // Update issues analysis
+        updateIssuesAnalysis(data.issues_timeline);
+    }
+    
+    function updateOverview(data) {
+        // This would be populated with actual SonarCloud data
+        document.getElementById('quality-gate-status').textContent = 'PASS';
+        document.getElementById('total-issues').textContent = '42';
+    }
+    
+    function updateTrends(trends) {
+        // Update trend indicators
+        updateTrendIndicator('maintainability', trends.maintainability_trend);
+        updateTrendIndicator('reliability', trends.reliability_trend);
+        updateTrendIndicator('security', trends.security_trend);
+    }
+    
+    function updateTrendIndicator(metric, trend) {
+        const trendElement = document.getElementById(`${metric}-trend`);
+        const iconElement = document.getElementById(`${metric}-trend-icon`);
+        
+        if (trend === 'improving') {
+            trendElement.textContent = 'Improving';
+            trendElement.className = 'text-sm text-green-600';
+            iconElement.innerHTML = '↗️';
+        } else if (trend === 'degrading') {
+            trendElement.textContent = 'Degrading';
+            trendElement.className = 'text-sm text-red-600';
+            iconElement.innerHTML = '↘️';
+        } else {
+            trendElement.textContent = 'Stable';
+            trendElement.className = 'text-sm text-gray-600';
+            iconElement.innerHTML = '→';
+        }
+    }
+    
+    function updateTimelineChart(metricsTimeline) {
+        // This would create a chart using Chart.js or similar
+        console.log('Timeline data:', metricsTimeline);
+    }
+    
+    function updateIssuesAnalysis(issuesTimeline) {
+        // This would populate the issues analysis section
+        console.log('Issues data:', issuesTimeline);
+    }
+    
+    function showError(message) {
+        document.getElementById('sonarcloud-loading').classList.add('hidden');
+        document.getElementById('sonarcloud-error').classList.remove('hidden');
+        document.getElementById('sonarcloud-error-message').textContent = message;
+    }
+ });
+ </script>
+ {% endblock content %} 

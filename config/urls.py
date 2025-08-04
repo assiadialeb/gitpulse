@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from users.views import home_view, dashboard_view
-from debug_toolbar.toolbar import debug_toolbar_urls
+#from debug_toolbar.toolbar import debug_toolbar_urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -32,4 +32,4 @@ urlpatterns = [
     path('install/', include('install.urls')),
     path('management/', include('management.urls')),
     path('accounts/', include('allauth.urls')),
-] + debug_toolbar_urls()
+] #+ debug_toolbar_urls()

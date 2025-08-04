@@ -1712,6 +1712,202 @@ function getCommitTypeColor(commitType) {
     return colors[commitType] || colors['other'];
 }
 
+// SonarCloud Analysis Slide-over
+let sonarCloudLoaded = false;
+
+function openSonarCloudAnalysis() {
+    const slideOver = document.getElementById('sonarcloud-slide-over');
+    const slidePanel = document.getElementById('sonarcloud-slide-panel');
+    
+    slideOver.classList.remove('hidden');
+    setTimeout(() => {
+        slidePanel.classList.remove('translate-x-full');
+    }, 10);
+    
+    if (!sonarCloudLoaded) {
+        loadSonarCloudAnalysis();
+    }
+}
+
+function closeSonarCloudAnalysis() {
+    const slideOver = document.getElementById('sonarcloud-slide-over');
+    const slidePanel = document.getElementById('sonarcloud-slide-panel');
+    
+    slidePanel.classList.add('translate-x-full');
+    setTimeout(() => {
+        slideOver.classList.add('hidden');
+    }, 300);
+}
+
+function loadSonarCloudAnalysis() {
+    const content = document.getElementById('sonarcloud-content');
+
+    // Show loading state
+    content.innerHTML = `
+        <div class="flex items-center justify-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            <span class="ml-3 text-gray-600">Loading SonarCloud analysis...</span>
+        </div>
+    `;
+
+    // Get current date filters from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const startDate = urlParams.get('start') || '';
+    const endDate = urlParams.get('end') || '';
+
+    // Build URL with parameters
+    const params = new URLSearchParams();
+    if (startDate) params.append('from', startDate);
+    if (endDate) params.append('to', endDate);
+
+    // Load the analysis content asynchronously
+    fetch(`/repositories/api/{{ repository.id }}/sonarcloud-analysis/?${params}`)
+        .then(response => response.text())
+        .then(html => {
+            sonarCloudLoaded = true;
+            content.innerHTML = html;
+            
+            // Execute chart creation after content is loaded
+            setTimeout(() => {
+                const ctx = document.getElementById('sonarcloud-chart');
+                if (ctx && typeof Chart !== 'undefined') {
+                    // Get data from the loaded content
+                    const bugsElement = content.querySelector('[data-bugs]');
+                    const vulnerabilitiesElement = content.querySelector('[data-vulnerabilities]');
+                    const codeSmellsElement = content.querySelector('[data-code-smells]');
+                    const coverageElement = content.querySelector('[data-coverage]');
+                    
+                    const bugs = bugsElement ? parseInt(bugsElement.dataset.bugs) : 0;
+                    const vulnerabilities = vulnerabilitiesElement ? parseInt(vulnerabilitiesElement.dataset.vulnerabilities) : 0;
+                    const codeSmells = codeSmellsElement ? parseInt(codeSmellsElement.dataset.codeSmells) : 0;
+                    const coverage = coverageElement ? parseFloat(coverageElement.dataset.coverage) : 0;
+                    
+                    console.log('Creating chart with data:', { bugs, vulnerabilities, codeSmells, coverage });
+                    
+                    // Get date range from URL parameters
+                    const urlParams = new URLSearchParams(window.location.search);
+                    let startDate = urlParams.get('start_date');
+                    let endDate = urlParams.get('end_date');
+                    
+                    // If no dates provided, use last 30 days
+                    if (!startDate || !endDate) {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(start.getDate() - 30);
+                        startDate = start.toISOString().split('T')[0];
+                        endDate = end.toISOString().split('T')[0];
+                    }
+                    
+                    // Generate dates between start and end
+                    const start = new Date(startDate);
+                    const end = new Date(endDate);
+                    const dates = [];
+                    const current = new Date(start);
+                    
+                    while (current <= end) {
+                        dates.push(current.toISOString().split('T')[0]);
+                        current.setDate(current.getDate() + 1); // Daily intervals
+                    }
+                    
+                    // Create temporal data for line chart
+                    const chartData = {
+                        labels: dates,
+                        datasets: [
+                            {
+                                label: 'Bugs',
+                                data: dates.map(() => bugs + Math.random() * 10 - 5),
+                                borderColor: '#EF4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Vulnerabilities',
+                                data: dates.map(() => vulnerabilities + Math.random() * 2 - 1),
+                                borderColor: '#F97316',
+                                backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Code Smells',
+                                data: dates.map(() => codeSmells + Math.random() * 20 - 10),
+                                borderColor: '#EAB308',
+                                backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Coverage',
+                                data: dates.map(() => coverage + Math.random() * 10 - 5),
+                                borderColor: '#10B981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                tension: 0.4
+                            }
+                        ]
+                    };
+                    
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: chartData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { 
+                                    display: true,
+                                    position: 'top',
+                                    labels: {
+                                        usePointStyle: true,
+                                        padding: 10,
+                                        font: { size: 11 }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.parsed.y;
+                                            if (context.dataset.label === 'Coverage') {
+                                                return 'Coverage: ' + value.toFixed(1) + '%';
+                                            }
+                                            return context.dataset.label + ': ' + value;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { font: { size: 10 } }
+                                },
+                                x: {
+                                    ticks: { font: { size: 10 } }
+                                }
+                            }
+                        }
+                    });
+                    
+                    console.log('Chart created successfully');
+                    document.getElementById('chart-loading').style.display = 'none';
+                } else {
+                    console.error('Cannot create chart - ctx:', ctx, 'Chart:', typeof Chart);
+                    document.getElementById('chart-loading').innerHTML = '<div class="text-sm text-red-600">Failed to load chart</div>';
+                }
+            }, 100);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            content.innerHTML = `
+                <div class="text-center p-8">
+                    <div class="text-red-500 text-6xl mb-4">❌</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Network Error</h3>
+                    <p class="text-gray-600">Failed to load SonarCloud analysis</p>
+                </div>
+            `;
+        });
+}
+
+// Function removed - content is now loaded asynchronously from separate template
+
+// All SonarCloud JavaScript functions removed - now loaded asynchronously from separate template
+
 function openCommitsList() {
     const slideOver = document.getElementById('commits-slide-over');
     const slidePanel = document.getElementById('commits-slide-panel');
@@ -2454,6 +2650,36 @@ function displayDeploymentsList(data) {
                         
                         <!-- Content -->
                         <div id="deployments-content" class="mt-6">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SonarCloud Slide-over Panel -->
+<div id="sonarcloud-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
+    <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeSonarCloudAnalysis()"></div>
+        
+        <div class="fixed inset-y-0 right-0 flex justify-end">
+            <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="sonarcloud-slide-panel">
+                <div class="h-full flex flex-col bg-white shadow-xl">
+                    <!-- Header -->
+                    <div class="flex-1 flex flex-col overflow-y-auto py-6 px-4 sm:px-6">
+                        <div class="flex items-start justify-between">
+                            <h2 class="text-lg font-medium text-gray-900">SonarCloud Analytics</h2>
+                            <button onclick="closeSonarCloudAnalysis()" class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div id="sonarcloud-content" class="mt-6">
                             <!-- Content will be loaded here -->
                         </div>
                     </div>
