@@ -2066,11 +2066,12 @@ def generate_sbom_task(repository_id: int, force_generate: bool = False):
         sbom_data = sbom_service.generate_sbom(repo_path)
         sbom = sbom_service.process_sbom(sbom_data)
         
-        # Cleanup
-        try:
-            shutil.rmtree(repo_path)
-        except Exception as e:
-            logger.warning(f"Failed to cleanup repo path {repo_path}: {e}")
+        # Cleanup - DISABLED FOR DEBUGGING
+        # try:
+        #     shutil.rmtree(repo_path)
+        # except Exception as e:
+        #     logger.warning(f"Failed to cleanup repo path {repo_path}: {e}")
+        logger.info(f"DEBUG: Repository clone kept at {repo_path}")
         
         logger.info(f"Successfully generated SBOM for {repository.full_name}")
         return {

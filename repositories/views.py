@@ -226,7 +226,20 @@ def repository_detail(request, repo_id):
         
         # Get SBOM vulnerability data
         from analytics.models import SBOM, SBOMVulnerability
-        sbom = SBOM.objects(repository_full_name=repository.full_name).order_by('-created_at').first()
+        # Get all SBOMs for this repository
+        all_sboms = SBOM.objects(repository_full_name=repository.full_name).order_by('-generated_at')
+        
+        # Find the best SBOM (prefer one with vulnerabilities, then most recent)
+        sbom = None
+        for potential_sbom in all_sboms:
+            vulnerabilities_count = SBOMVulnerability.objects(sbom_id=potential_sbom.id).count()
+            if vulnerabilities_count > 0:
+                sbom = potential_sbom
+                break
+        
+        # If no SBOM with vulnerabilities, take the most recent one
+        if not sbom and all_sboms:
+            sbom = all_sboms[0]
         vulnerability_stats = {
             'total_vulnerabilities': 0,
             'severity_counts': {},
@@ -234,16 +247,39 @@ def repository_detail(request, repo_id):
         }
         
         if sbom:
-            vulnerabilities = SBOMVulnerability.objects(sbom_id=sbom)
-            vulnerability_stats['has_sbom'] = True
-            vulnerability_stats['total_vulnerabilities'] = len(vulnerabilities)
+            # Apply date filtering to SBOM generation date
+            sbom_in_range = True
+            if start_date and end_date:
+                try:
+                    # Convert date objects to timezone-aware datetime
+                    start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+                    end_dt = timezone.make_aware(datetime.combine(end_date, datetime.min.time()))
+                    # Add one day to end_date to include the full day
+                    end_dt = end_dt + timedelta(days=1)
+                    
+                    # Check if SBOM was generated within the date range
+                    if sbom.generated_at:
+                        sbom_date = sbom.generated_at
+                        # Ensure SBOM date is timezone-aware
+                        if sbom_date.tzinfo is None:
+                            sbom_date = timezone.make_aware(sbom_date)
+                        if sbom_date < start_dt or sbom_date >= end_dt:
+                            sbom_in_range = False
+                except ValueError:
+                    # Invalid date format, continue without filtering
+                    pass
             
-            # Count by severity
-            severity_counts = {}
-            for vuln in vulnerabilities:
-                severity = vuln.severity or 'unknown'
-                severity_counts[severity] = severity_counts.get(severity, 0) + 1
-            vulnerability_stats['severity_counts'] = severity_counts
+            if sbom_in_range:
+                vulnerabilities = SBOMVulnerability.objects(sbom_id=sbom)
+                vulnerability_stats['has_sbom'] = True
+                vulnerability_stats['total_vulnerabilities'] = len(vulnerabilities)
+                
+                # Count by severity
+                severity_counts = {}
+                for vuln in vulnerabilities:
+                    severity = vuln.severity or 'unknown'
+                    severity_counts[severity] = severity_counts.get(severity, 0) + 1
+                vulnerability_stats['severity_counts'] = severity_counts
         
         # Get SonarCloud metrics
         from repositories.views import _get_sonarcloud_metrics
@@ -873,26 +909,73 @@ def repository_vulnerabilities_analysis(request, repo_id):
     try:
         repository = get_object_or_404(Repository, id=repo_id)
         
+        # Get date parameters (for consistency with other APIs)
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        
         # Get SBOM analysis
         from analytics.sbom_service import SBOMService
-        sbom_service = SBOMService()
+        sbom_service = SBOMService(repository.full_name, request.user.id)
         
         # Check if SBOM exists
-        sbom = sbom_service.get_sbom(repository.full_name)
+        sbom = sbom_service.get_sbom()
         if not sbom:
             return JsonResponse({
-                'success': False,
-                'error': 'No SBOM found for this repository'
+                'status': 'no_sbom',
+                'message': 'No SBOM found for this repository. Generate one first.'
             })
         
+        # Apply date filtering to SBOM generation date
+        if start_date and end_date:
+            try:
+                from django.utils import timezone
+                start_dt = timezone.make_aware(datetime.strptime(start_date, "%Y-%m-%d"))
+                end_dt = timezone.make_aware(datetime.strptime(end_date, "%Y-%m-%d"))
+                # Add one day to end_date to include the full day
+                end_dt = end_dt + timedelta(days=1)
+                
+                # Check if SBOM was generated within the date range
+                if sbom.generated_at:
+                    sbom_date = sbom.generated_at
+                    # Ensure SBOM date is timezone-aware
+                    if sbom_date.tzinfo is None:
+                        sbom_date = timezone.make_aware(sbom_date)
+                    if sbom_date < start_dt or sbom_date >= end_dt:
+                        return JsonResponse({
+                            'status': 'no_vulnerabilities_in_range',
+                            'message': f'No vulnerability data available for the selected period ({start_date} to {end_date}). The latest SBOM was generated on {sbom.generated_at.strftime("%Y-%m-%d")}.'
+                        })
+            except ValueError:
+                # Invalid date format, continue without filtering
+                pass
+        
         # Get vulnerabilities
-        vulnerabilities = sbom_service.get_vulnerabilities(repository.full_name)
+        vulnerabilities = sbom_service.get_vulnerabilities()
+        
+        # Calculate severity counts
+        severity_counts = {}
+        for vuln in vulnerabilities:
+            severity = vuln.get('severity', 'unknown').lower()
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+        
+        # Add date filter info for consistency
+        filters = {}
+        if start_date and end_date:
+            filters['start_date'] = start_date
+            filters['end_date'] = end_date
+        elif start_date:
+            filters['start_date'] = start_date
+        elif end_date:
+            filters['end_date'] = end_date
         
         return JsonResponse({
-            'success': True,
+            'status': 'success',
             'vulnerabilities': vulnerabilities,
             'total_vulnerabilities': len(vulnerabilities),
-            'sbom_generated': sbom.generated_at.isoformat() if sbom.generated_at else None
+            'severity_counts': severity_counts,
+            'sbom_generated': sbom.generated_at.isoformat() if sbom.generated_at else None,
+            'filters': filters,
+            'note': 'Vulnerabilities represent current state of dependencies, filtered by SBOM generation date'
         })
         
     except Exception as e:
@@ -900,8 +983,8 @@ def repository_vulnerabilities_analysis(request, repo_id):
         logger = logging.getLogger(__name__)
         logger.error(f"Error in vulnerabilities analysis: {e}")
         return JsonResponse({
-            'success': False,
-            'error': str(e)
+            'status': 'error',
+            'message': str(e)
         }, status=500)
 
 
