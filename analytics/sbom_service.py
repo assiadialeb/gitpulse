@@ -10,6 +10,7 @@ import shutil
 from datetime import datetime, timezone as dt_timezone
 from typing import Dict, List, Optional
 from pathlib import Path
+from django.utils import timezone
 
 from .models import SBOM, SBOMComponent, SBOMVulnerability
 from management.models import OSSIndexConfig
@@ -54,6 +55,7 @@ class SBOMService:
             # Build cdxgen command
             cmd = [
                 'npx', '@cyclonedx/cdxgen',
+                '--no-install-deps'
                 '--include-vulnerabilities',
                 '--profile', 'license-compliance',
                 '-o', sbom_file,
@@ -275,13 +277,26 @@ class SBOMService:
         tool_info = tools[0] if tools else {}
         
         # Create SBOM document
+        # Parse timestamp with timezone awareness
+        timestamp_str = metadata.get('timestamp', '')
+        if timestamp_str:
+            # Handle ISO format with Z suffix
+            if timestamp_str.endswith('Z'):
+                timestamp_str = timestamp_str.replace('Z', '+00:00')
+            generated_at = datetime.fromisoformat(timestamp_str)
+            # Ensure timezone awareness
+            if generated_at.tzinfo is None:
+                generated_at = timezone.make_aware(generated_at)
+        else:
+            generated_at = timezone.now()
+        
         sbom = SBOM(
             repository_full_name=self.repository_full_name,
             bom_format=sbom_data.get('bomFormat'),
             spec_version=sbom_data.get('specVersion'),
             serial_number=sbom_data.get('serialNumber'),
             version=sbom_data.get('version'),
-            generated_at=datetime.fromisoformat(metadata.get('timestamp', '').replace('Z', '+00:00')),
+            generated_at=generated_at,
             tool_name=tool_info.get('name', 'cdxgen'),
             tool_version=tool_info.get('version', 'unknown'),
             component_count=len(sbom_data.get('components', [])),
@@ -333,8 +348,8 @@ class SBOMService:
                     affected_component_version=component.version,
                     references=vuln_data.get('references', []),
                     ratings=vuln_data.get('ratings', []),
-                    published_date=datetime.fromisoformat(vuln_data.get('published', '').replace('Z', '+00:00')) if vuln_data.get('published') else None,
-                    updated_date=datetime.fromisoformat(vuln_data.get('updated', '').replace('Z', '+00:00')) if vuln_data.get('updated') else None,
+                    published_date=self._parse_timezone_aware_date(vuln_data.get('published')) if vuln_data.get('published') else None,
+                    updated_date=self._parse_timezone_aware_date(vuln_data.get('updated')) if vuln_data.get('updated') else None,
                     raw_vulnerability=vuln_data
                 )
                 vulnerability.save()
@@ -345,6 +360,35 @@ class SBOMService:
         
         logger.info(f"Processed SBOM with {sbom.component_count} components and {sbom.vulnerability_count} vulnerabilities")
         return sbom 
+
+    def _parse_timezone_aware_date(self, date_str: str) -> Optional[datetime]:
+        """
+        Parse a date string and ensure it's timezone-aware
+        
+        Args:
+            date_str: ISO format date string
+            
+        Returns:
+            Timezone-aware datetime object or None if parsing fails
+        """
+        if not date_str:
+            return None
+            
+        try:
+            # Handle ISO format with Z suffix
+            if date_str.endswith('Z'):
+                date_str = date_str.replace('Z', '+00:00')
+            
+            parsed_date = datetime.fromisoformat(date_str)
+            
+            # Ensure timezone awareness
+            if parsed_date.tzinfo is None:
+                parsed_date = timezone.make_aware(parsed_date)
+                
+            return parsed_date
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to parse date '{date_str}': {e}")
+            return None
 
     def _extract_rust_licenses(self, repo_path: str) -> List[Dict]:
         """
