@@ -2,6 +2,7 @@
 
 GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, and curious developers who want to better understand developer activity and contribution trends within their GitHub organizations.
 
+🚨 *GitPulse is under alpha dev process
 
 📄 [Documentation](https://assiadialeb.github.io/gitpulse/)
 
@@ -274,7 +275,7 @@ This project is licensed under the GNU Affero General Public License v3.0 (AGPLv
 
 If you encounter any issues:
 
-1. Check the [documentation](docs/)
+1. Check the [documentation](ttps://assiadialeb.github.io/gitpulse/)
 2. Search existing issues
 3. Create a new issue with detailed information
 
