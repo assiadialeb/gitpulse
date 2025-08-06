@@ -26,4 +26,5 @@ urlpatterns = [
     path('api/<int:repo_id>/deployments/', views.repository_deployments_list, name='api_deployments_list'),
     path('api/<int:repo_id>/sonarcloud-temporal/', views.repository_sonarcloud_temporal, name='api_sonarcloud_temporal'),
     path('api/<int:repo_id>/sonarcloud-analysis/', views.repository_sonarcloud_analysis, name='api_sonarcloud_analysis'),
+    path('api/<int:repo_id>/codeql-analysis/', views.repository_codeql_analysis, name='api_codeql_analysis'),
 ] 

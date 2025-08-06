@@ -1,0 +1,249 @@
+{% load static %}
+
+<div class="space-y-6">
+    <!-- Summary -->
+    <div class="bg-gray-50 rounded-lg p-4">
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">Security Summary</h3>
+        
+        {% if codeql_data.status == 'not_available' %}
+            <div class="text-center p-8">
+                <div class="text-gray-400 text-6xl mb-4">🔒</div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">CodeQL Not Available</h3>
+                <p class="text-gray-600 mb-4">CodeQL analysis is not enabled for this repository.</p>
+                <div class="text-sm text-gray-500 space-y-2">
+                    <p>To enable CodeQL security analysis:</p>
+                    <ul class="list-disc list-inside space-y-1 text-left max-w-md mx-auto">
+                        <li>Go to your repository settings on GitHub</li>
+                        <li>Navigate to "Security & analysis"</li>
+                        <li>Enable "Code scanning" with CodeQL</li>
+                        <li>Commit and push the generated workflow file</li>
+                    </ul>
+                </div>
+            </div>
+        {% elif codeql_data.total_vulnerabilities == 0 %}
+            <div class="text-center p-8">
+                <div class="text-green-500 text-6xl mb-4">🛡️</div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">No Vulnerabilities Found</h3>
+                <p class="text-gray-600">Great! No security vulnerabilities were detected by CodeQL analysis.</p>
+                {% if codeql_data.last_analysis %}
+                    <p class="text-sm text-gray-500 mt-2">Last analyzed: {{ codeql_data.last_analysis|date:"M d, Y H:i" }}</p>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                <div class="bg-white p-3 rounded-lg border">
+                    <span class="text-gray-600">Security Score</span>
+                    <div class="text-2xl font-bold {% if codeql_data.score >= 80 %}text-green-500{% elif codeql_data.score >= 60 %}text-yellow-500{% else %}text-red-500{% endif %}">
+                        {{ codeql_data.score }}/100
+                    </div>
+                </div>
+                <div class="bg-white p-3 rounded-lg border">
+                    <span class="text-gray-600">Total Vulnerabilities</span>
+                    <div class="text-2xl font-bold text-gray-800" data-vulnerabilities="{{ codeql_data.total_vulnerabilities }}">
+                        {{ codeql_data.total_vulnerabilities }}
+                    </div>
+                </div>
+                <div class="bg-white p-3 rounded-lg border">
+                    <span class="text-gray-600">Open Issues</span>
+                    <div class="text-2xl font-bold {% if codeql_data.open_count == 0 %}text-green-500{% else %}text-red-500{% endif %}">
+                        {{ codeql_data.open_count }}
+                    </div>
+                </div>
+                <div class="bg-white p-3 rounded-lg border">
+                    <span class="text-gray-600">Fixed Issues</span>
+                    <div class="text-2xl font-bold text-green-500">
+                        {{ codeql_data.fixed_count }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Severity breakdown -->
+            <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div class="bg-red-50 border border-red-200 rounded p-2 text-center">
+                    <div class="text-red-600 font-bold text-lg" data-critical="{{ codeql_data.critical_count }}">{{ codeql_data.critical_count }}</div>
+                    <div class="text-xs text-red-500">Critical</div>
+                </div>
+                <div class="bg-orange-50 border border-orange-200 rounded p-2 text-center">
+                    <div class="text-orange-600 font-bold text-lg" data-high="{{ codeql_data.high_count }}">{{ codeql_data.high_count }}</div>
+                    <div class="text-xs text-orange-500">High</div>
+                </div>
+                <div class="bg-yellow-50 border border-yellow-200 rounded p-2 text-center">
+                    <div class="text-yellow-600 font-bold text-lg" data-medium="{{ codeql_data.medium_count }}">{{ codeql_data.medium_count }}</div>
+                    <div class="text-xs text-yellow-500">Medium</div>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded p-2 text-center">
+                    <div class="text-blue-600 font-bold text-lg" data-low="{{ codeql_data.low_count }}">{{ codeql_data.low_count }}</div>
+                    <div class="text-xs text-blue-500">Low</div>
+                </div>
+            </div>
+
+            {% if codeql_data.last_analysis %}
+                <div class="text-sm text-gray-500 mt-2">
+                    Last analyzed: {{ codeql_data.last_analysis|date:"M d, Y H:i" }}
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    {% if codeql_data.total_vulnerabilities > 0 %}
+        <!-- Trend Chart -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3">Vulnerability Trends (Last 30 Days)</h3>
+            <div class="relative">
+                <div id="codeql-chart-loading" class="flex items-center justify-center py-8">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
+                    <span class="ml-2 text-gray-600">Loading chart...</span>
+                </div>
+                <canvas id="codeql-chart" height="300" class="hidden"></canvas>
+            </div>
+        </div>
+
+        <!-- Vulnerability Categories -->
+        {% if codeql_data.categories %}
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Vulnerability Categories</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% for category, count in codeql_data.categories.items %}
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700 capitalize">
+                                {% if category == 'sql-injection' %}SQL Injection
+                                {% elif category == 'xss' %}Cross-Site Scripting
+                                {% elif category == 'path-traversal' %}Path Traversal
+                                {% elif category == 'command-injection' %}Command Injection
+                                {% elif category == 'information-disclosure' %}Information Disclosure
+                                {% elif category == 'cryptography' %}Cryptography
+                                {% elif category == 'authentication' %}Authentication
+                                {% elif category == 'authorization' %}Authorization
+                                {% else %}{{ category|title }}
+                                {% endif %}
+                            </span>
+                            <span class="text-sm font-bold text-gray-800">{{ count }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Recent Vulnerabilities -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3">Vulnerability Details</h3>
+            
+            {% if codeql_data.vulnerabilities %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rule</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for vuln in codeql_data.vulnerabilities %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4">
+                                        <div class="text-sm font-medium text-gray-900">{{ vuln.rule_name|default:vuln.rule_id }}</div>
+                                        {% if vuln.message %}
+                                            <div class="text-xs text-gray-500 max-w-xs truncate" title="{{ vuln.message }}">{{ vuln.message }}</div>
+                                        {% endif %}
+                                        {% if vuln.cwe_id %}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 mt-1">
+                                                {{ vuln.cwe_id }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <div class="text-sm font-medium 
+                                            {% if vuln.severity == 'critical' %}text-red-600
+                                            {% elif vuln.severity == 'high' %}text-orange-600
+                                            {% elif vuln.severity == 'medium' %}text-yellow-600
+                                            {% else %}text-blue-600
+                                            {% endif %}">
+                                            {{ vuln.severity|title }}
+                                        </div>
+                                        {% if vuln.confidence %}
+                                            <div class="text-xs text-gray-500">{{ vuln.confidence|title }} confidence</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        {% if vuln.file_path %}
+                                            <div class="text-sm text-gray-900 font-mono">{{ vuln.file_path|truncatechars:30 }}</div>
+                                            {% if vuln.start_line %}
+                                                <div class="text-xs text-gray-500">Line {{ vuln.start_line }}</div>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-sm text-gray-400">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                            {% if vuln.state == 'open' %}bg-red-100 text-red-800
+                                            {% elif vuln.state == 'fixed' %}bg-green-100 text-green-800
+                                            {% elif vuln.state == 'dismissed' %}bg-gray-100 text-gray-800
+                                            {% endif %}">
+                                            {{ vuln.state|title }}
+                                        </span>
+                                        {% if vuln.dismissed_reason %}
+                                            <div class="text-xs text-gray-500 mt-1">{{ vuln.dismissed_reason|title }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <div class="text-sm text-gray-600">{{ vuln.get_age_days }} day{{ vuln.get_age_days|pluralize }}</div>
+                                        {% if vuln.html_url %}
+                                            <a href="{{ vuln.html_url }}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800">
+                                                View on GitHub ↗
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center p-4">
+                    <p class="text-gray-500">No vulnerability details available.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Security Recommendations -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-blue-800 mb-3">🛡️ Security Recommendations</h3>
+            <div class="space-y-2 text-sm text-blue-700">
+                {% if codeql_data.critical_count > 0 %}
+                    <div class="flex items-start">
+                        <span class="text-red-500 font-bold mr-2">🚨</span>
+                        <span><strong>Critical vulnerabilities found!</strong> Address critical severity issues immediately as they pose significant security risks.</span>
+                    </div>
+                {% endif %}
+                {% if codeql_data.high_count > 0 %}
+                    <div class="flex items-start">
+                        <span class="text-orange-500 font-bold mr-2">⚠️</span>
+                        <span><strong>High severity issues detected.</strong> Review and fix high-priority vulnerabilities to improve security posture.</span>
+                    </div>
+                {% endif %}
+                <div class="flex items-start">
+                    <span class="text-blue-500 font-bold mr-2">💡</span>
+                    <span>Regular security scans help maintain code quality. Consider setting up automated CodeQL workflows.</span>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-green-500 font-bold mr-2">✅</span>
+                    <span>Keep dependencies updated and follow secure coding practices to prevent future vulnerabilities.</span>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Show the chart canvas after loading
+setTimeout(() => {
+    const chartCanvas = document.getElementById('codeql-chart');
+    if (chartCanvas) {
+        chartCanvas.classList.remove('hidden');
+    }
+}, 50);
+</script>

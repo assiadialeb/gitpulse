@@ -701,4 +701,116 @@ class SonarCloudMetrics(Document):
         return colors.get(rating, 'gray')
     
     def __str__(self):
-        return f"SonarCloud Metrics for {self.repository_full_name} at {self.timestamp}" 
+        return f"SonarCloud Metrics for {self.repository_full_name} at {self.timestamp}"
+
+
+class CodeQLVulnerability(Document):
+    """MongoDB document for storing CodeQL security vulnerabilities"""
+    # Repository information
+    repository_full_name = fields.StringField(required=True, max_length=255)
+    application_id = fields.IntField(null=True)  # For compatibility with existing structure
+    
+    # Vulnerability identification
+    vulnerability_id = fields.StringField(required=True, max_length=255)  # GitHub Alert ID
+    rule_id = fields.StringField(required=True, max_length=100)  # CWE-XXX or rule identifier
+    rule_description = fields.StringField(max_length=500)
+    rule_name = fields.StringField(max_length=255)
+    
+    # Severity and confidence
+    severity = fields.StringField(choices=['critical', 'high', 'medium', 'low'], required=True)
+    confidence = fields.StringField(choices=['high', 'medium', 'low'], default='medium')
+    
+    # State management
+    state = fields.StringField(choices=['open', 'dismissed', 'fixed'], default='open')
+    dismissed_reason = fields.StringField(choices=['false_positive', 'wont_fix', 'used_in_tests'], null=True)
+    dismissed_comment = fields.StringField(max_length=1000, null=True)
+    
+    # Location information
+    file_path = fields.StringField(max_length=500)
+    start_line = fields.IntField(null=True)
+    end_line = fields.IntField(null=True)
+    start_column = fields.IntField(null=True)
+    end_column = fields.IntField(null=True)
+    
+    # Message and description
+    message = fields.StringField(max_length=1000)
+    description = fields.StringField(max_length=2000)
+    
+    # Security classification
+    category = fields.StringField(max_length=100)  # e.g., "sql-injection", "xss", "path-traversal"
+    cwe_id = fields.StringField(max_length=20)  # e.g., "CWE-89"
+    
+    # Temporal information
+    created_at = fields.DateTimeField(required=True)
+    updated_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    dismissed_at = fields.DateTimeField(null=True)
+    fixed_at = fields.DateTimeField(null=True)
+    
+    # GitHub metadata
+    html_url = fields.URLField(max_length=500)
+    number = fields.IntField()  # GitHub alert number
+    
+    # Analysis metadata
+    tool_name = fields.StringField(default='CodeQL')
+    tool_version = fields.StringField(max_length=50)
+    analyzed_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
+    
+    # Raw GitHub payload
+    payload = fields.DictField()
+    
+    # MongoDB settings
+    meta = {
+        'collection': 'codeql_vulnerabilities',
+        'indexes': [
+            'repository_full_name',
+            'vulnerability_id',
+            'severity',
+            'state',
+            'category',
+            'created_at',
+            ('repository_full_name', 'state'),
+            ('repository_full_name', 'severity'),
+            ('repository_full_name', 'created_at'),
+            ('repository_full_name', 'category'),
+            ('vulnerability_id', 'repository_full_name'),  # Unique combination
+        ]
+    }
+    
+    def __str__(self):
+        return f"CodeQL {self.severity} vulnerability in {self.repository_full_name}: {self.rule_id}"
+    
+    def is_critical_or_high(self):
+        """Check if vulnerability is critical or high severity"""
+        return self.severity in ['critical', 'high']
+    
+    def get_severity_color(self):
+        """Get color for severity display"""
+        colors = {
+            'critical': 'red',
+            'high': 'orange',
+            'medium': 'yellow',
+            'low': 'blue'
+        }
+        return colors.get(self.severity, 'gray')
+    
+    def get_age_days(self):
+        """Get age of vulnerability in days"""
+        if not self.created_at:
+            return 0
+        now = datetime.now(dt_timezone.utc)
+        if self.created_at.tzinfo is None:
+            created_at = self.created_at.replace(tzinfo=dt_timezone.utc)
+        else:
+            created_at = self.created_at
+        return (now - created_at).days
+    
+    def is_recently_fixed(self, days=7):
+        """Check if vulnerability was fixed recently"""
+        if not self.fixed_at:
+            return False
+        now = datetime.now(dt_timezone.utc)
+        if self.fixed_at.tzinfo is None:
+            fixed_at = self.fixed_at.replace(tzinfo=dt_timezone.utc)
+        else:
+            fixed_at = self.fixed_at
+        return (now - fixed_at).days <= days 

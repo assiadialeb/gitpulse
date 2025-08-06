@@ -28,6 +28,7 @@ class GitHubTokenService:
         'private_repos': ['repo'],  # Access to private repositories
         'user_info': ['user:email'],  # Access to user email
         'org_access': ['read:org'],  # Access to organization membership
+        'code_scanning': ['security_events'],  # Access to CodeQL and security events
         'full_access': ['repo', 'user:email', 'read:org']  # Full access
     }
     

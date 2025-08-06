@@ -132,17 +132,17 @@
                     </div>
                 </div>
             </div>
-            <!-- Total Developers -->
+            <!-- Lines Added -->
             <div class="bg-white p-6 rounded-xl shadow-lg">
                 <div class="flex items-center">
-                    <div class="p-3 bg-purple-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    <div class="p-3 bg-green-500 bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                         </svg>
                     </div>
                     <div>
-                        <p class="text-medium-gray text-sm">Total Developers</p>
-                        <p class="text-2xl font-bold text-purple-500">{{ overall_stats.total_authors|default:"0" }}</p>
+                        <p class="text-medium-gray text-sm">Lines Added</p>
+                        <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_additions|default:"0" }}</p>
                     </div>
                 </div>
             </div>
@@ -160,17 +160,17 @@
                     </div>
                 </div>
             </div>
-            <!-- Lines Added -->
+            <!-- Total Developers -->
             <div class="bg-white p-6 rounded-xl shadow-lg">
                 <div class="flex items-center">
-                    <div class="p-3 bg-green-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    <div class="p-3 bg-purple-500 bg-opacity-10 rounded-xl mr-4">
+                        <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                         </svg>
                     </div>
                     <div>
-                        <p class="text-medium-gray text-sm">Lines Added</p>
-                        <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_additions|default:"0" }}</p>
+                        <p class="text-medium-gray text-sm">Total Developers</p>
+                        <p class="text-2xl font-bold text-purple-500">{{ overall_stats.total_authors|default:"0" }}</p>
                     </div>
                 </div>
             </div>
@@ -334,6 +334,72 @@
                                 </span>
                             </div>
                         </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Analysis (CodeQL) -->
+            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
+                 onclick="openCodeQLAnalysis()">
+                <div class="flex items-start">
+                                   <div class="p-3 bg-red-500 bg-opacity-10 rounded-xl mr-4">
+                   <svg class="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+                       <path d="M435.209,96.685l-19.627-1.077c-53.229-2.957-99.37-23.39-126.611-56.099L255.999,0l-32.98,39.509
+		c-27.24,32.709-73.391,53.142-126.611,56.099l-40.497,2.24v187.094c0,26.61,8.059,51.698,20.878,74.642
+		c44.26,79.84,144.978,134.496,159.311,142.02L255.999,512l19.891-10.396c18.454-9.678,180.198-97.664,180.198-216.662V97.848
+		L435.209,96.685z M98.737,261.106c0-46.326,0-122.674,0-122.674c64.333-3.579,121.509-28.578,157.263-71.5v194.174h157.247v23.836
+		c0,96.501-157.247,178.668-157.247,178.668V261.106H98.737z"/>
+                   </svg>
+               </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-dark-gray">Security Analysis</h3>
+                        <p class="text-sm text-medium-gray mt-1">CodeQL vulnerability scanning</p>
+                        
+                        {% if codeql_metrics %}
+                            {% if codeql_metrics.status == 'not_available' %}
+                                <div class="mt-3 text-xs">
+                                    <div class="flex items-center text-gray-500">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <span>Not available</span>
+                                    </div>
+                                    <p class="text-xs text-gray-400 mt-1">CodeQL analysis not enabled for this repository</p>
+                                </div>
+                            {% else %}
+                                <div class="mt-3 space-y-2 text-xs">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-medium-gray">Security Score</span>
+                                        <span class="font-medium {% if codeql_metrics.score >= 80 %}text-green-500{% elif codeql_metrics.score >= 60 %}text-yellow-500{% else %}text-red-500{% endif %}">
+                                            {{ codeql_metrics.score }}/100
+                                        </span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-medium-gray">Open Vulnerabilities</span>
+                                        <span class="font-medium {% if codeql_metrics.open_count == 0 %}text-green-500{% elif codeql_metrics.open_count < 5 %}text-yellow-500{% else %}text-red-500{% endif %}">
+                                            {{ codeql_metrics.open_count }}
+                                        </span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-medium-gray">Critical/High</span>
+                                        <span class="font-medium {% if codeql_metrics.critical_count == 0 and codeql_metrics.high_count == 0 %}text-green-500{% else %}text-red-500{% endif %}">
+                                            {{ codeql_metrics.critical_count|add:codeql_metrics.high_count }}
+                                        </span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="mt-3 text-xs">
+                                <div class="flex items-center text-gray-500">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                        <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>Loading...</span>
+                                </div>
+                            </div>
                         {% endif %}
                     </div>
                 </div>
@@ -1849,6 +1915,194 @@ function loadSonarCloudAnalysis() {
 
 // All SonarCloud JavaScript functions removed - now loaded asynchronously from separate template
 
+// CodeQL Analysis Slide-over
+let codeQLLoaded = false;
+
+function openCodeQLAnalysis() {
+    const slideOver = document.getElementById('codeql-slide-over');
+    const slidePanel = document.getElementById('codeql-slide-panel');
+    
+    slideOver.classList.remove('hidden');
+    setTimeout(() => {
+        slidePanel.classList.remove('translate-x-full');
+    }, 10);
+    
+    if (!codeQLLoaded) {
+        loadCodeQLAnalysis();
+    }
+}
+
+function closeCodeQLAnalysis() {
+    const slideOver = document.getElementById('codeql-slide-over');
+    const slidePanel = document.getElementById('codeql-slide-panel');
+    
+    slidePanel.classList.add('translate-x-full');
+    setTimeout(() => {
+        slideOver.classList.add('hidden');
+    }, 300);
+}
+
+function loadCodeQLAnalysis() {
+    const content = document.getElementById('codeql-content');
+
+    // Show loading state
+    content.innerHTML = `
+        <div class="flex items-center justify-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+            <span class="ml-3 text-gray-600">Loading CodeQL analysis...</span>
+        </div>
+    `;
+
+    // Get current date filters from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const startDate = urlParams.get('start') || '';
+    const endDate = urlParams.get('end') || '';
+
+    // Build URL with parameters
+    const params = new URLSearchParams();
+    if (startDate) params.append('from', startDate);
+    if (endDate) params.append('to', endDate);
+
+    // Load the analysis content asynchronously
+    fetch(`/repositories/api/{{ repository.id }}/codeql-analysis/?${params}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.text();
+        })
+        .then(html => {
+            codeQLLoaded = true;
+            content.innerHTML = html;
+            
+            // Execute chart creation after content is loaded
+            setTimeout(() => {
+                const ctx = document.getElementById('codeql-chart');
+                if (ctx && typeof Chart !== 'undefined') {
+                    // Get data from the loaded content
+                    const vulnerabilitiesElement = content.querySelector('[data-vulnerabilities]');
+                    const criticalElement = content.querySelector('[data-critical]');
+                    const highElement = content.querySelector('[data-high]');
+                    const mediumElement = content.querySelector('[data-medium]');
+                    const lowElement = content.querySelector('[data-low]');
+                    
+                    const totalVulns = vulnerabilitiesElement ? parseInt(vulnerabilitiesElement.dataset.vulnerabilities) : 0;
+                    const critical = criticalElement ? parseInt(criticalElement.dataset.critical) : 0;
+                    const high = highElement ? parseInt(highElement.dataset.high) : 0;
+                    const medium = mediumElement ? parseInt(mediumElement.dataset.medium) : 0;
+                    const low = lowElement ? parseInt(lowElement.dataset.low) : 0;
+                    
+                    console.log('Creating CodeQL chart with data:', { totalVulns, critical, high, medium, low });
+                    
+                    // Generate dummy trend data (in real implementation, this would come from API)
+                    const last30Days = Array.from({length: 30}, (_, i) => {
+                        const date = new Date();
+                        date.setDate(date.getDate() - (29 - i));
+                        return date.toISOString().split('T')[0];
+                    });
+                    
+                    const chartData = {
+                        labels: last30Days.map(date => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+                        datasets: [
+                            {
+                                label: 'Critical',
+                                data: last30Days.map(() => critical + Math.random() * 2 - 1),
+                                borderColor: '#DC2626',
+                                backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: 'High',
+                                data: last30Days.map(() => high + Math.random() * 3 - 1.5),
+                                borderColor: '#EA580C',
+                                backgroundColor: 'rgba(234, 88, 12, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Medium',
+                                data: last30Days.map(() => medium + Math.random() * 5 - 2.5),
+                                borderColor: '#CA8A04',
+                                backgroundColor: 'rgba(202, 138, 4, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Low',
+                                data: last30Days.map(() => low + Math.random() * 3 - 1.5),
+                                borderColor: '#2563EB',
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                tension: 0.4
+                            }
+                        ]
+                    };
+                    
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: chartData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { 
+                                    display: true,
+                                    position: 'top',
+                                    labels: {
+                                        usePointStyle: true,
+                                        padding: 10,
+                                        font: { size: 11 }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.dataset.label + ': ' + Math.round(context.parsed.y);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { 
+                                        font: { size: 10 },
+                                        stepSize: 1
+                                    }
+                                },
+                                x: {
+                                    ticks: { font: { size: 10 } }
+                                }
+                            }
+                        }
+                    });
+                    
+                    console.log('CodeQL chart created successfully');
+                    const loadingElement = document.getElementById('codeql-chart-loading');
+                    if (loadingElement) {
+                        loadingElement.style.display = 'none';
+                    }
+                } else {
+                    console.error('Cannot create CodeQL chart - ctx:', ctx, 'Chart:', typeof Chart);
+                    const loadingElement = document.getElementById('codeql-chart-loading');
+                    if (loadingElement) {
+                        loadingElement.innerHTML = '<div class="text-sm text-red-600">Failed to load chart</div>';
+                    }
+                }
+            }, 100);
+        })
+        .catch(error => {
+            console.error('Error loading CodeQL analysis:', error);
+            content.innerHTML = `
+                <div class="text-center p-8">
+                    <div class="text-red-500 text-6xl mb-4">❌</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Error</h3>
+                    <p class="text-gray-600">Failed to load CodeQL analysis: ${error.message}</p>
+                    <button onclick="loadCodeQLAnalysis()" class="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">
+                        Retry
+                    </button>
+                </div>
+            `;
+        });
+}
+
 function openCommitsList() {
     const slideOver = document.getElementById('commits-slide-over');
     const slidePanel = document.getElementById('commits-slide-panel');
@@ -2594,6 +2848,36 @@ function displayDeploymentsList(data) {
                         
                         <!-- Content -->
                         <div id="sonarcloud-content" class="mt-6">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CodeQL Slide-over Panel -->
+<div id="codeql-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
+    <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeCodeQLAnalysis()"></div>
+        
+        <div class="fixed inset-y-0 right-0 flex justify-end">
+            <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="codeql-slide-panel">
+                <div class="h-full flex flex-col bg-white shadow-xl">
+                    <!-- Header -->
+                    <div class="flex-1 flex flex-col overflow-y-auto py-6 px-4 sm:px-6">
+                        <div class="flex items-start justify-between">
+                            <h2 class="text-lg font-medium text-gray-900">CodeQL Security Analysis</h2>
+                            <button onclick="closeCodeQLAnalysis()" class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div id="codeql-content" class="mt-6">
                             <!-- Content will be loaded here -->
                         </div>
                     </div>

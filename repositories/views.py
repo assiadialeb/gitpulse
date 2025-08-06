@@ -16,6 +16,7 @@ from analytics.unified_metrics_service import UnifiedMetricsService
 from analytics.license_analysis_service import LicenseAnalysisService
 from analytics.llm_service import LLMService
 from analytics.sonarcloud_service import SonarCloudService
+from analytics.codeql_indexing_service import get_codeql_indexing_service_for_user
 
 
 def _get_sonarcloud_metrics(repository_id: int):
@@ -41,6 +42,45 @@ def _is_sonarcloud_configured():
         logger = logging.getLogger(__name__)
         logger.error(f"Error checking SonarCloud configuration: {e}")
         return False
+
+
+def _get_codeql_metrics(repository, user_id: int):
+    """Get latest CodeQL metrics for a repository"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Get CodeQL indexing service
+        indexing_service = get_codeql_indexing_service_for_user(user_id)
+        
+        # Get repository security metrics
+        metrics = indexing_service.get_repository_security_metrics(repository.full_name)
+        
+        # Add status information
+        if metrics['total_vulnerabilities'] == 0 and metrics.get('last_analysis') is None:
+            # No data at all - likely CodeQL not available
+            metrics['status'] = 'not_available'
+        else:
+            metrics['status'] = 'available'
+        
+        logger.info(f"Retrieved CodeQL metrics for {repository.full_name}: {metrics['total_vulnerabilities']} vulnerabilities")
+        return metrics
+        
+    except Exception as e:
+        logger.error(f"Error getting CodeQL metrics for repository {repository.full_name}: {e}")
+        return {
+            'status': 'not_available',
+            'score': 100,
+            'total_vulnerabilities': 0,
+            'open_count': 0,
+            'critical_count': 0,
+            'high_count': 0,
+            'medium_count': 0,
+            'low_count': 0,
+            'categories': {},
+            'trend': 'stable',
+            'last_analysis': None
+        }
 
 
 @login_required
@@ -289,6 +329,9 @@ def repository_detail(request, repo_id):
         if sonarcloud_metrics:
             print(f"DEBUG: sonarcloud_metrics.quality_gate = {sonarcloud_metrics.quality_gate}")
         
+        # Get CodeQL metrics
+        codeql_metrics = _get_codeql_metrics(repository, request.user.id)
+        
         # Build context
         context = {
             'repository': repository,
@@ -322,6 +365,7 @@ def repository_detail(request, repo_id):
             },
             'vulnerability_stats': vulnerability_stats,
             'sonarcloud_metrics': sonarcloud_metrics,
+            'codeql_metrics': codeql_metrics,
         }
         
     except Exception as e:
@@ -1407,4 +1451,78 @@ def repository_sonarcloud_analysis(request, repo_id):
         
         return render(request, 'repositories/sonarcloud_analysis.html', {
             'error': str(e)
+        })
+
+
+@login_required
+def repository_codeql_analysis(request, repo_id):
+    """API endpoint for CodeQL analysis slide-over content"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        repository = get_object_or_404(Repository, id=repo_id)
+        
+        # Get CodeQL indexing service
+        indexing_service = get_codeql_indexing_service_for_user(request.user.id)
+        
+        # Get repository security metrics
+        codeql_metrics = indexing_service.get_repository_security_metrics(repository.full_name)
+        
+        # Get detailed vulnerability data if available
+        vulnerabilities = []
+        if codeql_metrics['total_vulnerabilities'] > 0:
+            try:
+                from analytics.models import CodeQLVulnerability
+                # Get recent vulnerabilities (limit to 50 for performance)
+                vuln_objects = CodeQLVulnerability.objects(
+                    repository_full_name=repository.full_name
+                ).order_by('-created_at').limit(50)
+                
+                for vuln in vuln_objects:
+                    vulnerabilities.append({
+                        'rule_id': vuln.rule_id,
+                        'rule_name': vuln.rule_name,
+                        'message': vuln.message,
+                        'severity': vuln.severity,
+                        'confidence': vuln.confidence,
+                        'state': vuln.state,
+                        'file_path': vuln.file_path,
+                        'start_line': vuln.start_line,
+                        'cwe_id': vuln.cwe_id,
+                        'dismissed_reason': vuln.dismissed_reason,
+                        'html_url': vuln.html_url,
+                        'get_age_days': vuln.get_age_days(),
+                        'created_at': vuln.created_at
+                    })
+                    
+            except Exception as e:
+                logger.warning(f"Could not fetch detailed vulnerability data: {e}")
+        
+        # Add status information
+        if codeql_metrics['total_vulnerabilities'] == 0 and codeql_metrics.get('last_analysis') is None:
+            codeql_metrics['status'] = 'not_available'
+        else:
+            codeql_metrics['status'] = 'available'
+        
+        # Add vulnerabilities to metrics
+        codeql_metrics['vulnerabilities'] = vulnerabilities
+        
+        logger.info(f"Retrieved CodeQL analysis for {repository.full_name}: {len(vulnerabilities)} vulnerabilities")
+        
+        return render(request, 'repositories/codeql_analysis.html', {
+            'repository': repository,
+            'codeql_data': codeql_metrics
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting CodeQL analysis for repository {repo_id}: {e}")
+        
+        return render(request, 'repositories/codeql_analysis.html', {
+            'repository': repository if 'repository' in locals() else None,
+            'codeql_data': {
+                'status': 'error',
+                'error': str(e),
+                'total_vulnerabilities': 0
+            }
         })

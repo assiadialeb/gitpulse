@@ -2153,3 +2153,228 @@ def check_new_releases_and_generate_sbom_task():
         raise
 
 
+def index_codeql_intelligent_task(repository_id=None, args=None, **kwargs):
+    """
+    Django-Q task for intelligent CodeQL vulnerability indexing
+    
+    Args:
+        repository_id: Repository ID to index CodeQL alerts for
+        args: Alternative way to pass arguments (for corrupted tasks)
+    """
+    # Handle corrupted tasks that pass args as kwargs
+    if repository_id is None and args is not None:
+        if isinstance(args, list) and len(args) > 0:
+            repository_id = args[0]
+    
+    if repository_id is None:
+        raise ValueError("repository_id is required")
+    
+    # Handle corrupted tasks that pass lists instead of integers
+    if isinstance(repository_id, list):
+        if len(repository_id) > 0:
+            repository_id = repository_id[0]  # Take first element
+            if isinstance(repository_id, list) and len(repository_id) > 0:
+                repository_id = repository_id[0]  # Handle nested lists
+        else:
+            raise ValueError("repository_id is an empty list")
+    
+    # Ensure repository_id is an integer
+    try:
+        repository_id = int(repository_id)
+    except (ValueError, TypeError):
+        raise ValueError(f"repository_id must be an integer, got {type(repository_id)}: {repository_id}")
+    
+    logger.info(f"Starting intelligent CodeQL indexing for repository {repository_id}")
+    
+    try:
+        # Get repository to get user_id
+        from repositories.models import Repository
+        repository = Repository.objects.get(id=repository_id)
+        user_id = repository.owner.id
+        
+        # Intelligent rate limit check before proceeding
+        from .github_token_service import GitHubTokenService
+        import requests
+        
+        # Get token for rate limit check
+        github_token = GitHubTokenService.get_token_for_operation('code_scanning', user_id)
+        if not github_token:
+            github_token = GitHubTokenService._get_user_token(user_id)
+            if not github_token:
+                github_token = GitHubTokenService._get_oauth_app_token()
+        
+        if github_token:
+            # Check rate limit
+            headers = {'Authorization': f'token {github_token}'}
+            try:
+                rate_response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
+                
+                if rate_response.status_code == 200:
+                    rate_data = rate_response.json()
+                    remaining = rate_data['resources']['core']['remaining']
+                    
+                    # If rate limited, schedule for later
+                    if remaining < 30:  # Keep buffer for CodeQL API calls
+                        logger.warning(f"GitHub API rate limit low ({remaining} remaining), scheduling CodeQL indexing for later")
+                        
+                        # Schedule next run after rate limit reset
+                        reset_time = datetime.fromtimestamp(rate_data['resources']['core']['reset'])
+                        next_run = reset_time + timedelta(minutes=10)  # 10 minutes after reset
+                        
+                        from django_q.models import Schedule
+                        # Check if a retry task already exists for this repository
+                        existing_retry = Schedule.objects.filter(
+                            name=f'codeql_indexing_repo_{repository_id}_retry'
+                        ).first()
+                        
+                        if existing_retry:
+                            # Update existing retry schedule
+                            existing_retry.func = 'analytics.tasks.index_codeql_intelligent_task'
+                            existing_retry.args = [repository_id]
+                            existing_retry.next_run = next_run
+                            existing_retry.schedule_type = Schedule.ONCE
+                            existing_retry.save()
+                        else:
+                            # Create new retry schedule
+                            Schedule.objects.create(
+                                func='analytics.tasks.index_codeql_intelligent_task',
+                                args=[repository_id],
+                                next_run=next_run,
+                                schedule_type=Schedule.ONCE,
+                                name=f'codeql_indexing_repo_{repository_id}_retry'
+                            )
+                        
+                        return {
+                            'status': 'rate_limited',
+                            'repository_id': repository_id,
+                            'repository_full_name': repository.full_name,
+                            'remaining_requests': remaining,
+                            'scheduled_for': next_run.isoformat(),
+                            'message': f'Scheduled for retry at {next_run}'
+                        }
+                        
+            except Exception as e:
+                logger.warning(f"Could not check rate limit: {e}, proceeding with indexing")
+        
+        # Run intelligent indexing
+        from .codeql_indexing_service import get_codeql_indexing_service_for_user
+        indexing_service = get_codeql_indexing_service_for_user(user_id)
+        
+        result = indexing_service.index_codeql_for_repository(
+            repository_id=repository_id,
+            repository_full_name=repository.full_name
+        )
+        
+        logger.info(f"CodeQL indexing completed for repository {repository_id}: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"CodeQL indexing task failed for repository {repository_id}: {e}")
+        raise
+
+
+def index_all_codeql_task():
+    """
+    Django-Q task to start CodeQL indexing for all repositories
+    """
+    logger.info("Starting CodeQL indexing for all repositories")
+    
+    try:
+        from repositories.models import Repository
+        
+        results = []
+        repositories = Repository.objects.all()  # Index ALL repositories, not just already indexed ones
+        
+        for repo in repositories:
+            try:
+                # Start CodeQL indexing for this repository
+                task_id = async_task(
+                    'analytics.tasks.index_codeql_intelligent_task',
+                    repo.id  # Pass as positional argument
+                )
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': task_id,
+                    'status': 'scheduled'
+                })
+                logger.info(f"Scheduled CodeQL indexing for repository {repo.full_name}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to schedule CodeQL indexing for repository {repo.full_name}: {e}")
+                results.append({
+                    'repo_id': repo.id,
+                    'repo_name': repo.full_name,
+                    'task_id': None,
+                    'status': 'failed',
+                    'error': str(e)
+                })
+        
+        summary = {
+            'total_repositories': len(repositories),
+            'successfully_scheduled': len([r for r in results if r['status'] == 'scheduled']),
+            'failed_to_schedule': len([r for r in results if r['status'] == 'failed']),
+            'results': results
+        }
+        
+        logger.info(f"CodeQL indexing scheduling completed: {summary}")
+        return summary
+        
+    except Exception as e:
+        logger.error(f"Failed to start CodeQL indexing for all repositories: {e}")
+        raise
+
+
+def daily_codeql_analysis_task():
+    """
+    Django-Q task to run daily CodeQL analysis for all indexed repositories
+    """
+    logger.info("Starting daily CodeQL analysis task")
+    
+    try:
+        from repositories.models import Repository
+        
+        results = {
+            'repositories_processed': 0,
+            'vulnerabilities_found': 0,
+            'errors': []
+        }
+        
+        # Get all indexed repositories
+        indexed_repositories = Repository.objects.filter(is_indexed=True)
+        
+        for repo in indexed_repositories:
+            try:
+                user_id = repo.owner_id
+                from .codeql_indexing_service import get_codeql_indexing_service_for_user
+                
+                indexing_service = get_codeql_indexing_service_for_user(user_id)
+                
+                # Only reindex if needed (not forced)
+                if indexing_service.should_reindex(repo.full_name):
+                    # Schedule async task for this repository
+                    task_id = async_task(
+                        'analytics.tasks.index_codeql_intelligent_task',
+                        repo.id,
+                        group=f'daily_codeql_{datetime.now(dt_timezone.utc).strftime("%Y%m%d")}',
+                        timeout=1800  # 30 minute timeout
+                    )
+                    
+                    logger.info(f"Scheduled CodeQL analysis task {task_id} for repository {repo.full_name}")
+                    results['repositories_processed'] += 1
+                else:
+                    logger.info(f"Skipping CodeQL analysis for {repo.full_name} - recently analyzed")
+                
+            except Exception as e:
+                error_msg = f"Failed to schedule CodeQL analysis for repository {repo.full_name}: {e}"
+                logger.error(error_msg)
+                results['errors'].append(error_msg)
+        
+        logger.info(f"Daily CodeQL analysis task completed: {results}")
+        return results
+        
+    except Exception as e:
+        logger.error(f"Daily CodeQL analysis task failed: {e}")
+        raise
+
+
