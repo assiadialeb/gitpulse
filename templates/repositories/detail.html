@@ -298,42 +298,7 @@
                 </div>
             </div>
             
-            <!-- Dependencies Vulnerabilities - TEMPORARILY DISABLED -->
-            <!--
-            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
-                 onclick="openVulnerabilitiesAnalysis()">
-                <div class="flex items-start">
-                    <div class="p-3 bg-red-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-red-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M20.91 11.12C20.91 16.01 17.36 20.59 12.51 21.93C12.18 22.02 11.82 22.02 11.49 21.93C6.63996 20.59 3.08997 16.01 3.08997 11.12V6.72997C3.08997 5.90997 3.70998 4.97998 4.47998 4.66998L10.05 2.39001C11.3 1.88001 12.71 1.88001 13.96 2.39001L19.53 4.66998C20.29 4.97998 20.92 5.90997 20.92 6.72997L20.91 11.12Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M12 12.5C13.1046 12.5 14 11.6046 14 10.5C14 9.39543 13.1046 8.5 12 8.5C10.8954 8.5 10 9.39543 10 10.5C10 11.6046 10.8954 12.5 12 12.5Z" stroke="currentColor" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M12 12.5V15.5" stroke="currentColor" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Dependencies Vulnerabilities</p>
-                        <p class="text-2xl font-bold text-red-500" id="vulnerabilities-status">
-                            {% if vulnerability_stats.has_sbom %}
-                                {{ vulnerability_stats.total_vulnerabilities }}
-                            {% else %}
-                                0
-                            {% endif %}
-                        </p>
-                        <p class="text-xs text-medium-gray">
-                            {% if vulnerability_stats.has_sbom %}
-                                {% if vulnerability_stats.total_vulnerabilities > 0 %}
-                                    Security issues detected
-                                {% else %}
-                                    No vulnerabilities found
-                                {% endif %}
-                            {% else %}
-                                No data for period
-                            {% endif %}
-                        </p>
-                    </div>
-                </div>
-            </div>
-            -->
+
             
             <!-- Code Quality Metrics (SonarCloud) -->
             <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
@@ -488,45 +453,17 @@
             </div>
         </div>
 
-        <!-- Quality Metrics -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <h3 class="text-xl font-semibold text-dark-gray mb-4">📝 Commit Quality</h3>
-                {% if commit_quality.total_commits > 0 %}
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between">
-                        <span class="text-medium-gray">Explicit Messages</span>
-                        <span class="font-bold text-primary-green">{{ commit_quality.explicit_ratio }}%</span>
+        <!-- Commit Type Distribution - Full Width -->
+        <div class="bg-white p-6 rounded-xl shadow-lg relative">
+            <h3 class="text-xl font-semibold text-dark-gray mb-4">🍩 Commit Type Distribution</h3>
+            {% if commit_types.counts %}
+            <div class="flex items-start gap-8">
+                <!-- Left side: Chart and Legend (50%) -->
+                <div class="w-1/2 flex items-start space-x-6">
+                    <div class="relative flex-1" style="min-height: 250px;">
+                        <canvas id="commitTypeDoughnut" class="w-full h-full"></canvas>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-primary-green h-2 rounded-full" style="width: {{ commit_quality.explicit_ratio }}%"></div>
-                    </div>
-                    
-                    <div class="flex items-center justify-between">
-                        <span class="text-medium-gray">Generic Messages</span>
-                        <span class="font-bold text-red-500">{{ commit_quality.generic_ratio }}%</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-red-500 h-2 rounded-full" style="width: {{ commit_quality.generic_ratio }}%"></div>
-                    </div>
-                    
-                    <!-- Bloc gris pour 'Total commits analyzed' supprimé pour éviter la redondance -->
-                </div>
-                {% else %}
-                <div class="text-center py-8">
-                    <p class="text-medium-gray">No commit quality data available</p>
-                </div>
-                {% endif %}
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow-lg relative">
-                <h3 class="text-xl font-semibold text-dark-gray mb-4">🍩 Commit Type Distribution</h3>
-                {% if commit_types.counts %}
-                <div class="flex items-start space-x-6">
-                    <div class="relative" style="width: 280px; height: 280px;">
-                        <canvas id="commitTypeDoughnut"></canvas>
-                    </div>
-                    <div class="flex flex-col space-y-3">
+                    <div class="flex flex-col space-y-3 flex-shrink-0">
                         {% for item in commit_type_legend %}
                             <div class="flex items-center space-x-2">
                                 <span class="inline-block w-4 h-4 rounded-full" style="background-color: {{ item.color }};"></span>
@@ -536,8 +473,11 @@
                     </div>
                 </div>
                 
+                <!-- Right side: Indicators (50%) -->
+                <div class="w-1/2 flex flex-col space-y-4">
+                
                 <!-- Feature-to-Fix Ratio Block -->
-                <div class="mt-6 p-4 rounded-xl shadow-sm bg-light-gray">
+                <div class="p-4 rounded-xl shadow-sm bg-light-gray">
                     <div class="flex items-center mb-2">
                         <span class="text-lg font-semibold text-dark-gray mr-2">Feature-to-Fix Ratio</span>
                         <span class="text-sm text-medium-gray">(Feature / Fix &gt; 1)</span>
@@ -554,7 +494,7 @@
                 </div>
                 
                 <!-- Test Coverage Ratio Block -->
-                <div class="mt-6 p-4 rounded-xl shadow-sm bg-light-gray">
+                <div class="p-4 rounded-xl shadow-sm bg-light-gray">
                     <div class="flex items-center mb-2">
                         <span class="text-lg font-semibold text-dark-gray mr-2">Test Coverage Ratio</span>
                         <span class="text-sm text-medium-gray">(Test / Feature ≥ 0.3)</span>
@@ -571,7 +511,7 @@
                 </div>
                 
                 <!-- Focus Ratio Block -->
-                <div class="mt-4 p-4 rounded-xl shadow-sm bg-light-gray">
+                <div class="p-4 rounded-xl shadow-sm bg-light-gray">
                     <div class="flex items-center mb-2">
                         <span class="text-lg font-semibold text-dark-gray mr-2">Focus Ratio</span>
                         <span class="text-sm text-medium-gray">(Chore + Docs &lt; 30%)</span>
@@ -589,6 +529,7 @@
                 {% else %}
                 <p class="text-center text-medium-gray py-8">No commit types to display</p>
                 {% endif %}
+                </div>
             </div>
         </div>
 
@@ -2540,36 +2481,7 @@ function displayDeploymentsList(data) {
 </div>
 
 <!-- Vulnerabilities Slide-over Panel - TEMPORARILY DISABLED -->
-<!--
-<div id="vulnerabilities-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
-    <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeVulnerabilitiesAnalysis()"></div>
-        
-        <div class="fixed inset-y-0 right-0 flex justify-end">
-            <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="vulnerabilities-slide-panel">
-                <div class="h-full flex flex-col bg-white shadow-xl">
-                    <!-- Header -->
-                    <div class="flex-1 flex flex-col overflow-y-auto py-6 px-4 sm:px-6">
-                        <div class="flex items-start justify-between">
-                            <h2 class="text-lg font-medium text-gray-900">Dependencies Vulnerabilities</h2>
-                            <button onclick="closeVulnerabilitiesAnalysis()" class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
-                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                        
-                        <!-- Content -->
-                        <div id="vulnerabilities-content" class="mt-6">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
--->
+
 
 <!-- Commits Slide-over Panel -->
 <div id="commits-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
