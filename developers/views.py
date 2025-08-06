@@ -271,6 +271,205 @@ def search_developers_ajax(request):
     })
 
 
+def search_teams_ajax(request):
+    """AJAX endpoint for inline teams search"""
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        return JsonResponse({
+            'error': 'Authentication required',
+            'teams': {},
+            'total_count': 0,
+            'search_query': ''
+        }, status=401)
+    
+    search_query = request.GET.get('q', '').strip()
+    
+    # Get teams summary
+    teams_service = GitHubTeamsService()
+    teams_summary = teams_service.get_teams_summary()
+    
+    if not teams_summary['success']:
+        return JsonResponse({
+            'teams': {},
+            'total_count': 0,
+            'search_query': search_query,
+            'error': teams_summary.get('error', 'Unknown error')
+        })
+    
+    teams_data = teams_summary['teams']
+    
+    # Filter teams based on search query
+    if search_query:
+        filtered_teams = {}
+        for team_name, members in teams_data.items():
+            # Check if team name matches
+            if search_query.lower() in team_name.lower():
+                filtered_teams[team_name] = members
+                continue
+            
+            # Check if any member name matches
+            for member in members:
+                if (search_query.lower() in member['name'].lower() or 
+                    search_query.lower() in member.get('email', '').lower()):
+                    filtered_teams[team_name] = members
+                    break
+        
+        teams_data = filtered_teams
+    
+    total_teams = len(teams_data)
+    total_developers = sum(len(members) for members in teams_data.values())
+    
+    return JsonResponse({
+        'teams': teams_data,
+        'total_count': total_teams,
+        'total_developers': total_developers,
+        'search_query': search_query
+    })
+
+
+def search_aliases_ajax(request):
+    """AJAX endpoint for inline aliases search"""
+    from analytics.models import Commit
+    
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        return JsonResponse({
+            'error': 'Authentication required',
+            'aliases': [],
+            'total_count': 0,
+            'search_query': ''
+        }, status=401)
+    
+    search_query = request.GET.get('q', '').strip()
+    
+    # Collect all unique identities from commits only
+    identities = set()
+    
+    # From Commits - use aggregation to get unique author combinations
+    if search_query:
+        # Use case-insensitive search in MongoDB
+        commits_aggregation = Commit.objects.aggregate([
+            {
+                '$match': {
+                    '$or': [
+                        {'author_name': {'$regex': search_query, '$options': 'i'}},
+                        {'author_email': {'$regex': search_query, '$options': 'i'}}
+                    ]
+                }
+            },
+            {
+                '$group': {
+                    '_id': {
+                        'name': '$author_name',
+                        'email': '$author_email'
+                    }
+                }
+            }
+        ])
+    else:
+        # Get all unique author combinations
+        commits_aggregation = Commit.objects.aggregate([
+            {
+                '$group': {
+                    '_id': {
+                        'name': '$author_name',
+                        'email': '$author_email'
+                    }
+                }
+            }
+        ])
+    
+    for commit_group in commits_aggregation:
+        author_data = commit_group['_id']
+        if author_data['name'] and author_data['email']:
+            identities.add((author_data['name'].lower(), author_data['email'].lower(), 'Commit'))
+    
+    # Convert to list and deduplicate
+    unique_identities = []
+    seen_names = set()
+    seen_emails = set()
+    
+    # Get existing aliases and developers using aggregation for better performance
+    existing_aliases_aggregation = DeveloperAlias.objects.aggregate([
+        {
+            '$group': {
+                '_id': {
+                    'name': '$name',
+                    'email': '$email'
+                }
+            }
+        }
+    ])
+    
+    existing_name_email_combinations = set()
+    for alias_group in existing_aliases_aggregation:
+        alias_data = alias_group['_id']
+        if alias_data['name'] and alias_data['email']:
+            existing_name_email_combinations.add((alias_data['name'].lower(), alias_data['email'].lower()))
+    
+    # Get existing developers
+    existing_developers_aggregation = Developer.objects.aggregate([
+        {
+            '$group': {
+                '_id': {
+                    'name': '$primary_name',
+                    'email': '$primary_email'
+                }
+            }
+        }
+    ])
+    
+    existing_developer_name_email_combinations = set()
+    for dev_group in existing_developers_aggregation:
+        dev_data = dev_group['_id']
+        if dev_data['name'] and dev_data['email']:
+            existing_developer_name_email_combinations.add((dev_data['name'].lower(), dev_data['email'].lower()))
+    
+    for name, email, source in identities:
+        name_lower = name.lower()
+        email_lower = email.lower() if email else None
+        
+        # Check if we already have this email in our current list (email-only deduplication)
+        if email_lower and email_lower in seen_emails:
+            continue
+        
+        # Check if this exact name+email combination already exists in developer_aliases
+        if email_lower and (name_lower, email_lower) in existing_name_email_combinations:
+            continue
+        
+        # Check if this exact name+email combination matches an existing developer's primary identity
+        if email_lower and (name_lower, email_lower) in existing_developer_name_email_combinations:
+            continue
+        
+        # Simplified filtering: Check if this email is already used anywhere
+        if email_lower:
+            # Check if email exists in any alias or developer
+            email_in_aliases = DeveloperAlias.objects.filter(email=email_lower).count() > 0
+            email_in_developers = Developer.objects.filter(primary_email=email_lower).count() > 0
+            
+            if email_in_aliases or email_in_developers:
+                continue
+        
+        # Only track emails, not names (allow multiple identities with same name but different emails)
+        if email_lower:
+            seen_emails.add(email_lower)
+        
+        unique_identities.append({
+            'name': name.title(),  # Capitalize first letter
+            'email': email or f'No email ({source})',
+            'source': source
+        })
+    
+    # Sort by name
+    unique_identities.sort(key=lambda x: x['name'])
+    
+    return JsonResponse({
+        'aliases': unique_identities,
+        'total_count': len(unique_identities),
+        'search_query': search_query
+    })
+
+
 @login_required
 @require_http_methods(["POST"])
 def update_developer_name(request, developer_id):
@@ -1151,6 +1350,9 @@ def list_teams(request):
     
     print("DEBUG: list_teams view called")  # Debug log
     
+    # Get search query
+    search_query = request.GET.get('search', '').strip()
+    
     # Get teams summary
     teams_service = GitHubTeamsService()
     print("DEBUG: Calling get_teams_summary")  # Debug log
@@ -1164,14 +1366,34 @@ def list_teams(request):
         total_developers = 0
     else:
         teams_data = teams_summary['teams']
-        total_teams = teams_summary['total_teams']
-        total_developers = teams_summary['total_developers']
+        
+        # Filter teams based on search query
+        if search_query:
+            filtered_teams = {}
+            for team_name, members in teams_data.items():
+                # Check if team name matches
+                if search_query.lower() in team_name.lower():
+                    filtered_teams[team_name] = members
+                    continue
+                
+                # Check if any member name matches
+                for member in members:
+                    if (search_query.lower() in member['name'].lower() or 
+                        search_query.lower() in member.get('email', '').lower()):
+                        filtered_teams[team_name] = members
+                        break
+            
+            teams_data = filtered_teams
+        
+        total_teams = len(teams_data)
+        total_developers = sum(len(members) for members in teams_data.values())
     
     context = {
         'teams': teams_data,
         'total_teams': total_teams,
         'total_developers': total_developers,
         'active_tab': 'teams',
+        'search_query': search_query,
     }
     
     return render(request, 'developers/list.html', context)
@@ -1208,5 +1430,6 @@ def sync_github_teams(request):
         messages.error(request, f"Sync failed with exception: {str(e)}")
     
     # Redirect back to teams tab
+    print(f"DEBUG: Redirecting to /developers/?tab=teams")
     return redirect('/developers/?tab=teams')
 

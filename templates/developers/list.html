@@ -98,7 +98,7 @@
             <input 
                 type="text" 
                 id="searchInput"
-                placeholder="{% if active_tab == 'developers' %}Search developers by name or email...{% else %}Search aliases by name or email...{% endif %}"
+                placeholder="{% if active_tab == 'teams' %}Search teams by name...{% elif active_tab == 'developers' %}Search developers by name or email...{% else %}Search aliases by name or email...{% endif %}"
                 value="{{ search_query }}"
                 class="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
             >
@@ -486,7 +486,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalCount = document.getElementById('totalCount');
     const pluralSuffix = document.getElementById('pluralSuffix');
     
-    // Only initialize search functionality for developers tab
+    // Initialize search functionality based on active tab
     {% if active_tab == 'developers' %}
     let searchTimeout;
     
@@ -501,11 +501,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Set timeout to avoid too many requests
         searchTimeout = setTimeout(() => {
-            performSearch(query);
+            performDevelopersSearch(query);
         }, 300);
     });
     
-    function performSearch(query) {
+    function performDevelopersSearch(query) {
         const url = new URL('{% url "developers:search_ajax" %}', window.location.origin);
         if (query) {
             url.searchParams.set('q', query);
@@ -525,7 +525,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(data => {
                 if (data && !data.error) {
-                    updateResults(data);
+                    updateDevelopersResults(data);
                 } else {
                     console.error('Search error:', data.error);
                 }
@@ -540,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
-    function updateResults(data) {
+    function updateDevelopersResults(data) {
         const developers = data.developers;
         const totalCount = data.total_count;
         const searchQuery = data.search_query;
@@ -597,21 +597,280 @@ document.addEventListener('DOMContentLoaded', function() {
             emptyState.classList.remove('hidden');
         }
     }
-    {% else %}
-    // For aliases tab, handle search by form submission
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            const query = this.value.trim();
-            const currentUrl = new URL(window.location);
-            if (query) {
-                currentUrl.searchParams.set('search', query);
-            } else {
-                currentUrl.searchParams.delete('search');
-            }
-            currentUrl.searchParams.set('tab', 'aliases');
-            window.location.href = currentUrl.toString();
-        }
+    {% elif active_tab == 'teams' %}
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        // Clear previous timeout
+        clearTimeout(searchTimeout);
+        
+        // Show spinner
+        searchSpinner.classList.remove('hidden');
+        
+        // Set timeout to avoid too many requests
+        searchTimeout = setTimeout(() => {
+            performTeamsSearch(query);
+        }, 300);
     });
+    
+    function performTeamsSearch(query) {
+        const url = new URL('{% url "developers:search_teams_ajax" %}', window.location.origin);
+        if (query) {
+            url.searchParams.set('q', query);
+        }
+        
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Redirect to login if not authenticated
+                        window.location.href = '/users/login/?next=' + encodeURIComponent(window.location.pathname);
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && !data.error) {
+                    updateTeamsResults(data);
+                } else {
+                    console.error('Search error:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Search error:', error);
+                // Show error state or fallback to original content
+                searchSpinner.classList.add('hidden');
+            })
+            .finally(() => {
+                searchSpinner.classList.add('hidden');
+            });
+    }
+    
+    function updateTeamsResults(data) {
+        const teams = data.teams;
+        const totalTeams = data.total_count;
+        const totalDevelopers = data.total_developers;
+        const searchQuery = data.search_query;
+        
+        // Update results info
+        if (searchQuery) {
+            resultsInfo.innerHTML = `Found <span id="totalCount">${totalTeams}</span> team<span id="pluralSuffix">${totalTeams === 1 ? '' : 's'}</span> with <span id="totalDevelopers">${totalDevelopers}</span> developer<span id="pluralSuffix">${totalDevelopers === 1 ? '' : 's'}</span> matching "${searchQuery}"`;
+        } else {
+            resultsInfo.innerHTML = `Showing <span id="totalCount">${totalTeams}</span> team<span id="pluralSuffix">${totalTeams === 1 ? '' : 's'}</span> with <span id="totalDevelopers">${totalDevelopers}</span> developer<span id="pluralSuffix">${totalDevelopers === 1 ? '' : 's'}</span> in total`;
+        }
+        
+        // Update teams table
+        const teamsTable = document.querySelector('table');
+        const teamsTableBody = teamsTable.querySelector('tbody');
+        
+        if (Object.keys(teams).length > 0) {
+            teamsTable.classList.remove('hidden');
+            
+            // Clear existing rows
+            teamsTableBody.innerHTML = '';
+            
+            // Add new rows
+            Object.entries(teams).forEach(([team_name, members]) => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 715.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">
+                                    ${team_name}
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    ${members.length} member${members.length === 1 ? '' : 's'}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-wrap gap-2">
+                            ${members.map(member => `
+                                <a href="/developers/${member.id}/" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                    ${member.primary_team ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-gray-100 text-gray-800 border border-gray-200'}
+                                    hover:bg-blue-50 hover:text-blue-900 transition-colors">
+                                    <span class="w-2 h-2 rounded-full mr-2
+                                        ${member.primary_team ? 'bg-blue-500' : 'bg-gray-400'}">
+                                    </span>
+                                    ${member.name || 'Unknown'}
+                                </a>
+                            `).join('')}
+                        </div>
+                    </td>
+                `;
+                
+                teamsTableBody.appendChild(row);
+            });
+        } else {
+            // Show empty state
+            const emptyState = document.querySelector('.text-center.py-12');
+            if (emptyState) {
+                emptyState.classList.remove('hidden');
+            }
+        }
+    }
+    {% elif active_tab == 'aliases' %}
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        // Clear previous timeout
+        clearTimeout(searchTimeout);
+        
+        // Show spinner
+        searchSpinner.classList.remove('hidden');
+        
+        // Set timeout to avoid too many requests
+        searchTimeout = setTimeout(() => {
+            performAliasesSearch(query);
+        }, 300);
+    });
+    
+    function performAliasesSearch(query) {
+        const url = new URL('{% url "developers:search_aliases_ajax" %}', window.location.origin);
+        if (query) {
+            url.searchParams.set('q', query);
+        }
+        
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Redirect to login if not authenticated
+                        window.location.href = '/users/login/?next=' + encodeURIComponent(window.location.pathname);
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && !data.error) {
+                    updateAliasesResults(data);
+                } else {
+                    console.error('Search error:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Search error:', error);
+                // Show error state or fallback to original content
+                searchSpinner.classList.add('hidden');
+            })
+            .finally(() => {
+                searchSpinner.classList.add('hidden');
+            });
+    }
+    
+    function updateAliasesResults(data) {
+        const aliases = data.aliases;
+        const totalCount = data.total_count;
+        const searchQuery = data.search_query;
+        
+        // Update results info
+        document.getElementById('totalCount').textContent = totalCount;
+        document.getElementById('pluralSuffix').textContent = totalCount === 1 ? '' : 's';
+        
+        if (searchQuery) {
+            resultsInfo.innerHTML = `Found <span id="totalCount">${totalCount}</span> alias<span id="pluralSuffix">${totalCount === 1 ? '' : 's'}</span> matching "${searchQuery}"`;
+        } else {
+            resultsInfo.innerHTML = `Showing <span id="totalCount">${totalCount}</span> alias<span id="pluralSuffix">${totalCount === 1 ? '' : 's'}</span> in total`;
+        }
+        
+        // Update aliases table
+        const aliasesTable = document.querySelector('table');
+        const aliasesTableBody = aliasesTable.querySelector('tbody');
+        
+        // Clear existing rows
+        aliasesTableBody.innerHTML = '';
+        
+        if (aliases.length > 0) {
+            // Add new rows
+            aliases.forEach((alias, index) => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input 
+                            type="checkbox" 
+                            class="alias-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            value="${index}"
+                            data-name="${alias.name}"
+                            data-email="${alias.email}"
+                            data-source="${alias.source}"
+                            onchange="updateAliasSelection()"
+                        >
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-900 font-medium">
+                                ${alias.name}
+                            </span>
+                            <button 
+                                onclick="debugIdentity('${alias.name}', '${alias.email}')"
+                                class="text-xs text-blue-600 hover:text-blue-800"
+                                title="Debug this identity"
+                            >
+                                🔍
+                            </button>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${alias.email}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            ${alias.source === 'Commit' ? 'bg-green-100 text-green-800' :
+                              alias.source === 'Release' ? 'bg-blue-100 text-blue-800' :
+                              alias.source === 'Deployment' ? 'bg-purple-100 text-purple-800' :
+                              'bg-orange-100 text-orange-800'}">
+                            ${alias.source}
+                        </span>
+                    </td>
+                `;
+                
+                aliasesTableBody.appendChild(row);
+            });
+            
+            // Update aliasesData for the modal functionality
+            window.aliasesData = aliases;
+        } else {
+            // Create empty state row
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `
+                <td colspan="4" class="px-6 py-12 text-center">
+                    <div class="text-gray-400 mb-4">
+                        <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">
+                        No aliases found
+                    </h3>
+                    <p class="text-gray-500">
+                        Try adjusting your search terms
+                    </p>
+                </td>
+            `;
+            aliasesTableBody.appendChild(emptyRow);
+        }
+    }
     {% endif %}
 });
 
@@ -1181,8 +1440,13 @@ function syncGitHubTeams() {
         body: 'csrfmiddlewaretoken=' + csrfToken
     })
     .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response redirected:', response.redirected);
+        console.log('Response url:', response.url);
+        
         if (response.redirected) {
             // Django redirected us, follow the redirect
+            console.log('Following redirect to:', response.url);
             window.location.href = response.url;
         } else {
             return response.text();
