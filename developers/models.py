@@ -8,6 +8,13 @@ class Developer(models.Model):
     id = models.CharField(primary_key=True, max_length=24)  # MongoDB ObjectId length
     name = models.CharField(max_length=255)
     email = models.EmailField()
+    
+    # GitHub Teams integration
+    github_teams = models.JSONField(default=list, blank=True, help_text="List of GitHub team slugs")
+    github_organizations = models.JSONField(default=list, blank=True, help_text="List of GitHub organization names")
+    primary_team = models.CharField(max_length=100, blank=True, help_text="Main team for this developer")
+    team_role = models.CharField(max_length=50, blank=True, help_text="Role in the team (member, admin, etc.)")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

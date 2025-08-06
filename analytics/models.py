@@ -70,6 +70,12 @@ class Developer(Document):
     # Application context (None for global developers)
     application_id = fields.IntField(required=False, null=True)
     
+    # GitHub Teams integration
+    github_teams = fields.ListField(fields.StringField(), default=list)  # List of team slugs
+    github_organizations = fields.ListField(fields.StringField(), default=list)  # List of org names
+    primary_team = fields.StringField()  # Main team for this developer
+    team_role = fields.StringField()  # Role in the team (member, admin, etc.)
+    
     # Developer metadata
     created_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
     updated_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))

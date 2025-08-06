@@ -15,15 +15,25 @@ from datetime import datetime, timedelta, timezone
 from analytics.models import Developer, DeveloperAlias
 
 from analytics.commit_classifier import get_commit_type_stats
+from .github_teams_service import GitHubTeamsService
+
+
+
 
 
 @login_required
 def list_developers(request):
     """List all developers with simple search functionality and tabs"""
     # Get tab parameter
-    active_tab = request.GET.get('tab', 'developers')
+    active_tab = request.GET.get('tab', 'teams')
     
-    if active_tab == 'aliases':
+    print(f"DEBUG: active_tab = {active_tab}")  # Debug log
+    
+    if active_tab == 'teams':
+        print("DEBUG: Calling list_teams")  # Debug log
+        return list_teams(request)
+    elif active_tab == 'aliases':
+        print("DEBUG: Calling list_aliases")  # Debug log
         return list_aliases(request)
     
     # Get all developers from MongoDB
@@ -1132,4 +1142,71 @@ def debug_identity_issues(request):
             for match in email_matches
         ]
     })
+
+
+@login_required
+def list_teams(request):
+    """List all teams with their members"""
+    from django.contrib import messages
+    
+    print("DEBUG: list_teams view called")  # Debug log
+    
+    # Get teams summary
+    teams_service = GitHubTeamsService()
+    print("DEBUG: Calling get_teams_summary")  # Debug log
+    teams_summary = teams_service.get_teams_summary()
+    print(f"DEBUG: Teams summary: {teams_summary}")  # Debug log
+    
+    if not teams_summary['success']:
+        messages.warning(request, f"No teams data available: {teams_summary.get('error', 'Unknown error')}")
+        teams_data = {}
+        total_teams = 0
+        total_developers = 0
+    else:
+        teams_data = teams_summary['teams']
+        total_teams = teams_summary['total_teams']
+        total_developers = teams_summary['total_developers']
+    
+    context = {
+        'teams': teams_data,
+        'total_teams': total_teams,
+        'total_developers': total_developers,
+        'active_tab': 'teams',
+    }
+    
+    return render(request, 'developers/list.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def sync_github_teams(request):
+    """Sync GitHub teams for all developers"""
+    from django.contrib import messages
+    
+    print("DEBUG: sync_github_teams view called")  # Debug log
+    
+    try:
+        print("DEBUG: Creating GitHubTeamsService")  # Debug log
+        teams_service = GitHubTeamsService()
+        print("DEBUG: Calling sync_all_developers_teams")  # Debug log
+        result = teams_service.sync_all_developers_teams()
+        print(f"DEBUG: Result: {result}")  # Debug log
+        
+        if result['success']:
+            messages.success(
+                request, 
+                f"Successfully synced {result['synced_count']}/{result['total_developers']} developers with GitHub teams"
+            )
+            
+            if result.get('errors'):
+                for error in result['errors'][:5]:  # Show first 5 errors
+                    messages.warning(request, f"Sync warning: {error}")
+        else:
+            messages.error(request, f"Sync failed: {result.get('error', 'Unknown error')}")
+            
+    except Exception as e:
+        messages.error(request, f"Sync failed with exception: {str(e)}")
+    
+    # Redirect back to teams tab
+    return redirect('/developers/?tab=teams')
 

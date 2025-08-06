@@ -16,6 +16,12 @@
     <div class="mb-6">
         <div class="tabs tabs-boxed">
             <a 
+                href="?tab=teams{% if search_query %}&search={{ search_query }}{% endif %}" 
+                class="tab {% if active_tab == 'teams' %}tab-active{% endif %}"
+            >
+                Teams
+            </a>
+            <a 
                 href="?tab=developers{% if search_query %}&search={{ search_query }}{% endif %}" 
                 class="tab {% if active_tab == 'developers' %}tab-active{% endif %}"
             >
@@ -122,6 +128,7 @@
     </div>
 
     <!-- Content based on active tab -->
+    <!-- DEBUG: active_tab = {{ active_tab }} -->
     {% if active_tab == 'developers' %}
         <!-- Developers List -->
         <div class="bg-white rounded-lg shadow">
@@ -198,6 +205,104 @@
                 </p>
             </div>
         </div>
+    {% elif active_tab == 'teams' %}
+        <!-- Teams List -->
+        <div class="mb-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-900">GitHub Teams</h2>
+                    <p class="text-gray-600">Teams synced from GitHub organizations</p>
+                </div>
+                <button 
+                    id="syncTeamsBtn"
+                    class="btn btn-primary"
+                    onclick="syncGitHubTeams()"
+                >
+                    <svg id="syncIcon" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span id="syncText">Sync with GitHub</span>
+                </button>
+            </div>
+        </div>
+
+        {% if teams %}
+            <div class="bg-white rounded-lg shadow">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Team Name
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Members
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for team_name, members in teams.items %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0">
+                                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-gray-900">
+                                                    {{ team_name }}
+                                                </div>
+                                                <div class="text-sm text-gray-500">
+                                                    {{ members|length }} member{{ members|length|pluralize }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex flex-wrap gap-2">
+                                            {% for member in members %}
+                                                <a 
+                                                    href="{% url 'developers:detail' member.id %}" 
+                                                    class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                                        {% if member.primary_team %}bg-blue-100 text-blue-800 border border-blue-200
+                                                        {% else %}bg-gray-100 text-gray-800 border border-gray-200{% endif %}
+                                                        hover:bg-blue-50 hover:text-blue-900 transition-colors"
+                                                >
+                                                    <span class="w-2 h-2 rounded-full mr-2
+                                                        {% if member.primary_team %}bg-blue-500
+                                                        {% else %}bg-gray-400{% endif %}">
+                                                    </span>
+                                                    {{ member.name }}
+                                                </a>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% else %}
+            <!-- Empty Teams State -->
+            <div class="text-center py-12">
+                <div class="text-gray-400 mb-4">
+                    <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 715.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">
+                    No teams found
+                </h3>
+                <p class="text-gray-500 mb-4">
+                    No GitHub teams have been synced yet
+                </p>
+            </div>
+        {% endif %}
     {% else %}
         <!-- Aliases List -->
         <div class="bg-white rounded-lg shadow">
@@ -1048,6 +1153,65 @@ function performMerge() {
         alert('An error occurred while merging developers.');
     });
 }
+
 {% endif %}
+
+// Sync GitHub teams with AJAX - GLOBAL FUNCTION
+function syncGitHubTeams() {
+    const button = document.getElementById('syncTeamsBtn');
+    const icon = document.getElementById('syncIcon');
+    const text = document.getElementById('syncText');
+    
+    // Show loading state
+    button.disabled = true;
+    icon.style.display = 'none';
+    text.innerHTML = '<span class="loading loading-spinner loading-sm mr-2"></span>Syncing...';
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                     getCookie('csrftoken');
+    
+    // Make AJAX request
+    fetch('{% url "developers:sync_github_teams" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+        },
+        body: 'csrfmiddlewaretoken=' + csrfToken
+    })
+    .then(response => {
+        if (response.redirected) {
+            // Django redirected us, follow the redirect
+            window.location.href = response.url;
+        } else {
+            return response.text();
+        }
+    })
+    .catch(error => {
+        console.error('Sync error:', error);
+        // Reset button state
+        button.disabled = false;
+        icon.style.display = 'inline';
+        text.innerHTML = 'Sync with GitHub';
+        alert('Sync failed. Please try again.');
+    });
+}
+
+// Helper function to get cookie
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 </script>
 {% endblock content %} 
