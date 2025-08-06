@@ -321,7 +321,8 @@ class CodeQLIndexingService:
         
         if not vulnerabilities:
             return {
-                'score': 100,
+                'level': 'safe',
+                'level_display': 'Safe',
                 'total_vulnerabilities': 0,
                 'open_vulnerabilities': 0,
                 'critical_count': 0,
@@ -335,7 +336,7 @@ class CodeQLIndexingService:
         
         # Use CodeQL service to calculate metrics
         codeql_service = CodeQLService()
-        metrics = codeql_service.calculate_security_score(vulnerabilities)
+        metrics = codeql_service.calculate_security_level(vulnerabilities)
         
         # Add additional metrics
         metrics['last_analysis'] = self.get_latest_analysis_date(repository_full_name)

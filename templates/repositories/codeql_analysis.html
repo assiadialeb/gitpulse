@@ -30,13 +30,7 @@
                 {% endif %}
             </div>
         {% else %}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                <div class="bg-white p-3 rounded-lg border">
-                    <span class="text-gray-600">Security Score</span>
-                    <div class="text-2xl font-bold {% if codeql_data.score >= 80 %}text-green-500{% elif codeql_data.score >= 60 %}text-yellow-500{% else %}text-red-500{% endif %}">
-                        {{ codeql_data.score }}/100
-                    </div>
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                 <div class="bg-white p-3 rounded-lg border">
                     <span class="text-gray-600">Total Vulnerabilities</span>
                     <div class="text-2xl font-bold text-gray-800" data-vulnerabilities="{{ codeql_data.total_vulnerabilities }}">

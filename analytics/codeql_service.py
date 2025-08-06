@@ -293,19 +293,20 @@ class CodeQLService:
                 return tag
         return None
     
-    def calculate_security_score(self, vulnerabilities: List[CodeQLVulnerability]) -> Dict:
+    def calculate_security_level(self, vulnerabilities: List[CodeQLVulnerability]) -> Dict:
         """
-        Calculate security score and metrics from vulnerabilities
+        Calculate security level based on the most critical open vulnerability
         
         Args:
             vulnerabilities: List of vulnerabilities for a repository
             
         Returns:
-            Dictionary with security metrics
+            Dictionary with security metrics and level
         """
         if not vulnerabilities:
             return {
-                'score': 100,
+                'level': 'safe',
+                'level_display': 'Safe',
                 'total_vulnerabilities': 0,
                 'critical_count': 0,
                 'high_count': 0,
@@ -318,25 +319,52 @@ class CodeQLService:
                 'trend': 'stable'
             }
         
-        # Count by severity
+        # Count by severity (only open vulnerabilities)
         severity_counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
         state_counts = {'open': 0, 'fixed': 0, 'dismissed': 0}
         categories = {}
         
         for vuln in vulnerabilities:
-            severity_counts[vuln.severity] += 1
             state_counts[vuln.state] += 1
+            
+            # Only count severity for OPEN vulnerabilities
+            if vuln.state == 'open':
+                severity_counts[vuln.severity] += 1
             
             category = vuln.category or 'other'
             categories[category] = categories.get(category, 0) + 1
         
-        # Calculate score (100 - deductions)
-        score = 100
-        score -= severity_counts['critical'] * 20  # -20 per critical
-        score -= severity_counts['high'] * 10      # -10 per high
-        score -= severity_counts['medium'] * 5     # -5 per medium
-        score -= severity_counts['low'] * 2        # -2 per low
-        score = max(0, score)  # Minimum 0
+        # Determine security level based on most critical open vulnerability
+        open_vulnerabilities = [v for v in vulnerabilities if v.state == 'open']
+        
+        if not open_vulnerabilities:
+            level = 'safe'
+            level_display = 'Safe'
+        else:
+            # Find the most critical open vulnerability
+            severity_order = ['critical', 'high', 'medium', 'low']
+            max_severity = None
+            
+            for severity in severity_order:
+                if any(v.severity == severity for v in open_vulnerabilities):
+                    max_severity = severity
+                    break
+            
+            if max_severity == 'critical':
+                level = 'critical'
+                level_display = 'Critical'
+            elif max_severity == 'high':
+                level = 'high'
+                level_display = 'High'
+            elif max_severity == 'medium':
+                level = 'medium'
+                level_display = 'Medium'
+            elif max_severity == 'low':
+                level = 'low'
+                level_display = 'Low'
+            else:
+                level = 'safe'
+                level_display = 'Safe'
         
         # Calculate trend (simplified - based on recent activity)
         recent_vulns = [v for v in vulnerabilities if v.get_age_days() <= 30]
@@ -348,7 +376,8 @@ class CodeQLService:
             trend = 'stable'
         
         return {
-            'score': score,
+            'level': level,
+            'level_display': level_display,
             'total_vulnerabilities': len(vulnerabilities),
             'critical_count': severity_counts['critical'],
             'high_count': severity_counts['high'],

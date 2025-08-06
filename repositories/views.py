@@ -70,7 +70,8 @@ def _get_codeql_metrics(repository, user_id: int):
         logger.error(f"Error getting CodeQL metrics for repository {repository.full_name}: {e}")
         return {
             'status': 'not_available',
-            'score': 100,
+            'level': 'safe',
+            'level_display': 'Safe',
             'total_vulnerabilities': 0,
             'open_count': 0,
             'critical_count': 0,
