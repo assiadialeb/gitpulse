@@ -4,6 +4,7 @@ Fetches and processes GitHub Releases using the Intelligent Indexing Service
 """
 import logging
 import requests
+import time
 from datetime import datetime, timezone as dt_timezone
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
@@ -73,13 +74,12 @@ class ReleaseIndexingService:
                             published_at = datetime.fromisoformat(published_at_str.replace('Z', '+00:00'))
                             
                             # Ensure all dates are timezone-aware for comparison
-                            from django.utils import timezone
                             if since.tzinfo is None:
-                                since = timezone.make_aware(since)
+                                since = since.replace(tzinfo=dt_timezone.utc)
                             if until.tzinfo is None:
-                                until = timezone.make_aware(until)
+                                until = until.replace(tzinfo=dt_timezone.utc)
                             if published_at.tzinfo is None:
-                                published_at = timezone.make_aware(published_at)
+                                published_at = published_at.replace(tzinfo=dt_timezone.utc)
                             
                             if since <= published_at <= until:
                                 filtered_batch.append(release)
@@ -100,13 +100,12 @@ class ReleaseIndexingService:
                                     created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
                                     
                                     # Check created_at for drafts
-                                    from datetime import timezone
                                     if since.tzinfo is None:
-                                        since = timezone.make_aware(since)
+                                        since = since.replace(tzinfo=dt_timezone.utc)
                                     if until.tzinfo is None:
-                                        until = timezone.make_aware(until)
+                                        until = until.replace(tzinfo=dt_timezone.utc)
                                     if created_at.tzinfo is None:
-                                        created_at = timezone.make_aware(created_at)
+                                        created_at = created_at.replace(tzinfo=dt_timezone.utc)
                                     
                                     if since <= created_at <= until:
                                         filtered_batch.append(release)
@@ -126,6 +125,9 @@ class ReleaseIndexingService:
                 if page > 20:  # Max 2000 releases per batch (releases are usually fewer)
                     logger.warning(f"Hit maximum page limit (20) for {owner}/{repo} releases")
                     break
+                
+                # Rate limit protection - pause between pages
+                time.sleep(0.1)  # 100ms pause between pages
                     
             except requests.exceptions.RequestException as e:
                 logger.error(f"Error fetching releases from GitHub API: {e}")
@@ -214,9 +216,9 @@ class ReleaseIndexingService:
                     
                     if created:
                         processed += 1
-                        logger.debug(f"Created new release {release_data.get('tag_name', release_id)}")
+                        logger.debug(f"Created new release {release_id}")
                     else:
-                        logger.debug(f"Updated existing release {release_data.get('tag_name', release_id)}")
+                        logger.debug(f"Updated existing release {release_id}")
                         
                 except Exception as e:
                     logger.warning(f"Error saving release {release_id}: {e}")
@@ -232,7 +234,7 @@ class ReleaseIndexingService:
     @staticmethod
     def index_releases_for_repository(repository_id: int, user_id: int, batch_size_days: int = 365) -> Dict:
         """
-        Index releases for a specific repository, simple et robuste.
+        Index releases for a specific repository, optimized version.
         """
         try:
             from .github_token_service import GitHubTokenService
@@ -247,12 +249,19 @@ class ReleaseIndexingService:
             now = timezone.now()
             entity_type = 'releases'
             state = IndexingState.objects(repository_id=repository_id, entity_type=entity_type).first()
-            if state and state.last_indexed_at:
-                since = state.last_indexed_at
-            else:
-                # No time limit - index all releases from the beginning
-                since = datetime(2010, 1, 1, tzinfo=dt_timezone.utc)  # GitHub was founded in 2008, but use 2010 as safe start
-            until = now
+            
+            # Optimized date range - use intelligent indexing service
+            from .intelligent_indexing_service import IntelligentIndexingService
+            
+            indexing_service = IntelligentIndexingService(
+                repository_id=repository_id,
+                entity_type=entity_type,
+                github_token=github_token
+            )
+            
+            since, until = indexing_service.get_indexing_date_range()
+            
+            logger.info(f"Indexing period: {since.strftime('%Y-%m-%d')} to {until.strftime('%Y-%m-%d')}")
 
             github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
             if not github_token:
@@ -266,36 +275,21 @@ class ReleaseIndexingService:
             # Vérifier la rate limit
             headers = {'Authorization': f'token {github_token}'}
             try:
-                rate_response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
-                if rate_response.status_code == 200:
-                    rate_data = rate_response.json()
-                    remaining = rate_data['resources']['core']['remaining']
-                    reset_time = rate_data['resources']['core']['reset']
-                    if remaining < 20:
-                        next_run = datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
-                        from django_q.models import Schedule
-                        # Check if a retry task already exists for this repository
-                        existing_retry = Schedule.objects.filter(
-                            name=f'release_indexing_repo_{repository_id}_retry'
-                        ).first()
+                rate_limit_response = requests.get('https://api.github.com/rate_limit', headers=headers)
+                if rate_limit_response.status_code == 200:
+                    rate_limit_data = rate_limit_response.json()
+                    core_remaining = rate_limit_data['resources']['core']['remaining']
+                    core_limit = rate_limit_data['resources']['core']['limit']
+                    reset_time = rate_limit_data['resources']['core']['reset']
+                    
+                    logger.info(f"Rate limit: {core_remaining}/{core_limit} remaining")
+                    
+                    # If we have less than 100 requests remaining, schedule for later
+                    if core_remaining < 100:
+                        from datetime import datetime
+                        next_run = datetime.fromtimestamp(reset_time)
+                        logger.warning(f"Rate limit nearly exhausted, scheduling for {next_run}")
                         
-                        if existing_retry:
-                            # Update existing retry schedule
-                            existing_retry.func = 'analytics.tasks.index_releases_intelligent_task'
-                            existing_retry.args = [repository_id]
-                            existing_retry.next_run = next_run
-                            existing_retry.schedule_type = Schedule.ONCE
-                            existing_retry.save()
-                        else:
-                            # Create new retry schedule
-                            Schedule.objects.create(
-                                func='analytics.tasks.index_releases_intelligent_task',
-                                args=[repository_id],
-                                next_run=next_run,
-                                schedule_type=Schedule.ONCE,
-                                name=f'release_indexing_repo_{repository_id}_retry'
-                            )
-                        logger.warning(f"Rate limit reached, replanified for {next_run}")
                         return {'status': 'rate_limited', 'scheduled_for': next_run.isoformat()}
             except Exception as e:
                 logger.warning(f"Could not check rate limit: {e}, proceeding anyway")

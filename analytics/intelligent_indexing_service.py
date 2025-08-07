@@ -3,12 +3,12 @@ Intelligent indexing service for GitHub API entities
 Manages indexing state and implements backfill strategy
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Optional, Dict, Any, List, Callable, Tuple
 from django.utils import timezone
 from mongoengine import Q
 
-from .models import IndexingState
+from .models import IndexingState, PullRequest, Release, Deployment
 from repositories.models import Repository
 
 logger = logging.getLogger(__name__)
@@ -269,3 +269,67 @@ class IntelligentIndexingService:
             'retry_count': self.state.retry_count,
             'error_message': self.state.error_message
         } 
+
+    def should_do_full_indexing(self) -> bool:
+        """
+        Determine if we should do a full indexing (from beginning) or incremental
+        
+        Returns:
+            True if full indexing is needed, False for incremental
+        """
+        # If no state exists, we need full indexing
+        if not self.state or not self.state.last_indexed_at:
+            return True
+        
+        # If last indexing was more than 90 days ago, do full indexing
+        if self.state.last_indexed_at:
+            # Ensure timezone-aware comparison
+            last_indexed = self.state.last_indexed_at
+            if last_indexed.tzinfo is None:
+                last_indexed = last_indexed.replace(tzinfo=dt_timezone.utc)
+            
+            now = timezone.now()
+            days_since_last_indexing = (now - last_indexed).days
+            if days_since_last_indexing > 90:
+                logger.info(f"Last indexing was {days_since_last_indexing} days ago, doing full indexing")
+                return True
+        
+        # If we have very few items, do full indexing to ensure completeness
+        if self.entity_type == 'pull_requests':
+            count = PullRequest.objects.filter(repository_full_name=self.repository.full_name).count()
+            if count < 10:  # Very few PRs, might be incomplete
+                logger.info(f"Only {count} PRs found, doing full indexing")
+                return True
+        elif self.entity_type == 'releases':
+            count = Release.objects.filter(repository_full_name=self.repository.full_name).count()
+            if count < 5:  # Very few releases, might be incomplete
+                logger.info(f"Only {count} releases found, doing full indexing")
+                return True
+        elif self.entity_type == 'deployments':
+            count = Deployment.objects.filter(repository_full_name=self.repository.full_name).count()
+            if count < 5:  # Very few deployments, might be incomplete
+                logger.info(f"Only {count} deployments found, doing full indexing")
+                return True
+        
+        return False
+    
+    def get_indexing_date_range(self) -> tuple[datetime, datetime]:
+        """
+        Get the date range for indexing based on completeness check
+        
+        Returns:
+            Tuple of (since, until) datetime objects
+        """
+        now = timezone.now()
+        
+        if self.should_do_full_indexing():
+            # Full indexing: go back to a reasonable start date
+            # GitHub was founded in 2008, but use 2010 as safe start
+            since = datetime(2010, 1, 1, tzinfo=dt_timezone.utc)
+            logger.info(f"Full indexing for {self.repository.full_name} - {self.entity_type}")
+        else:
+            # Incremental indexing: since last indexed
+            since = self.state.last_indexed_at
+            logger.info(f"Incremental indexing for {self.repository.full_name} - {self.entity_type}")
+        
+        return since, now 

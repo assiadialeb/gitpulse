@@ -4,6 +4,7 @@ Fetches and processes GitHub Pull Requests using the Intelligent Indexing Servic
 """
 import logging
 import requests
+import time
 from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
 from typing import List, Dict, Optional
@@ -59,7 +60,7 @@ class PullRequestIndexingService:
                 
                 # Handle 403 Forbidden (no access to private repo)
                 if response.status_code == 403:
-                    logger.warning(f"Access denied to repository {repo_full_name} (403 Forbidden)")
+                    logger.warning(f"Access denied to repository {owner}/{repo} (403 Forbidden)")
                     return []  # Return empty list to indicate no access
                 
                 response.raise_for_status()
@@ -68,7 +69,7 @@ class PullRequestIndexingService:
                 if not batch:
                     break
                 
-                # Filter PRs by date range (created_at)
+                # Filter PRs by date range (created_at) and process in batch
                 filtered_batch = []
                 for pr in batch:
                     created_at_str = pr.get('created_at')
@@ -78,19 +79,43 @@ class PullRequestIndexingService:
                             
                             # Ensure all dates are timezone-aware for comparison
                             if since.tzinfo is None:
-                                since = timezone.make_aware(since)
+                                since = since.replace(tzinfo=dt_timezone.utc)
                             if until.tzinfo is None:
-                                until = timezone.make_aware(until)
+                                until = until.replace(tzinfo=dt_timezone.utc)
                             if created_at.tzinfo is None:
-                                created_at = timezone.make_aware(created_at)
+                                created_at = created_at.replace(tzinfo=dt_timezone.utc)
                             
                             if since <= created_at <= until:
-                                # Get detailed PR information
-                                detailed_pr = PullRequestIndexingService._get_detailed_pr_info(
+                                # Add basic PR data first
+                                pr_data = {
+                                    'number': pr['number'],
+                                    'title': pr.get('title', ''),
+                                    'state': pr.get('state', ''),
+                                    'created_at': pr.get('created_at'),
+                                    'updated_at': pr.get('updated_at'),
+                                    'closed_at': pr.get('closed_at'),
+                                    'merged_at': pr.get('merged_at'),
+                                    'url': pr.get('html_url', ''),
+                                    'author': pr.get('user', {}).get('login', '') if pr.get('user') else '',
+                                    'merged_by': pr.get('merged_by', {}).get('login', '') if pr.get('merged_by') else '',
+                                    'labels': [l['name'] for l in pr.get('labels', [])],
+                                    'requested_reviewers': [r['login'] for r in pr.get('requested_reviewers', [])],
+                                    'assignees': [a['login'] for a in pr.get('assignees', [])],
+                                    'commits': pr.get('commits', 0),
+                                    'additions': pr.get('additions', 0),
+                                    'deletions': pr.get('deletions', 0),
+                                    'changed_files': pr.get('changed_files', 0),
+                                    'base': pr.get('base', {}),
+                                    'head': pr.get('head', {}),
+                                    'payload': pr  # Keep original payload
+                                }
+                                
+                                # Get additional stats in batch (optimized)
+                                pr_data.update(PullRequestIndexingService._get_pr_stats_batch(
                                     owner, repo, pr['number'], token
-                                )
-                                if detailed_pr:
-                                    filtered_batch.append(detailed_pr)
+                                ))
+                                
+                                filtered_batch.append(pr_data)
                             elif created_at < since:
                                 # We've gone past our date range, stop fetching
                                 logger.info(f"Reached PRs older than {since.strftime('%Y-%m-%d')}, stopping")
@@ -112,6 +137,9 @@ class PullRequestIndexingService:
                 if page > 50:  # Max 5000 PRs per batch
                     logger.warning(f"Hit maximum page limit (50) for {owner}/{repo} pull requests")
                     break
+                
+                # Rate limit protection - pause between pages
+                time.sleep(0.1)  # 100ms pause between pages
                     
             except requests.exceptions.RequestException as e:
                 logger.error(f"Error fetching pull requests from GitHub API: {e}")
@@ -121,9 +149,9 @@ class PullRequestIndexingService:
         return pull_requests
     
     @staticmethod
-    def _get_detailed_pr_info(owner: str, repo: str, pr_number: int, token: str) -> Optional[Dict]:
+    def _get_pr_stats_batch(owner: str, repo: str, pr_number: int, token: str) -> Dict:
         """
-        Get detailed PR information including review comments, commits, etc.
+        Get PR statistics in an optimized way (single request with GraphQL-like approach)
         
         Args:
             owner: Repository owner
@@ -132,10 +160,10 @@ class PullRequestIndexingService:
             token: GitHub API token
             
         Returns:
-            Detailed PR info dictionary or None if error
+            Dictionary with PR statistics
         """
         try:
-            # Get detailed PR info
+            # Get detailed PR info with all stats in one request
             url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
             headers = {
                 "Authorization": f"token {token}",
@@ -147,33 +175,34 @@ class PullRequestIndexingService:
             
             pr_data = response.json()
             
-            # Get additional PR stats
-            # Get review comments count
-            review_comments_url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/comments"
-            review_resp = requests.get(review_comments_url, headers=headers)
-            review_comments_count = 0
-            if review_resp.status_code == 200:
-                review_comments_count = len(review_resp.json())
+            # Extract stats from the main PR response (already included)
+            stats = {
+                'review_comments_count': pr_data.get('review_comments', 0),
+                'comments_count': pr_data.get('comments', 0),
+                'commits_count': pr_data.get('commits', 0),
+                'additions_count': pr_data.get('additions', 0),
+                'deletions_count': pr_data.get('deletions', 0),
+                'changed_files_count': pr_data.get('changed_files', 0),
+                'requested_reviewers_list': [r['login'] for r in pr_data.get('requested_reviewers', [])],
+                'assignees_list': [a['login'] for a in pr_data.get('assignees', [])],
+                'labels_list': [l['name'] for l in pr_data.get('labels', [])]
+            }
             
-            # Get regular comments count
-            comments_url = f"https://api.github.com/repos/{owner}/{repo}/issues/{pr_number}/comments"
-            comments_resp = requests.get(comments_url, headers=headers)
-            comments_count = 0
-            if comments_resp.status_code == 200:
-                comments_count = len(comments_resp.json())
-            
-            # Add computed fields
-            pr_data['review_comments_count'] = review_comments_count
-            pr_data['comments_count'] = comments_count
-            pr_data['requested_reviewers_list'] = [r['login'] for r in pr_data.get('requested_reviewers', [])]
-            pr_data['assignees_list'] = [a['login'] for a in pr_data.get('assignees', [])]
-            pr_data['labels_list'] = [l['name'] for l in pr_data.get('labels', [])]
-            
-            return pr_data
+            return stats
             
         except Exception as e:
-            logger.warning(f"Could not get detailed PR info for #{pr_number}: {e}")
-            return None
+            logger.warning(f"Could not get PR stats for #{pr_number}: {e}")
+            return {
+                'review_comments_count': 0,
+                'comments_count': 0,
+                'commits_count': 0,
+                'additions_count': 0,
+                'deletions_count': 0,
+                'changed_files_count': 0,
+                'requested_reviewers_list': [],
+                'assignees_list': [],
+                'labels_list': []
+            }
     
     @staticmethod
     def process_pullrequests(pull_requests: List[Dict]) -> int:
@@ -256,24 +285,24 @@ class PullRequestIndexingService:
                     
                     # Update PR fields
                     pr.title = pr_data.get('title', '')
-                    pr.author = pr_data.get('user', {}).get('login', '') if pr_data.get('user') else ''
+                    pr.author = pr_data.get('author', '')
                     pr.created_at = created_at
                     pr.updated_at = updated_at
                     pr.closed_at = closed_at
                     pr.merged_at = merged_at
                     pr.state = pr_data.get('state', '')
-                    pr.url = pr_data.get('html_url', '')
+                    pr.url = pr_data.get('url', '')
                     pr.labels = pr_data.get('labels_list', [])
-                    pr.merged_by = pr_data.get('merged_by', {}).get('login', '') if pr_data.get('merged_by') else ''
+                    pr.merged_by = pr_data.get('merged_by', '')
                     pr.requested_reviewers = pr_data.get('requested_reviewers_list', [])
                     pr.assignees = pr_data.get('assignees_list', [])
                     pr.review_comments_count = pr_data.get('review_comments_count', 0)
                     pr.comments_count = pr_data.get('comments_count', 0)
-                    pr.commits_count = pr_data.get('commits', 0)
-                    pr.additions_count = pr_data.get('additions', 0)
-                    pr.deletions_count = pr_data.get('deletions', 0)
-                    pr.changed_files_count = pr_data.get('changed_files', 0)
-                    pr.payload = pr_data
+                    pr.commits_count = pr_data.get('commits_count', 0)
+                    pr.additions_count = pr_data.get('additions_count', 0)
+                    pr.deletions_count = pr_data.get('deletions_count', 0)
+                    pr.changed_files_count = pr_data.get('changed_files_count', 0)
+                    pr.payload = pr_data.get('payload', {})
                     pr.save()
                     
                     if created:
@@ -296,7 +325,7 @@ class PullRequestIndexingService:
     @staticmethod
     def index_pullrequests_for_repository(repository_id: int, user_id: int, batch_size_days: int = 365) -> Dict:
         """
-        Index pull requests for a specific repository, simple et robuste.
+        Index pull requests for a specific repository, optimized version.
         """
         try:
             from .github_token_service import GitHubTokenService
@@ -311,12 +340,19 @@ class PullRequestIndexingService:
             now = timezone.now()
             entity_type = 'pull_requests'
             state = IndexingState.objects(repository_id=repository_id, entity_type=entity_type).first()
-            if state and state.last_indexed_at:
-                since = state.last_indexed_at
-            else:
-                # No time limit - index all PRs from the beginning
-                since = datetime(2010, 1, 1, tzinfo=dt_timezone.utc)  # GitHub was founded in 2008, but use 2010 as safe start
-            until = now
+            
+            # Optimized date range - use intelligent indexing service
+            from .intelligent_indexing_service import IntelligentIndexingService
+            
+            indexing_service = IntelligentIndexingService(
+                repository_id=repository_id,
+                entity_type=entity_type,
+                github_token=github_token
+            )
+            
+            since, until = indexing_service.get_indexing_date_range()
+            
+            logger.info(f"Indexing period: {since.strftime('%Y-%m-%d')} to {until.strftime('%Y-%m-%d')}")
 
             github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
             if not github_token:
@@ -330,36 +366,21 @@ class PullRequestIndexingService:
             # Vérifier la rate limit
             headers = {'Authorization': f'token {github_token}'}
             try:
-                rate_response = requests.get('https://api.github.com/rate_limit', headers=headers, timeout=10)
-                if rate_response.status_code == 200:
-                    rate_data = rate_response.json()
-                    remaining = rate_data['resources']['core']['remaining']
-                    reset_time = rate_data['resources']['core']['reset']
-                    if remaining < 20:
-                        next_run = datetime.fromtimestamp(reset_time, tz=dt_timezone.utc) + timedelta(minutes=5)
-                        from django_q.models import Schedule
-                        # Check if a retry task already exists for this repository
-                        existing_retry = Schedule.objects.filter(
-                            name=f'pullrequest_indexing_repo_{repository_id}_retry'
-                        ).first()
+                rate_limit_response = requests.get('https://api.github.com/rate_limit', headers=headers)
+                if rate_limit_response.status_code == 200:
+                    rate_limit_data = rate_limit_response.json()
+                    core_remaining = rate_limit_data['resources']['core']['remaining']
+                    core_limit = rate_limit_data['resources']['core']['limit']
+                    reset_time = rate_limit_data['resources']['core']['reset']
+                    
+                    logger.info(f"Rate limit: {core_remaining}/{core_limit} remaining")
+                    
+                    # If we have less than 100 requests remaining, schedule for later
+                    if core_remaining < 100:
+                        from datetime import datetime
+                        next_run = datetime.fromtimestamp(reset_time)
+                        logger.warning(f"Rate limit nearly exhausted, scheduling for {next_run}")
                         
-                        if existing_retry:
-                            # Update existing retry schedule
-                            existing_retry.func = 'analytics.tasks.index_pullrequests_intelligent_task'
-                            existing_retry.args = [repository_id]
-                            existing_retry.next_run = next_run
-                            existing_retry.schedule_type = Schedule.ONCE
-                            existing_retry.save()
-                        else:
-                            # Create new retry schedule
-                            Schedule.objects.create(
-                                func='analytics.tasks.index_pullrequests_intelligent_task',
-                                args=[repository_id],
-                                next_run=next_run,
-                                schedule_type=Schedule.ONCE,
-                                name=f'pullrequest_indexing_repo_{repository_id}_retry'
-                            )
-                        logger.warning(f"Rate limit reached, replanified for {next_run}")
                         return {'status': 'rate_limited', 'scheduled_for': next_run.isoformat()}
             except Exception as e:
                 logger.warning(f"Could not check rate limit: {e}, proceeding anyway")

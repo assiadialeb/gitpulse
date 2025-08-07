@@ -4,7 +4,8 @@ Fetches and processes GitHub deployments using the Intelligent Indexing Service
 """
 import logging
 import requests
-from datetime import datetime
+import time
+from datetime import datetime, timezone as dt_timezone
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
 
@@ -26,7 +27,7 @@ class DeploymentIndexingService:
         Args:
             owner: Repository owner
             repo: Repository name
-            token: GitHub API token
+            token: GitHub API token (can be None for public repos)
             since: Start date (inclusive)
             until: End date (inclusive)
             
@@ -34,10 +35,11 @@ class DeploymentIndexingService:
             List of deployment dictionaries from GitHub API
         """
         url = f"https://api.github.com/repos/{owner}/{repo}/deployments"
-        headers = {
-            "Authorization": f"token {token}",
-            "Accept": "application/vnd.github.v3+json"
-        }
+        
+        # For public repos, we can fetch without authentication
+        headers = {"Accept": "application/vnd.github.v3+json"}
+        if token:
+            headers["Authorization"] = f"token {token}"
         
         deployments = []
         page = 1
@@ -75,13 +77,12 @@ class DeploymentIndexingService:
                             created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
                             
                             # Ensure all dates are timezone-aware for comparison
-                            from django.utils import timezone
                             if since.tzinfo is None:
-                                since = timezone.make_aware(since)
+                                since = since.replace(tzinfo=dt_timezone.utc)
                             if until.tzinfo is None:
-                                until = timezone.make_aware(until)
+                                until = until.replace(tzinfo=dt_timezone.utc)
                             if created_at.tzinfo is None:
-                                created_at = timezone.make_aware(created_at)
+                                created_at = created_at.replace(tzinfo=dt_timezone.utc)
                             
                             if since <= created_at <= until:
                                 filtered_batch.append(deployment)
@@ -103,9 +104,12 @@ class DeploymentIndexingService:
                 page += 1
                 
                 # Protection against infinite loops
-                if page > 50:  # Max 5000 deployments per batch
-                    logger.warning(f"Hit maximum page limit (50) for {owner}/{repo} deployments")
+                if page > 20:  # Max 2000 deployments per batch
+                    logger.warning(f"Hit maximum page limit (20) for {owner}/{repo} deployments")
                     break
+                
+                # Rate limit protection - pause between pages
+                time.sleep(0.1)  # 100ms pause between pages
                     
             except requests.exceptions.RequestException as e:
                 logger.error(f"Error fetching deployments from GitHub API: {e}")
@@ -115,31 +119,39 @@ class DeploymentIndexingService:
         return deployments
     
     @staticmethod
-    def fetch_deployment_statuses(owner: str, repo: str, deployment_id: str, token: str) -> List[Dict]:
+    def fetch_deployment_statuses(owner: str, repo: str, deployment_id: str, token: str = None) -> List[Dict]:
         """
-        Fetch deployment statuses for a specific deployment
+        Fetch deployment statuses from GitHub API
         
         Args:
             owner: Repository owner
             repo: Repository name
             deployment_id: Deployment ID
-            token: GitHub API token
+            token: GitHub API token (can be None for public repos)
             
         Returns:
-            List of deployment status dictionaries
+            List of deployment status dictionaries from GitHub API
         """
         url = f"https://api.github.com/repos/{owner}/{repo}/deployments/{deployment_id}/statuses"
-        headers = {
-            "Authorization": f"token {token}",
-            "Accept": "application/vnd.github.v3+json"
-        }
+        
+        # For public repos, we can fetch without authentication
+        headers = {"Accept": "application/vnd.github.v3+json"}
+        if token:
+            headers["Authorization"] = f"token {token}"
         
         try:
             response = requests.get(url, headers=headers)
+            
+            # Handle 403 Forbidden (no access to private repo)
+            if response.status_code == 403:
+                logger.warning(f"Access denied to deployment statuses for {owner}/{repo} (403 Forbidden)")
+                return []
+            
             response.raise_for_status()
             return response.json()
+            
         except requests.exceptions.RequestException as e:
-            logger.warning(f"Error fetching deployment statuses for {deployment_id}: {e}")
+            logger.warning(f"Error fetching deployment statuses: {e}")
             return []
     
     @staticmethod
@@ -209,8 +221,60 @@ class DeploymentIndexingService:
                 deployment.created_at = created_at
                 deployment.updated_at = updated_at
                 deployment.payload = deployment_data.get('payload', {})
-                if created:
-                    deployment.statuses = []  # Initialize statuses for new deployments
+                
+                # Fetch deployment statuses (optimized - only for new deployments or if statuses are missing)
+                if created or not deployment.statuses:
+                    try:
+                        # Extract owner and repo from repository_full_name
+                        if repository_full_name and '/' in repository_full_name:
+                            owner, repo = repository_full_name.split('/')
+                            
+                            # Try to get user token for better permissions
+                            user_token = None
+                            try:
+                                from allauth.socialaccount.models import SocialToken, SocialApp
+                                from django.contrib.auth.models import User
+                                
+                                # Get first user with a token
+                                social_app = SocialApp.objects.filter(provider='github').first()
+                                if social_app:
+                                    social_token = SocialToken.objects.filter(app=social_app).first()
+                                    if social_token:
+                                        user_token = social_token.token
+                                        logger.debug(f"Using user token for deployment statuses")
+                            except Exception as e:
+                                logger.debug(f"Could not get user token: {e}")
+                            
+                            # Try with user token first, then without token for public repos
+                            statuses = []
+                            if user_token:
+                                try:
+                                    statuses = DeploymentIndexingService.fetch_deployment_statuses(
+                                        owner, repo, deployment_id, user_token
+                                    )
+                                    logger.debug(f"Fetched {len(statuses)} statuses with user token for deployment {deployment_id}")
+                                except Exception as e:
+                                    logger.debug(f"Failed to fetch statuses with user token: {e}")
+                            
+                            # If no statuses found with user token, try without token (for public repos)
+                            if not statuses:
+                                try:
+                                    statuses = DeploymentIndexingService.fetch_deployment_statuses(
+                                        owner, repo, deployment_id, None
+                                    )
+                                    logger.debug(f"Fetched {len(statuses)} statuses without token for deployment {deployment_id}")
+                                except Exception as e:
+                                    logger.debug(f"Failed to fetch statuses without token: {e}")
+                            
+                            deployment.statuses = statuses
+                            logger.debug(f"Fetched {len(statuses)} statuses for deployment {deployment_id}")
+                        else:
+                            deployment.statuses = []
+                            logger.warning(f"Could not extract owner/repo from {repository_full_name}")
+                    except Exception as e:
+                        logger.warning(f"Error fetching statuses for deployment {deployment_id}: {e}")
+                        deployment.statuses = []
+                
                 deployment.save()
                 
                 if created:
@@ -230,57 +294,91 @@ class DeploymentIndexingService:
     def index_deployments_for_repository(repository_id: int, user_id: int, 
                                        batch_size_days: int = 30) -> Dict:
         """
-        Index deployments for a specific repository using intelligent indexing
-        
-        Args:
-            repository_id: Repository ID
-            user_id: User ID (owner of the repository)
-            batch_size_days: Number of days per batch
-            
-        Returns:
-            Dictionary with indexing results
+        Index deployments for a specific repository, optimized version.
         """
         try:
             from .github_token_service import GitHubTokenService
             from repositories.models import Repository
-            
-            # Get repository info
+            from analytics.models import IndexingState
+            from datetime import timedelta
+            from django.utils import timezone
+            import requests
+            logger = logging.getLogger(__name__)
+
             repository = Repository.objects.get(id=repository_id)
+            now = timezone.now()
+            entity_type = 'deployments'
+            state = IndexingState.objects(repository_id=repository_id, entity_type=entity_type).first()
             
-            # Get GitHub token (simplified approach)
-            github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+            # Optimized date range - use intelligent indexing service
+            from .intelligent_indexing_service import IntelligentIndexingService
             
-            if not github_token:
-                # Fallback to any available token
-                github_token = GitHubTokenService._get_user_token(user_id)
-                if not github_token:
-                    github_token = GitHubTokenService._get_oauth_app_token()
-            
-            if not github_token:
-                logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
-                return {
-                    'status': 'skipped',
-                    'reason': 'No GitHub token available',
-                    'repository_id': repository_id,
-                    'repository_full_name': repository.full_name
-                }
-            
-            # Initialize intelligent indexing service
             indexing_service = IntelligentIndexingService(
                 repository_id=repository_id,
-                entity_type='deployments',
+                entity_type=entity_type,
                 github_token=github_token
             )
             
-            # Run indexing batch
-            result = indexing_service.index_batch(
-                fetch_function=DeploymentIndexingService.fetch_deployments_from_github,
-                process_function=DeploymentIndexingService.process_deployments,
-                batch_size_days=batch_size_days
+            since, until = indexing_service.get_indexing_date_range()
+            
+            logger.info(f"Indexing period: {since.strftime('%Y-%m-%d')} to {until.strftime('%Y-%m-%d')}")
+
+            github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+            if not github_token:
+                github_token = GitHubTokenService._get_user_token(user_id)
+                if not github_token:
+                    github_token = GitHubTokenService._get_oauth_app_token()
+            if not github_token:
+                logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
+                return {'status': 'skipped', 'reason': 'No GitHub token available', 'repository_id': repository_id}
+
+            # Vérifier la rate limit
+            headers = {'Authorization': f'token {github_token}'}
+            try:
+                rate_limit_response = requests.get('https://api.github.com/rate_limit', headers=headers)
+                if rate_limit_response.status_code == 200:
+                    rate_limit_data = rate_limit_response.json()
+                    core_remaining = rate_limit_data['resources']['core']['remaining']
+                    core_limit = rate_limit_data['resources']['core']['limit']
+                    reset_time = rate_limit_data['resources']['core']['reset']
+                    
+                    logger.info(f"Rate limit: {core_remaining}/{core_limit} remaining")
+                    
+                    # If we have less than 100 requests remaining, schedule for later
+                    if core_remaining < 100:
+                        from datetime import datetime
+                        next_run = datetime.fromtimestamp(reset_time)
+                        logger.warning(f"Rate limit nearly exhausted, scheduling for {next_run}")
+                        
+                        return {'status': 'rate_limited', 'scheduled_for': next_run.isoformat()}
+            except Exception as e:
+                logger.warning(f"Could not check rate limit: {e}, proceeding anyway")
+
+            # Extraire owner et repo depuis full_name
+            owner, repo = repository.full_name.split('/', 1)
+            deployments = DeploymentIndexingService.fetch_deployments_from_github(
+                owner=owner,
+                repo=repo,
+                token=github_token,
+                since=since,
+                until=until
             )
-            
-            return result
-            
+            processed = DeploymentIndexingService.process_deployments(deployments)
+
+            if not state:
+                state = IndexingState(repository_id=repository_id, entity_type=entity_type, repository_full_name=repository.full_name)
+            state.last_indexed_at = until
+            state.status = 'completed'
+            state.save()
+
+            logger.info(f"Indexed {processed} deployments for {repository.full_name} from {since} to {until}")
+            return {
+                'status': 'success',
+                'processed': processed,
+                'repository_id': repository_id,
+                'repository_full_name': repository.full_name,
+                'date_range': {'since': since.isoformat(), 'until': until.isoformat()}
+            }
         except Exception as e:
             logger.error(f"Error indexing deployments for repository {repository_id}: {e}")
             raise 
