@@ -18,7 +18,14 @@
                     </ul>
                 </nav>
                 <h1 class="text-3xl font-bold text-gray-900">{{ repository.name }}</h1>
-                <p class="text-gray-600">{{ repository.full_name }}</p>
+                <p class="text-gray-600">
+                    <a href="{{ repository.html_url }}" target="_blank" class="hover:text-blue-600 transition-colors duration-200">
+                        {{ repository.full_name }}
+                        <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                    </a>
+                </p>
                 {% if repository.description %}
                     <p class="text-gray-500 mt-2">{{ repository.description }}</p>
                 {% endif %}
@@ -59,12 +66,7 @@
                         Index Repository
                     </button>
                 {% endif %}
-                <a href="{{ repository.html_url }}" target="_blank" class="btn btn-outline">
-                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
-                    View on GitHub
-                </a>
+
                 <button onclick="deleteRepository({{ repository.id }})" class="btn btn-error">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -82,13 +84,16 @@
                     <p class="text-xl font-semibold text-gray-900">{{ repository.language|default:"N/A" }}</p>
                 </div>
                 <div>
-                    <h3 class="text-sm font-medium text-gray-500">Stars</h3>
-                    <p class="text-xl font-semibold text-gray-900">{{ repository.stargazers_count|default:0 }}</p>
+                    <h3 class="text-sm font-medium text-gray-500">KLOC</h3>
+                    <p class="text-xl font-semibold text-gray-900">
+                        {% if repository.kloc > 0 %}
+                            {{ repository.kloc|floatformat:1 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
                 </div>
-                <div>
-                    <h3 class="text-sm font-medium text-gray-500">Forks</h3>
-                    <p class="text-xl font-semibold text-gray-900">{{ repository.forks_count|default:0 }}</p>
-                </div>
+
                 <div>
                     <h3 class="text-sm font-medium text-gray-500">Visibility</h3>
                     <p class="text-xl font-semibold text-gray-900">
