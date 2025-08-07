@@ -222,8 +222,21 @@ class DeploymentIndexingService:
                 deployment.updated_at = updated_at
                 deployment.payload = deployment_data.get('payload', {})
                 
-                # Fetch deployment statuses (optimized - only for new deployments or if statuses are missing)
-                if created or not deployment.statuses:
+                # Fetch deployment statuses (refresh logic: new/missing, non-terminal, or metadata changed)
+                refresh_needed = created or not deployment.statuses
+                if not refresh_needed:
+                    try:
+                        last_state = str((deployment.statuses or [{}])[-1].get('state', '')).lower()
+                    except Exception:
+                        last_state = ''
+                    non_terminal_states = {'pending', 'in_progress', 'queued', 'waiting'}
+                    if last_state in non_terminal_states:
+                        refresh_needed = True
+                    # Refresh if GitHub updated_at changed
+                    if not refresh_needed and updated_at and (getattr(deployment, 'updated_at', None) != updated_at):
+                        refresh_needed = True
+
+                if refresh_needed:
                     try:
                         # Extract owner and repo from repository_full_name
                         if repository_full_name and '/' in repository_full_name:

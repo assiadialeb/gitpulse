@@ -1391,10 +1391,32 @@ def repository_deployments_list(request, repo_id):
                     # If any error occurs, keep the original creator name
                     pass
             
-            # Get latest status
+            # Determine effective status to display
             latest_status = None
+            effective_status = None
             if deployment.statuses:
-                latest_status = deployment.statuses[-1]  # Last status is the most recent
+                try:
+                    def _parse_iso(ts_str):
+                        if not ts_str:
+                            return datetime.min
+                        try:
+                            return datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                        except Exception:
+                            return datetime.min
+
+                    statuses_sorted = sorted(
+                        deployment.statuses,
+                        key=lambda s: _parse_iso(s.get('created_at') or s.get('updated_at'))
+                    )
+                    latest_status = statuses_sorted[-1]
+                    # Prefer the last terminal outcome if present (error/failure/success)
+                    terminal = {'error', 'failure', 'success'}
+                    terminal_candidates = [s for s in statuses_sorted if str(s.get('state', '')).lower() in terminal]
+                    effective_status = terminal_candidates[-1] if terminal_candidates else latest_status
+                except Exception:
+                    # Fallback to first element if parsing/sorting fails
+                    latest_status = deployment.statuses[0]
+                    effective_status = latest_status
             
             deployments_data.append({
                 'deployment_id': deployment.deployment_id,
@@ -1402,10 +1424,10 @@ def repository_deployments_list(request, repo_id):
                 'creator': creator_name,
                 'created_at': deployment.created_at.isoformat() if deployment.created_at else None,
                 'updated_at': deployment.updated_at.isoformat() if deployment.updated_at else None,
-                'status': latest_status.get('state', 'unknown') if latest_status else 'unknown',
-                'status_description': latest_status.get('description', '') if latest_status else '',
+                'status': str((effective_status or {}).get('state', 'unknown')).lower(),
+                'status_description': (effective_status or {}).get('description', ''),
                 'status_count': len(deployment.statuses) if deployment.statuses else 0,
-                'url': latest_status.get('target_url', '') if latest_status else '',
+                'url': (effective_status or {}).get('target_url', ''),
             })
         
         # Calculate pagination info
