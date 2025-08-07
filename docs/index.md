@@ -35,6 +35,8 @@ I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs
 
 🔍 Repository Analytics: Dive into activity metrics and code quality signals per repository.
 
+🛡️ Security Health Score: Advanced security metrics with CodeQL integration and vulnerability analysis.
+
 ⚡ Live GitHub Sync: Realtime updates powered by the GitHub API, no manual refresh.
 
 🎯 Integrations: Many integrations OSS Index, Github, CycloneDX and more to come (sonarqube, Snyk...)
