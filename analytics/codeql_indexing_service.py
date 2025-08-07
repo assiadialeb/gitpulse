@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Tuple
 
 from .codeql_service import CodeQLService, get_codeql_service_for_user
 from .sanitization import assert_safe_repository_full_name
-from .models import CodeQLVulnerability, IndexingState
+from .models import CodeQLVulnerability, IndexingState, SecurityHealthHistory
 from .security_health_score_service import SecurityHealthScoreService
 
 logger = logging.getLogger(__name__)
@@ -390,7 +390,11 @@ class CodeQLIndexingService:
             # Format SHS display
             if shs_result['shs_score'] is not None:
                 shs_display = f"{shs_result['shs_score']}/100"
-                if shs_result['delta_shs'] != 0:
+                # Show trend starting from the 2nd analysis (stable if delta == 0)
+                history_count = SecurityHealthHistory.objects(
+                    repository_full_name=repository_full_name
+                ).count()
+                if history_count >= 2:
                     delta_text = f" ({shs_result['delta_shs']:+.1f})"
                     shs_display += delta_text
             else:
