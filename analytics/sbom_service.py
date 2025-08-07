@@ -61,7 +61,7 @@ class SBOMService:
                 '--include-vulnerabilities',
                 '--profile', 'license-compliance',
                 '-o', sbom_file,
-                repo_path
+                '.'
             ]
             
             logger.info(f"Executing cdxgen command: {' '.join(cmd)}")
@@ -74,7 +74,7 @@ class SBOMService:
                     capture_output=True,
                     text=True,
                     timeout=1800,  # 30 minutes timeout
-                    cwd=temp_dir
+                    cwd=repo_path
                 )
                 
                 if result.returncode != 0:

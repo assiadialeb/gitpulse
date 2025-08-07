@@ -469,7 +469,8 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=None, 
     """
     from repositories.models import Repository
     from analytics.models import PullRequest
-    from analytics.github_service import GitHubService
+from analytics.github_service import GitHubService
+from analytics.sanitization import assert_safe_repository_full_name
     from analytics.github_token_service import GitHubTokenService
     import dateutil.parser
     from datetime import timezone as dt_timezone, datetime
@@ -536,6 +537,7 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=None, 
                     for pr in prs:
                         pr_number = pr.get('number')
                         try:
+                            assert_safe_repository_full_name(repo_name)
                             obj = PullRequest.objects(
                                 application_id=None, 
                                 repository_full_name=repo_name, 
@@ -703,6 +705,7 @@ def fetch_all_pull_requests_detailed_task(max_pages_per_repo=50, max_repos_per_r
                                     # Utiliser les données détaillées au lieu des données de base
                                     pr = detailed_pr
                                 
+                                assert_safe_repository_full_name(repo_name)
                                 obj = PullRequest.objects(
                                     application_id=None, 
                                     repository_full_name=repo_name, 
@@ -1209,6 +1212,7 @@ def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
 
     try:
         repository = Repository.objects.get(id=repository_id)
+        assert_safe_repository_full_name(repository.full_name)
         user_id = repository.owner.id
         now = timezone.now()
         entity_type = 'deployments'
@@ -2088,6 +2092,7 @@ def generate_sbom_task(repository_id: int, force_generate: bool = False):
         
         # Check if SBOM already exists (unless forced)
         if not force_generate:
+            assert_safe_repository_full_name(repository.full_name)
             existing_sbom = SBOM.objects(repository_full_name=repository.full_name).first()
             if existing_sbom:
                 logger.info(f"SBOM already exists for {repository.full_name}, skipping")
@@ -2163,9 +2168,11 @@ def check_new_releases_and_generate_sbom_task():
                 results['repositories_checked'] += 1
                 
                 # Check if repository has any SBOM
+                assert_safe_repository_full_name(repo.full_name)
                 existing_sbom = SBOM.objects(repository_full_name=repo.full_name).first()
                 
                 # Check for new releases in the last 24 hours
+                assert_safe_repository_full_name(repo.full_name)
                 recent_releases = Release.objects(
                     repository_full_name=repo.full_name,
                     published_at__gte=timezone.now() - timedelta(days=1)
