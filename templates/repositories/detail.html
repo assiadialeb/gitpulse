@@ -780,8 +780,7 @@
 // Chart initialization
 {% if repository.is_indexed %}
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Licensing Status - same as slide-over
-    loadLicensingAnalysis();
+    // Note: licensing analysis is now lazy-loaded on slide-over open to avoid double scrolljump and initial cost
     
     // Commit Type Doughnut Chart
     {% if commit_types.counts %}
@@ -1092,6 +1091,7 @@ function updateSortIcons(activeColumn, direction) {
 let licensingAnalysisLoaded = false;
 
 function openLicensingAnalysis() {
+    document.body.classList.add('overflow-hidden');
     const slideOver = document.getElementById('licensing-slide-over');
     const slidePanel = document.getElementById('licensing-slide-panel');
     const content = document.getElementById('licensing-content');
@@ -1124,6 +1124,7 @@ function closeLicensingAnalysis() {
         // Clear content and reset loaded state
         content.innerHTML = '';
         licensingAnalysisLoaded = false;
+        document.body.classList.remove('overflow-hidden');
     }, 300);
 }
 
@@ -1487,6 +1488,7 @@ function displayLLMAnalysis(analysis, licenses) {
 let vulnerabilitiesAnalysisLoaded = false;
 
 function openVulnerabilitiesAnalysis() {
+    document.body.classList.add('overflow-hidden');
     const slideOver = document.getElementById('vulnerabilities-slide-over');
     const slidePanel = document.getElementById('vulnerabilities-slide-panel');
     const content = document.getElementById('vulnerabilities-content');
@@ -1519,6 +1521,7 @@ function closeVulnerabilitiesAnalysis() {
         // Clear content and reset loaded state
         content.innerHTML = '';
         vulnerabilitiesAnalysisLoaded = false;
+        document.body.classList.remove('overflow-hidden');
     }, 300);
 }
 
@@ -1735,8 +1738,10 @@ function getCommitTypeColor(commitType) {
 
 // SonarCloud Analysis Slide-over
 let sonarCloudLoaded = false;
+let sonarCloudChart = null;
 
 function openSonarCloudAnalysis() {
+    document.body.classList.add('overflow-hidden');
     const slideOver = document.getElementById('sonarcloud-slide-over');
     const slidePanel = document.getElementById('sonarcloud-slide-panel');
     
@@ -1753,10 +1758,17 @@ function openSonarCloudAnalysis() {
 function closeSonarCloudAnalysis() {
     const slideOver = document.getElementById('sonarcloud-slide-over');
     const slidePanel = document.getElementById('sonarcloud-slide-panel');
+    const content = document.getElementById('sonarcloud-content');
     
     slidePanel.classList.add('translate-x-full');
     setTimeout(() => {
         slideOver.classList.add('hidden');
+        // Offload content/state to free memory
+        try { if (sonarCloudChart && typeof sonarCloudChart.destroy === 'function') { sonarCloudChart.destroy(); } } catch (e) { /* noop */ }
+        sonarCloudChart = null;
+        content.innerHTML = '';
+        sonarCloudLoaded = false;
+        document.body.classList.remove('overflow-hidden');
     }, 300);
 }
 
@@ -1865,7 +1877,7 @@ function loadSonarCloudAnalysis() {
                         ]
                     };
                     
-                    new Chart(ctx, {
+                    sonarCloudChart = new Chart(ctx, {
                         type: 'line',
                         data: chartData,
                         options: {
@@ -1931,8 +1943,10 @@ function loadSonarCloudAnalysis() {
 
 // CodeQL Analysis Slide-over
 let codeQLLoaded = false;
+let codeQLChart = null;
 
 function openCodeQLAnalysis() {
+    document.body.classList.add('overflow-hidden');
     const slideOver = document.getElementById('codeql-slide-over');
     const slidePanel = document.getElementById('codeql-slide-panel');
     
@@ -1949,10 +1963,17 @@ function openCodeQLAnalysis() {
 function closeCodeQLAnalysis() {
     const slideOver = document.getElementById('codeql-slide-over');
     const slidePanel = document.getElementById('codeql-slide-panel');
+    const content = document.getElementById('codeql-content');
     
     slidePanel.classList.add('translate-x-full');
     setTimeout(() => {
         slideOver.classList.add('hidden');
+        // Offload content/state to free memory
+        try { if (codeQLChart && typeof codeQLChart.destroy === 'function') { codeQLChart.destroy(); } } catch (e) { /* noop */ }
+        codeQLChart = null;
+        content.innerHTML = '';
+        codeQLLoaded = false;
+        document.body.classList.remove('overflow-hidden');
     }, 300);
 }
 
@@ -2049,7 +2070,7 @@ function loadCodeQLAnalysis() {
                         ]
                     };
                     
-                    new Chart(ctx, {
+                    codeQLChart = new Chart(ctx, {
                         type: 'line',
                         data: chartData,
                         options: {
@@ -2118,6 +2139,7 @@ function loadCodeQLAnalysis() {
 }
 
 function openCommitsList() {
+    document.body.classList.add('overflow-hidden');
     const slideOver = document.getElementById('commits-slide-over');
     const slidePanel = document.getElementById('commits-slide-panel');
     
@@ -2132,10 +2154,13 @@ function openCommitsList() {
 function closeCommitsList() {
     const slideOver = document.getElementById('commits-slide-over');
     const slidePanel = document.getElementById('commits-slide-panel');
+    const content = document.getElementById('commits-content');
     
     slidePanel.classList.add('translate-x-full');
     setTimeout(() => {
         slideOver.classList.add('hidden');
+        if (content) { content.innerHTML = ''; }
+        document.body.classList.remove('overflow-hidden');
     }, 300);
 }
 
@@ -2315,6 +2340,7 @@ function displayCommitsList(data) {
 
 // Releases List Functions
 function openReleasesList() {
+    document.body.classList.add('overflow-hidden');
     const slideOver = document.getElementById('releases-slide-over');
     const slidePanel = document.getElementById('releases-slide-panel');
     
@@ -2329,10 +2355,13 @@ function openReleasesList() {
 function closeReleasesList() {
     const slideOver = document.getElementById('releases-slide-over');
     const slidePanel = document.getElementById('releases-slide-panel');
+    const content = document.getElementById('releases-content');
     
     slidePanel.classList.add('translate-x-full');
     setTimeout(() => {
         slideOver.classList.add('hidden');
+        if (content) { content.innerHTML = ''; }
+        document.body.classList.remove('overflow-hidden');
     }, 300);
 }
 
@@ -2515,6 +2544,7 @@ function displayReleasesList(data) {
 
 // Deployments List Functions
 function openDeploymentsList() {
+    document.body.classList.add('overflow-hidden');
     const slideOver = document.getElementById('deployments-slide-over');
     const slidePanel = document.getElementById('deployments-slide-panel');
     
@@ -2529,10 +2559,13 @@ function openDeploymentsList() {
 function closeDeploymentsList() {
     const slideOver = document.getElementById('deployments-slide-over');
     const slidePanel = document.getElementById('deployments-slide-panel');
+    const content = document.getElementById('deployments-content');
     
     slidePanel.classList.add('translate-x-full');
     setTimeout(() => {
         slideOver.classList.add('hidden');
+        if (content) { content.innerHTML = ''; }
+        document.body.classList.remove('overflow-hidden');
     }, 300);
 }
 
