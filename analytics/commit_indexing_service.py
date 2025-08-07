@@ -360,6 +360,8 @@ class CommitIndexingService:
                 batch_size_days=batch_size_days
             )
             
+
+            
             return result
             
         except Exception as e:

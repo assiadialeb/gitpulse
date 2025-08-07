@@ -813,4 +813,66 @@ class CodeQLVulnerability(Document):
             fixed_at = self.fixed_at.replace(tzinfo=dt_timezone.utc)
         else:
             fixed_at = self.fixed_at
-        return (now - fixed_at).days <= days 
+        return (now - fixed_at).days <= days
+
+
+class RepositoryKLOCHistory(Document):
+    """MongoDB document for storing KLOC history per repository"""
+    
+    # Repository information
+    repository_full_name = fields.StringField(required=True, max_length=255)
+    repository_id = fields.IntField(required=True)
+    
+    # KLOC data
+    kloc = fields.FloatField(required=True)  # Kilo Lines of Code
+    total_lines = fields.IntField(required=True)  # Total lines of code
+    language_breakdown = fields.DictField(default={})  # {'Python': 1500, 'JavaScript': 800}
+    
+    # Calculation metadata
+    calculated_at = fields.DateTimeField(required=True, default=lambda: datetime.now(dt_timezone.utc))
+    calculation_duration = fields.FloatField(default=0.0)  # Duration in seconds
+    
+    # File statistics
+    total_files = fields.IntField(default=0)
+    code_files = fields.IntField(default=0)
+    
+    # Error handling
+    calculation_error = fields.StringField(null=True)
+    calculation_success = fields.BooleanField(default=True)
+    
+    # MongoDB settings
+    meta = {
+        'collection': 'repository_kloc_history',
+        'indexes': [
+            'repository_full_name',
+            'repository_id',
+            'calculated_at',
+            'kloc',
+            ('repository_full_name', 'calculated_at'),
+            ('repository_id', 'calculated_at'),
+        ]
+    }
+    
+    def __str__(self):
+        return f"KLOC History for {self.repository_full_name}: {self.kloc:.2f} KLOC at {self.calculated_at}"
+    
+    @property
+    def kloc_formatted(self):
+        """Get formatted KLOC value"""
+        if self.kloc >= 1000:
+            return f"{self.kloc/1000:.1f} MLOC"
+        else:
+            return f"{self.kloc:.1f} KLOC"
+    
+    @property
+    def top_languages(self):
+        """Get top 3 languages by line count"""
+        if not self.language_breakdown:
+            return []
+        
+        sorted_languages = sorted(
+            self.language_breakdown.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+        return sorted_languages[:3]

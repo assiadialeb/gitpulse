@@ -31,6 +31,10 @@ class Repository(models.Model):
     last_indexed = models.DateTimeField(null=True, blank=True)
     commit_count = models.IntegerField(default=0)
     
+    # KLOC (Kilo Lines of Code) tracking
+    kloc = models.FloatField(default=0.0)  # Current KLOC value
+    kloc_calculated_at = models.DateTimeField(null=True, blank=True)  # When KLOC was last calculated
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

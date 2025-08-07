@@ -342,6 +342,55 @@ def background_indexing_task(repository_id: int, user_id: int, task_id: Optional
             repository.last_indexed = timezone.now()
             repository.save()
             
+            # Calculate KLOC after successful indexing
+            try:
+                from .kloc_service import KLOCService
+                from .models import RepositoryKLOCHistory
+                import tempfile
+                import os
+                
+                # Get repository path (same as GitService)
+                repo_path = os.path.join(tempfile.gettempdir(), f"gitpulse_{repository.full_name.replace('/', '_')}")
+                
+                if os.path.exists(repo_path):
+                    logger.info(f"Calculating KLOC for {repository.full_name}")
+                    kloc_service = KLOCService()
+                    kloc_data = kloc_service.calculate_kloc(repo_path)
+                    
+                    # Update repository with KLOC data
+                    repository.kloc = kloc_data['kloc']
+                    repository.kloc_calculated_at = timezone.now()
+                    repository.save()
+                    
+                    # Save KLOC history
+                    kloc_history = RepositoryKLOCHistory(
+                        repository_full_name=repository.full_name,
+                        repository_id=repository_id,
+                        kloc=kloc_data['kloc'],
+                        total_lines=kloc_data['total_lines'],
+                        language_breakdown=kloc_data['language_breakdown'],
+                        calculated_at=kloc_data['calculated_at'],
+                        total_files=len(kloc_data.get('language_breakdown', {})),
+                        code_files=sum(1 for ext in kloc_data.get('language_breakdown', {}).values() if ext > 0)
+                    )
+                    kloc_history.save()
+                    
+                    logger.info(f"KLOC calculation completed for {repository.full_name}: {kloc_data['kloc']:.2f} KLOC")
+                    
+                    # Add KLOC info to results
+                    results['kloc'] = {
+                        'value': kloc_data['kloc'],
+                        'total_lines': kloc_data['total_lines'],
+                        'languages': len(kloc_data['language_breakdown']),
+                        'calculated_at': kloc_data['calculated_at'].isoformat()
+                    }
+                else:
+                    logger.warning(f"Repository not cloned at {repo_path}, skipping KLOC calculation")
+                    
+            except Exception as kloc_error:
+                logger.error(f"Error calculating KLOC for {repository.full_name}: {kloc_error}")
+                # Don't fail the entire indexing process if KLOC calculation fails
+            
             logger.info(f"Completed indexing for repository {repository.full_name}")
             
         except Exception as e:

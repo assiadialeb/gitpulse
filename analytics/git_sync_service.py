@@ -173,6 +173,9 @@ class GitSyncService:
                 repo_path = self.git_service.clone_repository(repo_url, repo_full_name, self.github_token)
                 print(f"DEBUG: Successfully cloned {repo_full_name} to {repo_path}")
                 logger.info(f"Successfully cloned {repo_full_name} to {repo_path}")
+                
+
+                
             except Exception as clone_error:
                 print(f"DEBUG: Failed to clone {repo_full_name}: {clone_error}")
                 logger.error(f"Failed to clone {repo_full_name}: {clone_error}")

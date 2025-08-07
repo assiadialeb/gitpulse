@@ -95,7 +95,7 @@ def repository_list(request):
     order = request.GET.get('order', 'asc')
     
     # Validate sort fields
-    allowed_sort_fields = ['name', 'full_name', 'language', 'stars', 'forks', 'is_indexed', 'created_at']
+    allowed_sort_fields = ['name', 'full_name', 'language', 'kloc', 'is_indexed', 'created_at']
     if sort_by not in allowed_sort_fields:
         sort_by = 'full_name'
     
@@ -133,8 +133,7 @@ def repository_list(request):
                 'full_name': repo.full_name,
                 'description': repo.description or '',
                 'language': repo.language or '',
-                'stars': repo.stars,
-                'forks': repo.forks,
+                'kloc': repo.kloc,
                 'is_indexed': repo.is_indexed,
                 'private': repo.private,
                 'fork': repo.fork,
