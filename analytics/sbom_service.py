@@ -453,6 +453,14 @@ class SBOMService:
             raise Exception("Repository path must be absolute")
         if not os.path.isdir(real):
             raise Exception("Repository path must be an existing directory")
+        # Ensure path is within an allowed base directory (system temp or configured work dir)
+        import tempfile
+        allowed_bases = [os.path.realpath(tempfile.gettempdir())]
+        work_dir = os.environ.get('GITPULSE_WORK_DIR')
+        if work_dir:
+            allowed_bases.append(os.path.realpath(work_dir))
+        if not any(os.path.commonpath([real, base]) == base for base in allowed_bases):
+            raise Exception("Repository path is outside allowed directories")
         # Ensure this is a git repository directory (heuristic)
         git_dir = os.path.join(real, '.git')
         if not os.path.exists(git_dir):
