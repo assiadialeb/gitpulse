@@ -288,6 +288,8 @@ class CodeQLIndexingService:
         Returns:
             Number of vulnerabilities removed
         """
+        # Validate input before querying
+        assert_safe_repository_full_name(repository_full_name)
         # Find open vulnerabilities not in current GitHub alerts
         obsolete_vulns = CodeQLVulnerability.objects(
             repository_full_name=repository_full_name,
