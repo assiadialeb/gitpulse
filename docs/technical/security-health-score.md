@@ -13,11 +13,11 @@ The Security Health Score (SHS) is a sophisticated metric that evaluates the sec
 The SHS calculation follows this mathematical model:
 
 ```
-SHS = 100 × (1 – exp(–α × score_surface))
+SHS = 100 × exp(–α × score_surface)
 ```
 
 Where:
-- `α` = 0.5 (saturation parameter)
+- `α` = 0.5 (decay parameter)
 - `score_surface` = total_weighted_vulnerabilities ÷ KLOC
 
 ### Vulnerability Weighting
@@ -39,12 +39,13 @@ The score is normalized by repository size (KLOC) to enable fair comparison acro
 score_surface = Σ(vulnerability_count × severity_weight) ÷ KLOC
 ```
 
-### Saturation Function
+### Exponential Decay Function
 
-The exponential saturation function ensures:
+The exponential decay function ensures:
 - Scores are bounded between 0-100
-- Intuitive interpretation (higher = better)
-- Diminishing returns for very high vulnerability counts
+- Intuitive interpretation (higher = better security)
+- Exponential penalty for high vulnerability density
+- Fair comparison across repositories of different sizes
 
 ## Implementation Details
 

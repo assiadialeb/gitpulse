@@ -86,8 +86,8 @@ class SecurityHealthScoreService:
             # Calculate surface score
             score_surface = total_weight / kloc
             
-            # Apply saturation function
-            shs_score = 100 * (1 - math.exp(-self.alpha * score_surface))
+            # Apply exponential decay function (higher vulnerabilities = lower score)
+            shs_score = 100 * math.exp(-self.alpha * score_surface)
             
             # Get delta from previous analysis
             delta_shs = self._calculate_delta_shs(repository_full_name, shs_score)
