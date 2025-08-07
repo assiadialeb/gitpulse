@@ -1092,11 +1092,41 @@ def repository_commits_list(request, repo_id):
         # Serialize commits
         commits_data = []
         for commit in commits:
+            # Get real developer name if available
+            author_name = commit.author_name
+            author_email = commit.author_email
+            
+            # Try to find the developer alias by name or email
+            if commit.author_name or commit.author_email:
+                from analytics.models import DeveloperAlias
+                from developers.models import Developer
+                
+                try:
+                    # Try to find by name first (case insensitive)
+                    alias = None
+                    if commit.author_name:
+                        alias = DeveloperAlias.objects.filter(
+                            name__iexact=commit.author_name
+                        ).first()
+                    
+                    # If not found by name, try by email
+                    if not alias and commit.author_email:
+                        alias = DeveloperAlias.objects.filter(
+                            email__iexact=commit.author_email
+                        ).first()
+                    
+                    if alias and alias.developer:
+                        author_name = alias.developer.primary_name
+                        # Keep the original email for display
+                except Exception:
+                    # If any error occurs, keep the original author name
+                    pass
+            
             commits_data.append({
                 'sha': commit.sha,
                 'message': commit.message,
-                'author_name': commit.author_name,
-                'author_email': commit.author_email,
+                'author_name': author_name,
+                'author_email': author_email,
                 'authored_date': commit.authored_date.isoformat() if commit.authored_date else None,
                 'committed_date': commit.committed_date.isoformat() if commit.committed_date else None,
                 'additions': commit.additions,
@@ -1207,11 +1237,29 @@ def repository_releases_list(request, repo_id):
         # Serialize releases
         releases_data = []
         for release in releases:
+            # Get real developer name if available
+            author_name = release.author
+            if release.author:
+                from analytics.models import DeveloperAlias
+                from developers.models import Developer
+                
+                # Try to find the developer alias by name (pseudo GitHub) - case insensitive
+                try:
+                    alias = DeveloperAlias.objects.filter(
+                        name__iexact=release.author
+                    ).first()
+                    
+                    if alias and alias.developer:
+                        author_name = alias.developer.primary_name
+                except Exception:
+                    # If any error occurs, keep the original author name
+                    pass
+            
             releases_data.append({
                 'release_id': release.release_id,
                 'tag_name': release.tag_name,
                 'name': release.name,
-                'author': release.author,
+                'author': author_name,
                 'published_at': release.published_at.isoformat() if release.published_at else None,
                 'draft': release.draft,
                 'prerelease': release.prerelease,
@@ -1319,6 +1367,26 @@ def repository_deployments_list(request, repo_id):
         # Serialize deployments
         deployments_data = []
         for deployment in deployments:
+            # Get real developer name if available
+            creator_name = deployment.creator
+            
+            # Try to find the developer alias by name
+            if deployment.creator:
+                from analytics.models import DeveloperAlias
+                from developers.models import Developer
+                
+                try:
+                    # Try to find by name (case insensitive)
+                    alias = DeveloperAlias.objects.filter(
+                        name__iexact=deployment.creator
+                    ).first()
+                    
+                    if alias and alias.developer:
+                        creator_name = alias.developer.primary_name
+                except Exception:
+                    # If any error occurs, keep the original creator name
+                    pass
+            
             # Get latest status
             latest_status = None
             if deployment.statuses:
@@ -1327,7 +1395,7 @@ def repository_deployments_list(request, repo_id):
             deployments_data.append({
                 'deployment_id': deployment.deployment_id,
                 'environment': deployment.environment,
-                'creator': deployment.creator,
+                'creator': creator_name,
                 'created_at': deployment.created_at.isoformat() if deployment.created_at else None,
                 'updated_at': deployment.updated_at.isoformat() if deployment.updated_at else None,
                 'status': latest_status.get('state', 'unknown') if latest_status else 'unknown',
