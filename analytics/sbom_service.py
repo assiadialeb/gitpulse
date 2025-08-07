@@ -21,6 +21,21 @@ logger = logging.getLogger(__name__)
 class SBOMService:
     """Service for generating and processing SBOMs"""
     
+    def _validate_repo_path(self, repo_path: str):
+        """
+        Validate that the repo_path is an absolute path within the system temp directory.
+        Raises an exception if the path is invalid.
+        """
+        temp_dir = tempfile.gettempdir()
+        abs_repo_path = os.path.abspath(repo_path)
+        abs_temp_dir = os.path.abspath(temp_dir)
+        if not abs_repo_path.startswith(abs_temp_dir + os.sep):
+            logger.error(f"Invalid repo_path: {repo_path} is not within temp directory {temp_dir}")
+            raise ValueError("Invalid repository path for SBOM generation.")
+        if not os.path.isdir(abs_repo_path):
+            logger.error(f"Invalid repo_path: {repo_path} is not a directory")
+            raise ValueError("Repository path for SBOM generation is not a directory.")
+    
     def __init__(self, repository_full_name: str, user_id: int):
         self.repository_full_name = repository_full_name
         self.user_id = user_id
@@ -36,6 +51,7 @@ class SBOMService:
         Returns:
             Dictionary with SBOM data and metadata
         """
+        self._validate_repo_path(repo_path)
         logger.info(f"Generating SBOM for {self.repository_full_name} at {repo_path}")
         
         # Prepare environment variables
