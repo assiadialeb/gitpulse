@@ -2,6 +2,7 @@
 CodeQL Indexing Service with intelligent state management
 """
 import logging
+import re
 from datetime import datetime, timezone as dt_timezone, timedelta
 from typing import Dict, List, Optional, Tuple
 
@@ -39,6 +40,8 @@ class CodeQLIndexingService:
             Dictionary with indexing results
         """
         logger.info(f"Starting CodeQL indexing for repository {repository_full_name}")
+        # Validate repository_full_name to prevent NoSQL injection
+        self._assert_safe_repository_full_name(repository_full_name)
         
         results = {
             'repository_id': repository_id,
@@ -305,6 +308,9 @@ class CodeQLIndexingService:
         Returns:
             Latest analysis date or None if no analysis found
         """
+        # Validate repository_full_name to prevent NoSQL injection
+        self._assert_safe_repository_full_name(repository_full_name)
+
         latest_vuln = CodeQLVulnerability.objects(
             repository_full_name=repository_full_name
         ).order_by('-analyzed_at').first()
@@ -323,6 +329,8 @@ class CodeQLIndexingService:
             Dictionary with security metrics including SHS
         """
         try:
+            # Validate repository_full_name to prevent NoSQL injection
+            self._assert_safe_repository_full_name(repository_full_name)
             # Get repository KLOC
             from repositories.models import Repository
             try:
@@ -385,6 +393,14 @@ class CodeQLIndexingService:
                 'severity_counts': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0},
                 'latest_analysis': None
             }
+
+    def _assert_safe_repository_full_name(self, repository_full_name: str) -> None:
+        """Ensure repository_full_name matches expected pattern owner/repo with safe characters."""
+        if not isinstance(repository_full_name, str):
+            raise ValueError("repository_full_name must be a string")
+        pattern = re.compile(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
+        if not pattern.match(repository_full_name):
+            raise ValueError("Invalid repository_full_name format")
     
     def should_reindex(self, repository_full_name: str, force: bool = False) -> bool:
         """

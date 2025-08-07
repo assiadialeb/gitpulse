@@ -245,14 +245,24 @@ class GitService:
             parsed = urlparse(repo_url)
             if parsed.scheme != 'https' or not parsed.netloc:
                 raise GitServiceError("Invalid repository URL")
-            if not parsed.netloc.endswith('github.com'):
-                raise GitServiceError("Only GitHub host is allowed for cloning")
-            if not parsed.path or owner not in parsed.path or repo.split('.git')[0] not in parsed.path:
+            host = (parsed.hostname or '').lower()
+            if host != 'github.com':
+                raise GitServiceError("Only github.com host is allowed for cloning")
+            path_parts = parsed.path.strip('/').split('/')
+            if len(path_parts) < 2:
+                raise GitServiceError("Repository URL path is invalid")
+            repo_no_git = repo[:-4] if repo.endswith('.git') else repo
+            expected_repo_names = {repo_no_git, f"{repo_no_git}.git"}
+            if path_parts[0] != owner or path_parts[1] not in expected_repo_names:
                 raise GitServiceError("Repository URL does not match repository full name")
         elif repo_url.startswith('git@'):
-            if not repo_url.startswith('git@github.com:'):
-                raise GitServiceError("Only GitHub SSH URLs are allowed")
-            if f":{owner}/{repo}" not in repo_url:
+            # Strict SSH format: git@github.com:owner/repo(.git)?
+            m = re.match(r'^git@github\.com:([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(\.git)?$', repo_url)
+            if not m:
+                raise GitServiceError("Only GitHub SSH URLs are allowed (git@github.com:owner/repo[.git])")
+            owner_m, repo_m, _ = m.groups()
+            repo_no_git = repo[:-4] if repo.endswith('.git') else repo
+            if owner_m != owner or repo_m != repo_no_git:
                 raise GitServiceError("SSH URL does not match repository full name")
         else:
             raise GitServiceError("Unsupported repository URL scheme")
@@ -268,9 +278,14 @@ class GitService:
             return repo_url
         if repo_url.startswith('https://'):
             parsed = urlparse(repo_url)
-            if not parsed.netloc.endswith('github.com'):
+            host = (parsed.hostname or '').lower()
+            if host != 'github.com':
                 return repo_url
-            netloc = f"{github_token}@{parsed.netloc}"
+            # Preserve port if present
+            netloc_host = host
+            if parsed.port:
+                netloc_host = f"{host}:{parsed.port}"
+            netloc = f"{github_token}@{netloc_host}"
             return urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
         return repo_url
     
