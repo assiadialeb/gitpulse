@@ -99,6 +99,9 @@ class GitService:
                 if github_token and clone_url != repo_url:
                     logger.info(f"Using authenticated clone URL for {repo_full_name}")
                 
+                # Validate arguments for git commands
+                self._assert_safe_git_args(clone_url, repo_dir)
+
                 # First try: clone normally with LFS disabled
                 result = subprocess.run(
                     ['git', 'clone', '--quiet', clone_url, repo_dir],
@@ -122,23 +125,11 @@ class GitService:
                     # Clone with multiple strategies for robustness
                     clone_strategies = [
                         # Strategy 1: Shallow clone without LFS (fastest, most reliable)
-                        [
-                            'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
-                            '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
-                            'clone', '--depth=1', '--no-single-branch', '--quiet', clone_url, repo_dir
-                        ],
+                        self._build_git_command('clone', clone_url, repo_dir, extra=['--depth=1', '--no-single-branch', '--quiet'], disable_lfs=True),
                         # Strategy 2: Full clone without LFS (if shallow fails)
-                        [
-                            'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
-                            '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
-                            'clone', '--quiet', clone_url, repo_dir
-                        ],
+                        self._build_git_command('clone', clone_url, repo_dir, extra=['--quiet'], disable_lfs=True),
                         # Strategy 3: Bare clone (minimal, no working directory)
-                        [
-                            'git', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', 
-                            '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
-                            'clone', '--bare', '--quiet', clone_url, repo_dir
-                        ]
+                        self._build_git_command('clone', clone_url, repo_dir, extra=['--bare', '--quiet'], disable_lfs=True),
                     ]
                     
                     result = None
@@ -187,9 +178,8 @@ class GitService:
                             time.sleep(3)
                             
                             # Try minimal clone (depth=1, single branch)
-                            minimal_result = subprocess.run([
-                                'git', 'clone', '--depth=1', '--single-branch', '--quiet', clone_url, repo_dir
-                            ], capture_output=True, text=True, timeout=180, env=env)
+                            minimal_cmd = self._build_git_command('clone', clone_url, repo_dir, extra=['--depth=1', '--single-branch', '--quiet'], disable_lfs=False)
+                            minimal_result = subprocess.run(minimal_cmd, capture_output=True, text=True, timeout=180, env=env)
                             
                             if minimal_result.returncode == 0:
                                 logger.info(f"Successfully cloned {repo_full_name} with minimal clone after pack error")
@@ -229,6 +219,45 @@ class GitService:
                 raise GitServiceError(f"Timeout while cloning repository {repo_full_name}")
             except Exception as e:
                 raise GitServiceError(f"Error cloning repository {repo_full_name}: {str(e)}")
+
+    def _assert_safe_git_args(self, clone_url: str, repo_dir: str) -> None:
+        """Additional safety checks to ensure args used in subprocess are controlled."""
+        # No whitespace or control characters
+        for s in (clone_url, repo_dir):
+            if any(ch.isspace() for ch in s) or '\x00' in s:
+                raise GitServiceError("Unsafe whitespace or null byte in arguments")
+
+        # clone_url must be validated HTTPS or SSH GitHub URL
+        if clone_url.startswith('https://'):
+            parsed = urlparse(clone_url)
+            host = (parsed.hostname or '').lower()
+            if host != 'github.com':
+                raise GitServiceError("Invalid clone URL host")
+        elif clone_url.startswith('git@'):
+            if not re.match(r'^git@github\.com:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(\.git)?$', clone_url):
+                raise GitServiceError("Invalid SSH clone URL format")
+        else:
+            raise GitServiceError("Unsupported clone URL scheme")
+
+        # Ensure repo_dir is within the configured temp_dir
+        temp_root = os.path.realpath(self.temp_dir)
+        repo_real = os.path.realpath(repo_dir)
+        if not repo_real.startswith(temp_root + os.sep):
+            raise GitServiceError("Repository directory escapes temp directory")
+
+    def _build_git_command(self, action: str, clone_url: str, repo_dir: str, extra: Optional[List[str]] = None, disable_lfs: bool = False) -> List[str]:
+        """Construct a safe git command with whitelisted args."""
+        if action != 'clone':
+            raise GitServiceError("Unsupported git action")
+        self._assert_safe_git_args(clone_url, repo_dir)
+        base = ['git']
+        if disable_lfs:
+            base.extend(['-c', 'filter.lfs.clean=', '-c', 'filter.lfs.smudge=', '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false'])
+        cmd = base + ['clone']
+        if extra:
+            cmd.extend(extra)
+        cmd.extend([clone_url, repo_dir])
+        return cmd
 
     def _validate_repo_inputs(self, repo_url: str, repo_full_name: str) -> None:
         """Validate repository URL and full name to prevent unsafe command arguments."""
