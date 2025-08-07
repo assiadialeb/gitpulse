@@ -10,7 +10,9 @@ from mongoengine import Q
 from mongoengine.errors import NotUniqueError
 
 from .models import Commit, SyncLog, RepositoryStats
+from .sanitization import assert_safe_repository_full_name
 from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
+from repositories.models import Application
 from .github_token_service import GitHubTokenService
 from .services import RateLimitService
 
@@ -158,6 +160,7 @@ class SyncService:
         
         try:
             # Get or create repository stats (MongoEngine way)
+            assert_safe_repository_full_name(repo_full_name)
             repo_stats = RepositoryStats.objects(repository_full_name=repo_full_name).first()
             created = False
             if not repo_stats:
@@ -305,6 +308,7 @@ class SyncService:
                     continue
                 
                 # Check if commit already exists for this repository
+                assert_safe_repository_full_name(repo_full_name)
                 existing_commit = Commit.objects(sha=sha, repository_full_name=repo_full_name).first()
                 
                 if existing_commit:
@@ -319,6 +323,7 @@ class SyncService:
                     #     if (datetime.now(dt_timezone.utc) - synced_at).days < 1:
                     #         results['commits_skipped'] += 1
                     #         continue
+                    pass
                 
                 # Get detailed commit data if basic data doesn't have file changes
                 if 'files' not in commit_data or 'stats' not in commit_data:
@@ -333,6 +338,7 @@ class SyncService:
                     except GitHubAPIError as e:
                         logger.warning(f"Could not fetch details for commit {sha}: {e}")
                         # Continue with basic data
+                        pass
                 
                 # Parse commit data
                 parsed_data = self.github_service.parse_commit_data(
@@ -384,6 +390,7 @@ class SyncService:
             repo_stats.oldest_commit_date = oldest_commit['authored_date']
         
         # Update commit count
+        assert_safe_repository_full_name(repo_stats.repository_full_name)
         repo_stats.total_commits = Commit.objects(repository_full_name=repo_stats.repository_full_name).count()
         
         # Update last sync time
