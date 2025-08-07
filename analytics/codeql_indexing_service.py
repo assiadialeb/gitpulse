@@ -121,6 +121,7 @@ class CodeQLIndexingService:
             
             # Process alerts
             processed_alert_ids = []
+            open_alert_ids = []  # track IDs of alerts that are currently open on GitHub
             
             for alert_data in alerts:
                 try:
@@ -134,6 +135,10 @@ class CodeQLIndexingService:
                         vulnerability_id=vulnerability.vulnerability_id
                     ).first()
                     
+                    # Track current open alerts regardless of DB state
+                    if vulnerability.state == 'open':
+                        open_alert_ids.append(vulnerability.vulnerability_id)
+
                     if existing:
                         # Update existing vulnerability
                         self._update_vulnerability(existing, vulnerability)
@@ -151,10 +156,11 @@ class CodeQLIndexingService:
                     logger.error(error_msg)
                     results['errors'].append(error_msg)
             
-            # Remove vulnerabilities that are no longer in GitHub (if they were open)
-            if processed_alert_ids:
+            # Remove open vulnerabilities that are no longer open on GitHub
+            # Use only IDs that are still open to avoid deleting fixed/dismissed entries
+            if open_alert_ids:
                 removed_count = self._remove_obsolete_vulnerabilities(
-                    repository_full_name, processed_alert_ids
+                    repository_full_name, open_alert_ids
                 )
                 results['vulnerabilities_removed'] = removed_count
             

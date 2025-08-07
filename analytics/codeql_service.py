@@ -222,6 +222,24 @@ class CodeQLService:
             }
             mapped_severity = severity_mapping.get(raw_severity.lower(), 'medium')
             
+            # Normalize precision (confidence) values to allowed choices
+            raw_precision = (rule_info.get('precision') or 'medium').lower()
+            precision_mapping = {
+                'very-high': 'high',
+                'high': 'high',
+                'medium': 'medium',
+                'low': 'low'
+            }
+            mapped_confidence = precision_mapping.get(raw_precision, 'medium')
+            
+            # Normalize dismissed reason to allowed choices (store None if not recognized)
+            raw_dismissed_reason = alert_data.get('dismissed_reason')
+            normalized_dismissed_reason = None
+            if raw_dismissed_reason:
+                tmp = raw_dismissed_reason.lower().replace("'", "").replace(' ', '_').replace('-', '_')
+                if tmp in {'false_positive', 'wont_fix', 'used_in_tests'}:
+                    normalized_dismissed_reason = tmp
+            
             # Create vulnerability instance
             vulnerability = CodeQLVulnerability(
                 repository_full_name=repo_full_name,
@@ -230,9 +248,9 @@ class CodeQLService:
                 rule_description=rule_info.get('description', ''),
                 rule_name=rule_info.get('name', ''),
                 severity=mapped_severity,
-                confidence=rule_info.get('precision', 'medium').lower(),
-                state=alert_data.get('state', 'open').lower(),
-                dismissed_reason=alert_data.get('dismissed_reason'),
+                confidence=mapped_confidence,
+                state=(alert_data.get('state') or 'open').lower(),
+                dismissed_reason=normalized_dismissed_reason,
                 dismissed_comment=alert_data.get('dismissed_comment'),
                 file_path=location.get('path'),
                 start_line=location.get('start_line'),
