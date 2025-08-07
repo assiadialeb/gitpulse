@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple
 
 from .codeql_service import CodeQLService, get_codeql_service_for_user
 from .models import CodeQLVulnerability, IndexingState
+from .security_health_score_service import SecurityHealthScoreService
 
 logger = logging.getLogger(__name__)
 
@@ -304,45 +305,80 @@ class CodeQLIndexingService:
         
         return latest_vuln.analyzed_at if latest_vuln else None
     
-    def get_repository_security_metrics(self, repository_full_name: str) -> Dict:
+    def get_repository_security_metrics(self, repository_full_name: str, repository_id: int = None) -> Dict:
         """
-        Get comprehensive security metrics for a repository
+        Get comprehensive security metrics for a repository including SHS
         
         Args:
             repository_full_name: Repository full name
+            repository_id: Repository ID (optional, for SHS calculation)
             
         Returns:
-            Dictionary with security metrics
+            Dictionary with security metrics including SHS
         """
-        # Get all vulnerabilities for this repository
-        vulnerabilities = list(CodeQLVulnerability.objects(
-            repository_full_name=repository_full_name
-        ))
-        
-        if not vulnerabilities:
+        try:
+            # Get repository KLOC
+            from repositories.models import Repository
+            try:
+                repository = Repository.objects.get(full_name=repository_full_name)
+                kloc = repository.kloc or 0.0
+                if repository_id is None:
+                    repository_id = repository.id
+            except Repository.DoesNotExist:
+                kloc = 0.0
+                if repository_id is None:
+                    repository_id = 0
+            
+            # Calculate SHS (always calculate, even for existing data)
+            shs_service = SecurityHealthScoreService()
+            shs_result = shs_service.calculate_shs(repository_full_name, repository_id, kloc)
+            
+            # Get latest vulnerabilities for additional info
+            vulnerabilities = list(CodeQLVulnerability.objects(
+                repository_full_name=repository_full_name
+            ))
+            
+            if shs_result['status'] == 'not_available':
+                return {
+                    'shs_score': None,
+                    'shs_display': 'Not available',
+                    'shs_message': shs_result['message'],
+                    'delta_shs': 0.0,
+                    'total_vulnerabilities': 0,
+                    'severity_counts': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0},
+                    'latest_analysis': None
+                }
+            
+            # Format SHS display
+            if shs_result['shs_score'] is not None:
+                shs_display = f"{shs_result['shs_score']}/100"
+                if shs_result['delta_shs'] != 0:
+                    delta_text = f" ({shs_result['delta_shs']:+.1f})"
+                    shs_display += delta_text
+            else:
+                shs_display = "Not available"
+            
             return {
-                'level': 'safe',
-                'level_display': 'Safe',
-                'total_vulnerabilities': 0,
-                'open_vulnerabilities': 0,
-                'critical_count': 0,
-                'high_count': 0,
-                'medium_count': 0,
-                'low_count': 0,
-                'categories': {},
-                'trend': 'stable',
-                'last_analysis': None
+                'shs_score': shs_result['shs_score'],
+                'shs_display': shs_display,
+                'shs_message': shs_result['message'],
+                'delta_shs': shs_result['delta_shs'],
+                'total_vulnerabilities': shs_result['total_vulnerabilities'],
+                'severity_counts': shs_result['severity_counts'],
+                'latest_analysis': self.get_latest_analysis_date(repository_full_name)
             }
-        
-        # Use CodeQL service to calculate metrics
-        codeql_service = CodeQLService()
-        metrics = codeql_service.calculate_security_level(vulnerabilities)
-        
-        # Add additional metrics
-        metrics['last_analysis'] = self.get_latest_analysis_date(repository_full_name)
-        metrics['open_vulnerabilities'] = len([v for v in vulnerabilities if v.state == 'open'])
-        
-        return metrics
+            
+        except Exception as e:
+            logger.error(f"Error getting security metrics for {repository_full_name}: {e}")
+            return {
+                'shs_score': None,
+                'shs_display': 'Error',
+                'shs_message': f'Error: {str(e)}',
+                'delta_shs': 0.0,
+                'total_vulnerabilities': 0,
+                'severity_counts': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0},
+                'latest_analysis': None
+            }
     
     def should_reindex(self, repository_full_name: str, force: bool = False) -> bool:
         """

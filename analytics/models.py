@@ -876,3 +876,35 @@ class RepositoryKLOCHistory(Document):
             reverse=True
         )
         return sorted_languages[:3]
+
+
+class SecurityHealthHistory(Document):
+    """Historical Security Health Score data"""
+    
+    repository_full_name = fields.StringField(required=True)
+    repository_id = fields.IntField(required=True)
+    shs_score = fields.FloatField(required=True)  # 0-100
+    delta_shs = fields.FloatField(default=0.0)  # Change from previous analysis
+    calculated_at = fields.DateTimeField(required=True)
+    month = fields.StringField(required=True)  # YYYY-MM format for easy querying
+    
+    # Metadata
+    total_vulnerabilities = fields.IntField(default=0)
+    critical_count = fields.IntField(default=0)
+    high_count = fields.IntField(default=0)
+    medium_count = fields.IntField(default=0)
+    low_count = fields.IntField(default=0)
+    kloc = fields.FloatField(default=0.0)
+    
+    meta = {
+        'collection': 'security_health_history',
+        'indexes': [
+            'repository_full_name',
+            'repository_id',
+            'calculated_at',
+            'month'
+        ]
+    }
+    
+    def __str__(self):
+        return f"SHS {self.repository_full_name}: {self.shs_score:.1f}/100 ({self.calculated_at})"

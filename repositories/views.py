@@ -53,34 +53,30 @@ def _get_codeql_metrics(repository, user_id: int):
         # Get CodeQL indexing service
         indexing_service = get_codeql_indexing_service_for_user(user_id)
         
-        # Get repository security metrics
-        metrics = indexing_service.get_repository_security_metrics(repository.full_name)
+        # Get repository security metrics with SHS
+        metrics = indexing_service.get_repository_security_metrics(repository.full_name, repository.id)
         
         # Add status information
-        if metrics['total_vulnerabilities'] == 0 and metrics.get('last_analysis') is None:
+        if metrics['total_vulnerabilities'] == 0 and metrics.get('latest_analysis') is None:
             # No data at all - likely CodeQL not available
             metrics['status'] = 'not_available'
         else:
             metrics['status'] = 'available'
         
-        logger.info(f"Retrieved CodeQL metrics for {repository.full_name}: {metrics['total_vulnerabilities']} vulnerabilities")
+        logger.info(f"Retrieved CodeQL metrics for {repository.full_name}: {metrics['total_vulnerabilities']} vulnerabilities, SHS: {metrics.get('shs_display', 'N/A')}")
         return metrics
         
     except Exception as e:
         logger.error(f"Error getting CodeQL metrics for repository {repository.full_name}: {e}")
         return {
             'status': 'not_available',
-            'level': 'safe',
-            'level_display': 'Safe',
+            'shs_score': None,
+            'shs_display': 'Error',
+            'shs_message': f'Error: {str(e)}',
+            'delta_shs': 0.0,
             'total_vulnerabilities': 0,
-            'open_count': 0,
-            'critical_count': 0,
-            'high_count': 0,
-            'medium_count': 0,
-            'low_count': 0,
-            'categories': {},
-            'trend': 'stable',
-            'last_analysis': None
+            'severity_counts': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0},
+            'latest_analysis': None
         }
 
 
@@ -1466,8 +1462,8 @@ def repository_codeql_analysis(request, repo_id):
         # Get CodeQL indexing service
         indexing_service = get_codeql_indexing_service_for_user(request.user.id)
         
-        # Get repository security metrics
-        codeql_metrics = indexing_service.get_repository_security_metrics(repository.full_name)
+        # Get repository security metrics with SHS
+        codeql_metrics = indexing_service.get_repository_security_metrics(repository.full_name, repository.id)
         
         # Get detailed vulnerability data if available
         vulnerabilities = []
@@ -1500,10 +1496,13 @@ def repository_codeql_analysis(request, repo_id):
                 logger.warning(f"Could not fetch detailed vulnerability data: {e}")
         
         # Add status information
-        if codeql_metrics['total_vulnerabilities'] == 0 and codeql_metrics.get('last_analysis') is None:
+        if codeql_metrics['total_vulnerabilities'] == 0 and codeql_metrics.get('latest_analysis') is None:
             codeql_metrics['status'] = 'not_available'
         else:
             codeql_metrics['status'] = 'available'
+        
+        # Add repository KLOC
+        codeql_metrics['kloc'] = repository.kloc or 0.0
         
         # Add vulnerabilities to metrics
         codeql_metrics['vulnerabilities'] = vulnerabilities
