@@ -448,21 +448,29 @@ class SBOMService:
             raise Exception("Invalid repository path")
         if '\x00' in repo_path:
             raise Exception("Invalid null byte in path")
-        real = os.path.realpath(repo_path)
-        if not os.path.isabs(real):
+        repo_path_obj = Path(repo_path).resolve()
+        if not repo_path_obj.is_absolute():
             raise Exception("Repository path must be absolute")
-        if not os.path.isdir(real):
+        if not repo_path_obj.is_dir():
             raise Exception("Repository path must be an existing directory")
         # Ensure path is within an allowed base directory (system temp or configured work dir)
         import tempfile
-        allowed_bases = [os.path.realpath(tempfile.gettempdir())]
+        allowed_base_paths = [Path(tempfile.gettempdir()).resolve()]
         work_dir = os.environ.get('GITPULSE_WORK_DIR')
         if work_dir:
-            allowed_bases.append(os.path.realpath(work_dir))
-        if not any(os.path.commonpath([real, base]) == base for base in allowed_bases):
+            allowed_base_paths.append(Path(work_dir).resolve())
+
+        def _is_within(base: Path, path: Path) -> bool:
+            try:
+                path.relative_to(base)
+                return True
+            except Exception:
+                return False
+
+        if not any(_is_within(base, repo_path_obj) or repo_path_obj == base for base in allowed_base_paths):
             raise Exception("Repository path is outside allowed directories")
         # Ensure this is a git repository directory (heuristic)
-        git_dir = os.path.join(real, '.git')
-        if not os.path.exists(git_dir):
+        git_dir = repo_path_obj.joinpath('.git')
+        if not git_dir.exists():
             # Allow non-git repos for SBOM if needed, but still restrict to directory
-            logger.warning(f"Path {real} does not contain a .git directory")
+            logger.warning(f"Path {str(repo_path_obj)} does not contain a .git directory")
