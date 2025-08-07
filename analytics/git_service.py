@@ -2,6 +2,7 @@
 Git service for local repository operations
 """
 import os
+import re
 import subprocess
 import tempfile
 import shutil
@@ -12,6 +13,7 @@ from datetime import datetime, timezone as dt_timezone
 from typing import List, Dict, Optional, Tuple, Generator
 from pathlib import Path
 import json
+from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +70,11 @@ class GitService:
             logger.info(f"Acquired lock for cloning {repo_full_name}")
             
             try:
+                # Validate inputs and sanitize directory name
+                self._validate_repo_inputs(repo_url, repo_full_name)
+                safe_dir_name = self._sanitize_repo_dir_name(repo_full_name)
                 # Create unique directory for this repository
-                repo_dir = os.path.join(self.temp_dir, f"gitpulse_{repo_full_name.replace('/', '_')}")
+                repo_dir = os.path.join(self.temp_dir, f"gitpulse_{safe_dir_name}")
                 
                 # Check if already exists and is valid
                 if os.path.exists(repo_dir) and os.path.exists(os.path.join(repo_dir, '.git')):
@@ -90,13 +95,9 @@ class GitService:
                 env['GIT_LFS_SKIP_PUSH'] = '1'    # Skip LFS push
                 
                 # Prepare clone URL with authentication if token provided
-                clone_url = repo_url
-                if github_token and repo_url.startswith('https://'):
-                    # Inject token into HTTPS URL
-                    if 'github.com' in repo_url:
-                        # Format: https://token@github.com/owner/repo.git
-                        clone_url = repo_url.replace('https://', f'https://{github_token}@')
-                        logger.info(f"Using authenticated clone URL for {repo_full_name}")
+                clone_url = self._build_authenticated_url(repo_url, github_token)
+                if github_token and clone_url != repo_url:
+                    logger.info(f"Using authenticated clone URL for {repo_full_name}")
                 
                 # First try: clone normally with LFS disabled
                 result = subprocess.run(
@@ -187,7 +188,7 @@ class GitService:
                             
                             # Try minimal clone (depth=1, single branch)
                             minimal_result = subprocess.run([
-                                'git', 'clone', '--depth=1', '--single-branch', '--quiet', repo_url, repo_dir
+                                'git', 'clone', '--depth=1', '--single-branch', '--quiet', clone_url, repo_dir
                             ], capture_output=True, text=True, timeout=180, env=env)
                             
                             if minimal_result.returncode == 0:
@@ -228,6 +229,50 @@ class GitService:
                 raise GitServiceError(f"Timeout while cloning repository {repo_full_name}")
             except Exception as e:
                 raise GitServiceError(f"Error cloning repository {repo_full_name}: {str(e)}")
+
+    def _validate_repo_inputs(self, repo_url: str, repo_full_name: str) -> None:
+        """Validate repository URL and full name to prevent unsafe command arguments."""
+        # Validate full name like owner/repo with safe characters
+        if not isinstance(repo_full_name, str) or '/' not in repo_full_name:
+            raise GitServiceError("Invalid repository full name format")
+        owner, repo = repo_full_name.split('/', 1)
+        safe_pattern = re.compile(r'^[A-Za-z0-9_.-]+$')
+        if not safe_pattern.match(owner) or not safe_pattern.match(repo):
+            raise GitServiceError("Repository name contains invalid characters")
+
+        # Validate URL scheme and host
+        if repo_url.startswith('https://'):
+            parsed = urlparse(repo_url)
+            if parsed.scheme != 'https' or not parsed.netloc:
+                raise GitServiceError("Invalid repository URL")
+            if not parsed.netloc.endswith('github.com'):
+                raise GitServiceError("Only GitHub host is allowed for cloning")
+            if not parsed.path or owner not in parsed.path or repo.split('.git')[0] not in parsed.path:
+                raise GitServiceError("Repository URL does not match repository full name")
+        elif repo_url.startswith('git@'):
+            if not repo_url.startswith('git@github.com:'):
+                raise GitServiceError("Only GitHub SSH URLs are allowed")
+            if f":{owner}/{repo}" not in repo_url:
+                raise GitServiceError("SSH URL does not match repository full name")
+        else:
+            raise GitServiceError("Unsupported repository URL scheme")
+
+    def _sanitize_repo_dir_name(self, repo_full_name: str) -> str:
+        """Create a safe directory name from owner/repo."""
+        flattened = repo_full_name.replace('/', '_')
+        return re.sub(r'[^A-Za-z0-9_.-]', '_', flattened)
+
+    def _build_authenticated_url(self, repo_url: str, github_token: Optional[str]) -> str:
+        """Return a URL with embedded token for HTTPS GitHub URLs; otherwise the original URL."""
+        if not github_token:
+            return repo_url
+        if repo_url.startswith('https://'):
+            parsed = urlparse(repo_url)
+            if not parsed.netloc.endswith('github.com'):
+                return repo_url
+            netloc = f"{github_token}@{parsed.netloc}"
+            return urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+        return repo_url
     
     def get_repo_path(self, repo_full_name: str) -> str:
         """
