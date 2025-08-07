@@ -31,10 +31,11 @@ The score is normalized by repository size (KLOC - Kilo Lines of Code):
 - Formula: `weighted_vulnerabilities ÷ KLOC`
 
 #### 3. Score Calculation
-GitPulse applies a saturation function to create an intuitive 0-100 scale:
+GitPulse applies an exponential decay function to create an intuitive 0-100 scale:
 - **Higher scores** = Better security posture
 - **Lower scores** = Higher security risk
 - **100/100** = Perfect security (no vulnerabilities)
+- **0/100** = Critical security issues (many high-severity vulnerabilities)
 
 ### Interpreting Your SHS
 

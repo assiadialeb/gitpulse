@@ -33,10 +33,10 @@ Our SHS implementation uses a weighted scoring system:
    - Score = Weighted vulnerabilities ÷ KLOC (Kilo Lines of Code)
    - This normalizes risk across repositories of different sizes
 
-3. **Saturation Function**:
-   - SHS = 100 × (1 – exp(–0.5 × score))
+3. **Exponential Decay Function**:
+   - SHS = 100 × exp(–0.5 × score)
    - Converts raw scores to a 0-100 scale
-   - Provides intuitive interpretation
+   - Provides intuitive interpretation (higher = better security)
 
 #### SHS Score Interpretation
 
