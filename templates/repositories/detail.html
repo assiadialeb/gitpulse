@@ -901,17 +901,27 @@ function setDateRange(days) {
         start.setDate(end.getDate() - days + 1);
     }
     
+    // Helper to format date in local timezone as YYYY-MM-DD
+    const formatDateLocal = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+    
     // Update form fields first
     const startDateField = document.getElementById('start-date');
     const endDateField = document.getElementById('end-date');
     
-    startDateField.value = start.toISOString().slice(0, 10);
-    endDateField.value = end.toISOString().slice(0, 10);
+    const startStr = formatDateLocal(start);
+    const endStr = formatDateLocal(end);
+    startDateField.value = startStr;
+    endDateField.value = endStr;
     
     // Build URL with the new dates
     const url = new URL(window.location.href);
-    url.searchParams.set('start', start.toISOString().slice(0, 10));
-    url.searchParams.set('end', end.toISOString().slice(0, 10));
+    url.searchParams.set('start', startStr);
+    url.searchParams.set('end', endStr);
     
     // Navigate to the new URL immediately
     window.location.href = url.toString();
@@ -926,9 +936,14 @@ window.addEventListener('DOMContentLoaded', () => {
         const end = new Date();
         const start = new Date();
         start.setDate(end.getDate() - 29); // 30 days ago
-        
-        startDate.value = start.toISOString().slice(0, 10);
-        endDate.value = end.toISOString().slice(0, 10);
+        const formatDateLocal = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+        startDate.value = formatDateLocal(start);
+        endDate.value = formatDateLocal(end);
     }
 });
 
