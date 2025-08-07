@@ -12,6 +12,7 @@ from mongoengine.errors import NotUniqueError
 
 from .models import Commit, SyncLog, RepositoryStats, FileChange
 from .git_service import GitService, GitServiceError
+from .sanitization import assert_safe_repository_full_name
 
 from .commit_classifier import classify_commit_with_files
 from analytics.models import DeveloperAlias
@@ -173,15 +174,13 @@ class GitSyncService:
                 repo_path = self.git_service.clone_repository(repo_url, repo_full_name, self.github_token)
                 print(f"DEBUG: Successfully cloned {repo_full_name} to {repo_path}")
                 logger.info(f"Successfully cloned {repo_full_name} to {repo_path}")
-                
-
-                
             except Exception as clone_error:
                 print(f"DEBUG: Failed to clone {repo_full_name}: {clone_error}")
                 logger.error(f"Failed to clone {repo_full_name}: {clone_error}")
                 raise
             
-            # Get or create repository stats
+            # Validate repository name before Mongo queries and get or create repository stats
+            assert_safe_repository_full_name(repo_full_name)
             repo_stats = RepositoryStats.objects(repository_full_name=repo_full_name).first()
             created = False
             if not repo_stats:
@@ -284,6 +283,7 @@ class GitSyncService:
                 logger.debug(f"Processing commit {sha[:8]} by {commit_data.get('author_name', 'unknown')}")
                 
                 # Check if commit already exists for this repository
+                assert_safe_repository_full_name(repo_full_name)
                 existing_commit = Commit.objects(sha=sha, repository_full_name=repo_full_name).first()
                 
                 if existing_commit:
@@ -421,9 +421,11 @@ class GitSyncService:
             repo_stats.first_commit_date = oldest_commit['authored_date']
         
         # Update totals
+        assert_safe_repository_full_name(repo_stats.repository_full_name)
         repo_stats.total_commits = Commit.objects(repository_full_name=repo_stats.repository_full_name).count()
         
         # Count unique authors
+        assert_safe_repository_full_name(repo_stats.repository_full_name)
         unique_authors = Commit.objects(repository_full_name=repo_stats.repository_full_name).distinct('author_email')
         repo_stats.total_authors = len(unique_authors)
         

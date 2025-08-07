@@ -7,6 +7,7 @@ from datetime import datetime, timezone as dt_timezone, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from .codeql_service import CodeQLService, get_codeql_service_for_user
+from .sanitization import assert_safe_repository_full_name
 from .models import CodeQLVulnerability, IndexingState
 from .security_health_score_service import SecurityHealthScoreService
 
@@ -84,6 +85,8 @@ class CodeQLIndexingService:
                 state.save()
                 return results
             
+            # Validate repository name before any Mongo queries
+            assert_safe_repository_full_name(repository_full_name)
             # Fetch all alerts from GitHub
             alerts, fetch_success = codeql_service.fetch_all_codeql_alerts(repository_full_name)
             
@@ -133,6 +136,7 @@ class CodeQLIndexingService:
                         continue
                     
                     # Check if vulnerability already exists
+                    assert_safe_repository_full_name(repository_full_name)
                     existing = CodeQLVulnerability.objects(
                         repository_full_name=repository_full_name,
                         vulnerability_id=vulnerability.vulnerability_id

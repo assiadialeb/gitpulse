@@ -7,6 +7,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from analytics.sanitization import assert_safe_repository_full_name
 import json
 from datetime import datetime, timedelta
 from django.utils import timezone
@@ -180,6 +181,8 @@ def repository_detail(request, repo_id):
     """Working repository detail view with proper charts"""
     try:
         repository = Repository.objects.get(id=repo_id)
+        # Validate before using repository.full_name in Mongo queries
+        assert_safe_repository_full_name(repository.full_name)
     except Repository.DoesNotExist:
         messages.error(request, "Repository not found.")
         return redirect('repositories:list')
@@ -263,6 +266,7 @@ def repository_detail(request, repo_id):
         # Get SBOM vulnerability data
         from analytics.models import SBOM, SBOMVulnerability
         # Get all SBOMs for this repository
+        # repository.full_name already validated above
         all_sboms = SBOM.objects(repository_full_name=repository.full_name).order_by('-generated_at')
         
         # Find the best SBOM (prefer one with vulnerabilities, then most recent)

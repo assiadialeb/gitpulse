@@ -37,6 +37,8 @@ class SBOMService:
             Dictionary with SBOM data and metadata
         """
         logger.info(f"Generating SBOM for {self.repository_full_name} at {repo_path}")
+        # Validate repository path before using it
+        self._assert_safe_repo_path(repo_path)
         
         # Prepare environment variables
         env = os.environ.copy()
@@ -55,7 +57,7 @@ class SBOMService:
             # Build cdxgen command
             cmd = [
                 'npx', '@cyclonedx/cdxgen',
-                '--no-install-deps'
+                '--no-install-deps',
                 '--include-vulnerabilities',
                 '--profile', 'license-compliance',
                 '-o', sbom_file,
@@ -128,6 +130,7 @@ class SBOMService:
             Basic SBOM data
         """
         logger.info(f"Creating basic SBOM for {self.repository_full_name}")
+        self._assert_safe_repo_path(repo_path)
         
         # Try to detect dependencies manually
         components = []
@@ -401,6 +404,7 @@ class SBOMService:
             List of license information
         """
         try:
+            self._assert_safe_repo_path(repo_path)
             # Check if cargo-license is available
             result = subprocess.run(['cargo', 'license', '--version'], 
                                   capture_output=True, text=True)
@@ -437,3 +441,20 @@ class SBOMService:
         except Exception as e:
             logger.error(f"Error extracting Rust licenses: {e}")
             return [] 
+
+    def _assert_safe_repo_path(self, repo_path: str) -> None:
+        """Validate that repo_path is a safe, existing directory and looks like a git repo."""
+        if not isinstance(repo_path, str) or not repo_path:
+            raise Exception("Invalid repository path")
+        if '\x00' in repo_path:
+            raise Exception("Invalid null byte in path")
+        real = os.path.realpath(repo_path)
+        if not os.path.isabs(real):
+            raise Exception("Repository path must be absolute")
+        if not os.path.isdir(real):
+            raise Exception("Repository path must be an existing directory")
+        # Ensure this is a git repository directory (heuristic)
+        git_dir = os.path.join(real, '.git')
+        if not os.path.exists(git_dir):
+            # Allow non-git repos for SBOM if needed, but still restrict to directory
+            logger.warning(f"Path {real} does not contain a .git directory")
