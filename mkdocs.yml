@@ -15,12 +15,12 @@ theme:
   language: en
   features:
     - navigation.expand
-    #- navigation.top
+    - navigation.top
     - search.highlight
     - search.suggest
     - content.code.annotate
     - content.tabs.link
-    - toc.integrate
+    #- toc.integrate
     #- header.autohide
   palette:
     - scheme: default
@@ -76,9 +76,20 @@ nav:
   - User Guide:
       - Overview: user-guide/overview.md
       - GitHub Setup: user-guide/github-setup.md
-      - Projects: user-guide/projects.md
-      - Analytics: user-guide/analytics.md
-      - Developers: user-guide/developers.md
+      - Repository :
+          - Overview: user-guide/repositories/overview.md
+          - Commit Frequency: user-guide/repositories/commit-frequency.md
+          - Commit Classification: user-guide/repositories/commit-classification.md
+          - Pull Requests: user-guide/repositories/pull-requests.md
+          - Releases: user-guide/repositories/releases.md
+          - Deployments: user-guide/repositories/deployments.md
+          - Security Health Score: user-guide/repositories/security-health-score.md
+          - SonarCloud Metrics: user-guide/repositories/sonarcloud-metrics.md
+          - Licensing: user-guide/repositories/licensing.md
+          
+      - Project Analytics:
+          - Overview: user-guide/projects/overview.md
+      - Developer Analytics: user-guide/developers.md
   - Technical Documentation:
       - Architecture: technical/architecture.md
       - API Reference: technical/api.md

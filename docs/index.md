@@ -43,13 +43,7 @@ I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs
 
 ---
 
-## 🎯 Who is it for?
 
-- **CTOs** who want a clear view of team productivity and project health
-- **Tech Leads** aiming to optimize engineering workflows
-- **Project Managers / POs** tracking delivery progress and team dynamics
-- **Developers** curious about their own or their team's contribution patterns
-- **Open Source Maintainers** monitoring community activity
 
 ---
 
@@ -98,13 +92,6 @@ python manage.py migrate
 python manage.py runserver
 ```
 ℹ️ Note: Don’t forget to review and adapt the .env file to match your local environment (e.g., database settings, GitHub token, debug mode, etc.).
-
-## 📚 Documentation
-
-- **[Getting Started](getting-started/quick-start.md)** - Quick setup guide
-- **[User Guide](user-guide/overview.md)** - How to use GitPulse
-- **[Technical Docs](technical/architecture.md)** - Architecture and API reference
-- **[Deployment](deployment/docker.md)** - Production deployment guide
 
 ## 🤝 Contributing
 
