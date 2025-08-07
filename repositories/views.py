@@ -1028,7 +1028,7 @@ def repository_vulnerabilities_analysis(request, repo_id):
         logger.error(f"Error in vulnerabilities analysis: {e}")
         return JsonResponse({
             'status': 'error',
-            'message': str(e)
+            'message': 'Internal server error'
         }, status=500)
 
 
@@ -1173,7 +1173,7 @@ def repository_commits_list(request, repo_id):
         logger.error(f"Error in commits list: {e}")
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'Internal server error'
         }, status=500)
 
 
@@ -1303,7 +1303,7 @@ def repository_releases_list(request, repo_id):
         logger.error(f"Error in releases list: {e}")
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'Internal server error'
         }, status=500)
 
 
@@ -1438,7 +1438,7 @@ def repository_deployments_list(request, repo_id):
         logger.error(f"Error in deployments list: {e}")
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'Internal server error'
         }, status=500)
 
 

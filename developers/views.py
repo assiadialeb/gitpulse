@@ -293,8 +293,8 @@ def search_teams_ajax(request):
             'teams': {},
             'total_count': 0,
             'search_query': search_query,
-            'error': teams_summary.get('error', 'Unknown error')
-        })
+            'error': 'Failed to load teams summary'
+        }, status=500)
     
     teams_data = teams_summary['teams']
     

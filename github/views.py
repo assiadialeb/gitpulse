@@ -186,10 +186,12 @@ def test_github_access(request):
         })
         
     except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error checking permissions: {e}")
         return JsonResponse({
             'success': False,
-            'error': str(e)
-        })
+            'error': 'Internal server error'
+        }, status=500)
 
 
 @login_required
@@ -263,9 +265,11 @@ def github_connection_status(request):
         })
         
     except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error getting token scopes: {e}")
         return JsonResponse({
-            'error': str(e)
-        })
+            'error': 'Internal server error'
+        }, status=500)
 
 
 def unified_setup(request):
