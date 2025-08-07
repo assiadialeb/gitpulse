@@ -206,21 +206,8 @@ class CodeQLService:
             # Extract location information
             location = most_recent_instance.get('location', {})
             
-            # Debug: Log the actual severity value from GitHub
-            raw_severity = rule_info.get('severity', 'medium')
-            logger.info(f"Raw severity from GitHub: '{raw_severity}' for alert {alert_data.get('id')}")
-            
-            # Map GitHub severity values to our model values
-            severity_mapping = {
-                'error': 'critical',
-                'warning': 'high', 
-                'note': 'medium',
-                'critical': 'critical',
-                'high': 'high',
-                'medium': 'medium',
-                'low': 'low'
-            }
-            mapped_severity = severity_mapping.get(raw_severity.lower(), 'medium')
+            # Determine severity using security-specific field when present
+            mapped_severity = self.map_github_severity(rule_info)
             
             # Normalize precision (confidence) values to allowed choices
             raw_precision = (rule_info.get('precision') or 'medium').lower()
@@ -277,6 +264,46 @@ class CodeQLService:
         except Exception as e:
             logger.error(f"Failed to process CodeQL alert {alert_data.get('id')}: {e}")
             return None
+
+    @staticmethod
+    def map_github_severity(rule_info: Dict) -> str:
+        """Map GitHub Code Scanning severity to our internal levels.
+
+        Prefer rule.security_severity_level (critical/high/medium/low) when available.
+        Fallback to rule.severity (error/warning/note) with a conservative mapping.
+        Also parse tags like 'security-severity: high' as a fallback.
+        """
+        try:
+            # 1) Prefer explicit security severity level
+            raw_sec = (rule_info.get('security_severity_level') or '').strip().lower()
+            if raw_sec in {'critical', 'high', 'medium', 'low'}:
+                return raw_sec
+
+            # 2) Check tags like 'security-severity: high'
+            tags = rule_info.get('tags', []) or []
+            for tag in tags:
+                if isinstance(tag, str) and tag.lower().startswith('security-severity'):
+                    # handle 'security-severity' or 'security-severity: high'
+                    parts = tag.split(':', 1)
+                    if len(parts) == 2:
+                        level = parts[1].strip().lower()
+                        if level in {'critical', 'high', 'medium', 'low'}:
+                            return level
+
+            # 3) Fallback to generic severity (error/warning/note)
+            raw = (rule_info.get('severity') or '').strip().lower()
+            fallback_map = {
+                'error': 'high',
+                'warning': 'medium',
+                'note': 'low',
+                'critical': 'critical',
+                'high': 'high',
+                'medium': 'medium',
+                'low': 'low',
+            }
+            return fallback_map.get(raw, 'medium')
+        except Exception:
+            return 'medium'
     
     def _extract_category(self, rule_info: Dict) -> str:
         """Extract security category from rule information"""

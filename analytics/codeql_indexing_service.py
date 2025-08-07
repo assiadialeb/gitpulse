@@ -261,6 +261,24 @@ class CodeQLIndexingService:
         existing.fixed_at = new_data.fixed_at
         existing.updated_at = new_data.updated_at or datetime.now(dt_timezone.utc)
         existing.payload = new_data.payload
+
+        # Keep severity/confidence in sync with GitHub (mapping may change over time)
+        if getattr(new_data, 'severity', None) and new_data.severity != existing.severity:
+            existing.severity = new_data.severity
+        if getattr(new_data, 'confidence', None) and new_data.confidence != existing.confidence:
+            existing.confidence = new_data.confidence
+
+        # Keep rule metadata in sync (name/description/category/CWE)
+        if getattr(new_data, 'rule_id', None):
+            existing.rule_id = new_data.rule_id
+        if getattr(new_data, 'rule_name', None):
+            existing.rule_name = new_data.rule_name
+        if getattr(new_data, 'rule_description', None):
+            existing.rule_description = new_data.rule_description
+        if getattr(new_data, 'category', None):
+            existing.category = new_data.category
+        if getattr(new_data, 'cwe_id', None):
+            existing.cwe_id = new_data.cwe_id
         
         # Update message if it changed
         if new_data.message and new_data.message != existing.message:
