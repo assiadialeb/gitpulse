@@ -1,34 +1,34 @@
-import os
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.http import JsonResponse
-from django.core.paginator import Paginator
-from django.db.models import Q, Sum
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from analytics.sanitization import assert_safe_repository_full_name
 import json
 from datetime import datetime, timedelta
-from django.utils import timezone
-from .models import Repository
-from analytics.github_token_service import GitHubTokenService
-from analytics.unified_metrics_service import UnifiedMetricsService
-from analytics.license_analysis_service import LicenseAnalysisService
-from analytics.llm_service import LLMService
-from analytics.sonarcloud_service import SonarCloudService
-from analytics.codeql_indexing_service import get_codeql_indexing_service_for_user
-from analytics.codeql_service import get_codeql_service_for_user
 import logging
 import uuid
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db.models import Q, Sum
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods
+
+from analytics.codeql_indexing_service import get_codeql_indexing_service_for_user
+from analytics.codeql_service import get_codeql_service_for_user
+from analytics.github_token_service import GitHubTokenService
+from analytics.license_analysis_service import LicenseAnalysisService
+from analytics.llm_service import LLMService
+from analytics.sanitization import assert_safe_repository_full_name
+from analytics.sonarcloud_service import SonarCloudService
+from analytics.unified_metrics_service import UnifiedMetricsService
+from .models import Repository
 logger = logging.getLogger(__name__)
 
 def _error_response(user_message: str, exc: Exception = None, status: int = 500):
     error_id = str(uuid.uuid4())
     if exc is not None:
-        logger.exception(f"{user_message} [error_id={error_id}]")
+        logger.exception("%s [error_id=%s]", user_message, error_id)
     else:
-        logger.error(f"{user_message} [error_id={error_id}]")
+        logger.error("%s [error_id=%s]", user_message, error_id)
     return JsonResponse({'success': False, 'message': user_message, 'error_id': error_id}, status=status)
 
 def _get_sonarcloud_metrics(repository_id: int):
@@ -36,10 +36,8 @@ def _get_sonarcloud_metrics(repository_id: int):
     try:
         sonar_service = SonarCloudService()
         return sonar_service.get_latest_metrics(repository_id)
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error getting SonarCloud metrics for repository {repository_id}: {e}")
+    except Exception:
+        logger.exception("Error getting SonarCloud metrics for repository %s", repository_id)
         return None
 
 
@@ -49,10 +47,8 @@ def _is_sonarcloud_configured():
         from sonarcloud.models import SonarCloudConfig
         config = SonarCloudConfig.get_config()
         return bool(config.access_token)
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error checking SonarCloud configuration: {e}")
+    except Exception:
+        logger.exception("Error checking SonarCloud configuration")
         return False
 
 
@@ -75,16 +71,18 @@ def _get_codeql_metrics(repository, user_id: int):
         else:
             metrics['status'] = 'available'
         
-        logger.info(f"Retrieved CodeQL metrics for {repository.full_name}: {metrics['total_vulnerabilities']} vulnerabilities, SHS: {metrics.get('shs_display', 'N/A')}")
+        logger.info("Retrieved CodeQL metrics for %s: %s vulnerabilities, SHS: %s", repository.full_name, metrics['total_vulnerabilities'], metrics.get('shs_display', 'N/A'))
         return metrics
         
-    except Exception as e:
-        logger.error(f"Error getting CodeQL metrics for repository {repository.full_name}: {e}")
+    except Exception:
+        error_id = str(uuid.uuid4())
+        logger.exception("Error getting CodeQL metrics for repository %s [error_id=%s]", repository.full_name, error_id)
         return {
             'status': 'not_available',
             'shs_score': None,
             'shs_display': 'Error',
-            'shs_message': f'Error: {str(e)}',
+            'shs_message': 'CodeQL metrics unavailable',
+            'error_id': error_id,
             'delta_shs': 0.0,
             'total_vulnerabilities': 0,
             'severity_counts': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0},
@@ -404,8 +402,8 @@ def repository_detail(request, repo_id):
             'doughnut_colors': {},
             'activity_heatmap_data': json.dumps([0] * 24),
             'sonarcloud_metrics': None,
-            'error': str(e),
-            'debug_error': True
+            'error_message': 'Failed to compute repository metrics',
+            'error_id': str(uuid.uuid4())
         }
     
     return render(request, 'repositories/detail.html', context)
@@ -438,7 +436,6 @@ def repository_sonarcloud_temporal(request, repo_id):
                 pass
         
         # Get temporal analysis from SonarCloud service
-        from analytics.sonarcloud_service import SonarCloudService
         sonar_service = SonarCloudService()
         
         temporal_data = sonar_service.get_temporal_analysis(
@@ -456,7 +453,7 @@ def repository_sonarcloud_temporal(request, repo_id):
         })
         
     except Exception as e:
-        logger.error(f"Error getting SonarCloud temporal analysis for repository {repo_id}")
+        logger.exception("Error getting SonarCloud temporal analysis for repository %s", repo_id)
         return _error_response('Error retrieving SonarCloud temporal analysis', exc=e)
 
 
@@ -894,21 +891,18 @@ def repository_llm_license_verdict(request, repo_id):
     if request.method != 'GET':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
-    import logging
-    logger = logging.getLogger(__name__)
-    
     try:
-        logger.info(f"Starting LLM license verdict for repository {repo_id}")
+        logger.info("Starting LLM license verdict for repository %s", repo_id)
         
         repository = get_object_or_404(Repository, id=repo_id)
         
         # Get license analysis first
-        logger.info(f"Getting license analysis for {repository.full_name}")
+        logger.info("Getting license analysis for %s", repository.full_name)
         license_service = LicenseAnalysisService(repository.full_name)
         analysis = license_service.analyze_commercial_compatibility()
         
         if not analysis['has_sbom']:
-            logger.warning(f"No SBOM found for {repository.full_name}")
+            logger.warning("No SBOM found for %s", repository.full_name)
             return JsonResponse({
                 'success': False,
                 'error': 'No SBOM found for this repository'
@@ -916,20 +910,20 @@ def repository_llm_license_verdict(request, repo_id):
         
         # Extract unique licenses
         unique_licenses = list(analysis['license_summary'].keys())
-        logger.info(f"Found {len(unique_licenses)} unique licenses: {unique_licenses}")
+        logger.info("Found %d unique licenses: %s", len(unique_licenses), unique_licenses)
         
         if not unique_licenses:
-            logger.warning(f"No licenses found in SBOM for {repository.full_name}")
+            logger.warning("No licenses found in SBOM for %s", repository.full_name)
             return JsonResponse({
                 'success': False,
                 'error': 'No licenses found in SBOM'
             })
         
         # Get LLM verdict
-        logger.info(f"Calling LLM service for verdict")
+        logger.info("Calling LLM service for verdict")
         llm_service = LLMService()
         verdict = llm_service.get_license_verdict(unique_licenses)
-        logger.info(f"LLM verdict: {verdict}")
+        logger.info("LLM verdict: %s", verdict)
         
         return JsonResponse({
             'success': True,
@@ -938,7 +932,7 @@ def repository_llm_license_verdict(request, repo_id):
         })
         
     except Exception as e:
-        logger.error(f"Error in LLM license verdict for repo {repo_id}")
+        logger.exception("Error in LLM license verdict for repo %s", repo_id)
         return _error_response('Internal server error during LLM license verdict', exc=e)
 
 
@@ -1021,9 +1015,7 @@ def repository_vulnerabilities_analysis(request, repo_id):
         })
         
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error in vulnerabilities analysis: {e}")
+        logger.exception("Error in vulnerabilities analysis")
         return JsonResponse({
             'status': 'error',
             'message': 'Internal server error'
@@ -1167,9 +1159,7 @@ def repository_commits_list(request, repo_id):
         })
         
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error in commits list: {e}")
+        logger.exception("Error in commits list")
         return JsonResponse({
             'success': False,
             'error': 'Internal server error'
@@ -1298,9 +1288,7 @@ def repository_releases_list(request, repo_id):
         })
         
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error in releases list: {e}")
+        logger.exception("Error in releases list")
         return JsonResponse({
             'success': False,
             'error': 'Internal server error'
@@ -1456,9 +1444,7 @@ def repository_deployments_list(request, repo_id):
         })
         
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error in deployments list: {e}")
+        logger.exception("Error in deployments list")
         return JsonResponse({
             'success': False,
             'error': 'Internal server error'
@@ -1541,7 +1527,8 @@ def repository_sonarcloud_analysis(request, repo_id):
         logger.error(f"Error getting SonarCloud analysis for repository {repo_id}: {e}")
         
         return render(request, 'repositories/sonarcloud_analysis.html', {
-            'error': str(e)
+            'error_message': 'Failed to load SonarCloud analysis',
+            'error_id': str(uuid.uuid4())
         })
 
 
@@ -1669,7 +1656,8 @@ def repository_codeql_analysis(request, repo_id):
             'repository': repository if 'repository' in locals() else None,
             'codeql_data': {
                 'status': 'error',
-                'error': str(e),
+                'message': 'Failed to load CodeQL analysis',
+                'error_id': str(uuid.uuid4()),
                 'total_vulnerabilities': 0
             }
         })
