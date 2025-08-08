@@ -27,6 +27,35 @@ def parse_object_id_or_raise(id_str: str):
     except Exception as exc:
         raise ValueError("Invalid ObjectId format") from exc
 
+def _is_safe_path_string(path_str: str) -> bool:
+    """Basic allowlist validation for path strings (POSIX focus).
+
+    Rules:
+    - Only allow characters: letters, numbers, hyphen, underscore, dot, slash
+    - Disallow path traversal segments: '.' and '..'
+    - Disallow backslashes and drive letters
+    - Disallow consecutive slashes
+    """
+    if not isinstance(path_str, str) or not path_str:
+        return False
+    if "\x00" in path_str:
+        return False
+    # Allowlist of characters
+    if not re.match(r'^[A-Za-z0-9_./-]+$', path_str):
+        return False
+    # Disallow Windows-style components
+    if "\\" in path_str or ":" in path_str:
+        return False
+    # Normalize and check traversal segments
+    segments = [seg for seg in path_str.split('/') if seg != '']
+    for seg in segments:
+        if seg in ('.', '..'):
+            return False
+    # Disallow consecutive slashes (already removed in segments, but check original)
+    if '//' in path_str:
+        return False
+    return True
+
 def assert_safe_repo_path(repo_path: str) -> Path:
     """Validate that repo_path is a safe, existing directory within allowed bases.
 
@@ -34,21 +63,22 @@ def assert_safe_repo_path(repo_path: str) -> Path:
     - system temporary directory
     - optional GITPULSE_WORK_DIR if set
     """
-    if not isinstance(repo_path, str) or not repo_path:
-        raise ValueError("Invalid repository path")
-    if "\x00" in repo_path:
-        raise ValueError("Invalid null byte in path")
+    if not _is_safe_path_string(repo_path):
+        raise ValueError("Repository path has unsafe characters or traversal segments")
 
-    repo_path_obj = Path(repo_path).resolve()
-    if not repo_path_obj.is_absolute():
+    # Ensure absolute path
+    if not os.path.isabs(repo_path):
         raise ValueError("Repository path must be absolute")
+
+    # Resolve without following unsafe input first
+    repo_path_obj = Path(os.path.normpath(repo_path)).resolve()
     if not repo_path_obj.is_dir():
         raise ValueError("Repository path must be an existing directory")
 
     allowed_base_paths = [Path(tempfile.gettempdir()).resolve()]
     work_dir = os.environ.get("GITPULSE_WORK_DIR")
-    if work_dir:
-        allowed_base_paths.append(Path(work_dir).resolve())
+    if work_dir and _is_safe_path_string(work_dir) and os.path.isabs(work_dir):
+        allowed_base_paths.append(Path(os.path.normpath(work_dir)).resolve())
 
     def _is_within(base: Path, path: Path) -> bool:
         try:
