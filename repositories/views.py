@@ -266,8 +266,8 @@ def repository_detail(request, repo_id):
         
         # Get SBOM vulnerability data
         from analytics.models import SBOM, SBOMVulnerability
-        # Get all SBOMs for this repository
-        # repository.full_name already validated above
+        # Get all SBOMs for this repository (full_name already validated above)
+        assert_safe_repository_full_name(repository.full_name)
         all_sboms = SBOM.objects(repository_full_name=repository.full_name).order_by('-generated_at')
         
         # Find the best SBOM (prefer one with vulnerabilities, then most recent)
@@ -643,31 +643,37 @@ def delete_repository(request, repo_id):
         }
         
         # Delete commits
+        assert_safe_repository_full_name(repository.full_name)
         commits = Commit.objects(repository_full_name=repository.full_name)
         deleted_counts['commits'] = commits.count()
         commits.delete()
         
         # Delete pull requests
+        assert_safe_repository_full_name(repository.full_name)
         pull_requests = PullRequest.objects(repository_full_name=repository.full_name)
         deleted_counts['pull_requests'] = pull_requests.count()
         pull_requests.delete()
         
         # Delete releases
+        assert_safe_repository_full_name(repository.full_name)
         releases = Release.objects(repository_full_name=repository.full_name)
         deleted_counts['releases'] = releases.count()
         releases.delete()
         
         # Delete deployments
+        assert_safe_repository_full_name(repository.full_name)
         deployments = Deployment.objects(repository_full_name=repository.full_name)
         deleted_counts['deployments'] = deployments.count()
         deployments.delete()
         
         # Delete repository stats
+        assert_safe_repository_full_name(repository.full_name)
         repo_stats = RepositoryStats.objects(repository_full_name=repository.full_name)
         deleted_counts['repository_stats'] = repo_stats.count()
         repo_stats.delete()
         
         # Delete sync logs
+        assert_safe_repository_full_name(repository.full_name)
         sync_logs = SyncLog.objects(repository_full_name=repository.full_name)
         deleted_counts['sync_logs'] = sync_logs.count()
         sync_logs.delete()
@@ -1056,6 +1062,7 @@ def repository_commits_list(request, repo_id):
         from django.utils import timezone
         
         # Build query
+        assert_safe_repository_full_name(repository.full_name)
         commits_query = Commit.objects.filter(repository_full_name=repository.full_name)
         
         # Apply date filtering
@@ -1201,6 +1208,7 @@ def repository_releases_list(request, repo_id):
         from django.utils import timezone
         
         # Build query
+        assert_safe_repository_full_name(repository.full_name)
         releases_query = Release.objects.filter(repository_full_name=repository.full_name)
         
         # Apply date filtering
@@ -1331,6 +1339,7 @@ def repository_deployments_list(request, repo_id):
         from django.utils import timezone
         
         # Build query
+        assert_safe_repository_full_name(repository.full_name)
         deployments_query = Deployment.objects.filter(repository_full_name=repository.full_name)
         
         # Apply date filtering
