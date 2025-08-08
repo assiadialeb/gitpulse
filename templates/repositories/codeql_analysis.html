@@ -166,7 +166,7 @@
                             {% for vuln in codeql_data.vulnerabilities %}
                                 <tr class="hover:bg-gray-50">
                                     <td class="py-3 px-4">
-                                        <div class="text-sm font-medium text-gray-900">{{ vuln.rule_name|default:vuln.rule_id }}</div>
+                                        <div class="text-sm font-medium text-gray-900">{{ vuln.rule_description|default:vuln.rule_name|default:vuln.rule_id }}</div>
                                         {% if vuln.message %}
                                             <div class="text-xs text-gray-500 max-w-xs truncate" title="{{ vuln.message }}">{{ vuln.message }}</div>
                                         {% endif %}

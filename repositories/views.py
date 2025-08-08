@@ -1561,6 +1561,7 @@ def repository_codeql_analysis(request, repo_id):
                     vulnerabilities.append({
                         'rule_id': vuln.rule_id,
                         'rule_name': vuln.rule_name,
+                        'rule_description': getattr(vuln, 'rule_description', None),
                         'message': vuln.message,
                         'severity': vuln.severity,
                         'confidence': vuln.confidence,
