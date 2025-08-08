@@ -469,8 +469,5 @@ class SBOMService:
 
         if not any(_is_within(base, repo_path_obj) or repo_path_obj == base for base in allowed_base_paths):
             raise Exception("Repository path is outside allowed directories")
-        # Ensure this is a git repository directory (heuristic)
-        git_dir = repo_path_obj.joinpath('.git')
-        if not git_dir.exists():
-            # Allow non-git repos for SBOM if needed, but still restrict to directory
-            logger.warning(f"Path {str(repo_path_obj)} does not contain a .git directory")
+        # Do not inspect arbitrary deeper paths to avoid path-expression sinks
+        # The directory containment checks above are sufficient for safety
