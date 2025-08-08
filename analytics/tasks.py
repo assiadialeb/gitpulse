@@ -2092,6 +2092,7 @@ def generate_sbom_task(repository_id: int, force_generate: bool = False):
         
         # Check if SBOM already exists (unless forced)
         if not force_generate:
+            # Validate before querying
             assert_safe_repository_full_name(repository.full_name)
             existing_sbom = SBOM.objects(repository_full_name=repository.full_name).first()
             if existing_sbom:
