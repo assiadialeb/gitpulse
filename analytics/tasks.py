@@ -537,17 +537,17 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=None, 
                     for pr in prs:
                         pr_number = pr.get('number')
                         try:
-                            assert_safe_repository_full_name(repo_name)
+                            
                             obj = PullRequest.objects(
                                 application_id=None, 
-                                repository_full_name=repo_name, 
+                                repository_full_name=assert_safe_repository_full_name(repo_name), 
                                 number=pr_number
                             ).first()
                             
                             if not obj:
                                 obj = PullRequest(
                                     application_id=None,
-                                    repository_full_name=repo_name,
+                                    repository_full_name=assert_safe_repository_full_name(repo_name),
                                     number=pr_number
                                 )
                                 
