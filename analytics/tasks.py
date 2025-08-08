@@ -469,8 +469,8 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=None, 
     """
     from repositories.models import Repository
     from analytics.models import PullRequest
-from analytics.github_service import GitHubService
-from analytics.sanitization import assert_safe_repository_full_name
+    from analytics.github_service import GitHubService
+    from analytics.sanitization import assert_safe_repository_full_name
     from analytics.github_token_service import GitHubTokenService
     import dateutil.parser
     from datetime import timezone as dt_timezone, datetime
