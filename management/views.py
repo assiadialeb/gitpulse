@@ -12,9 +12,23 @@ from users.models import UserDeveloperLink
 from analytics.models import Developer
 from bson import ObjectId
 import logging
+import uuid
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
+def _error_response(user_message: str, exc: Exception = None, status: int = 500):
+    """Return a safe JSON error with a correlation id; log full details server-side."""
+    error_id = str(uuid.uuid4())
+    if exc is not None:
+        logger.exception(f"{user_message} [error_id={error_id}]")
+    else:
+        logger.error(f"{user_message} [error_id={error_id}]")
+    return JsonResponse({
+        'success': False,
+        'message': user_message,
+        'error_id': error_id
+    }, status=status)
+
 
 
 def is_admin(user):
@@ -366,15 +380,9 @@ def test_github_connection(request):
             })
             
     except requests.exceptions.RequestException as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Network error: {str(e)}'
-        })
+        return _error_response('Network error when contacting GitHub API', exc=e, status=502)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Error testing connection: {str(e)}'
-        })
+        return _error_response('Error testing connection', exc=e)
 
 
 @login_required
@@ -414,10 +422,7 @@ def get_github_config(request):
         })
         
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Error loading configuration: {str(e)}'
-        })
+        return _error_response('Error loading configuration', exc=e)
 
 
 @login_required
@@ -440,10 +445,7 @@ def get_sonarcloud_config(request):
         })
         
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Error loading configuration: {str(e)}'
-        })
+        return _error_response('Error loading configuration', exc=e)
 
 
 @login_required
@@ -472,10 +474,7 @@ def save_sonarcloud_config(request):
         })
         
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Error saving configuration: {str(e)}'
-        })
+        return _error_response('Error saving configuration', exc=e)
 
 
 @login_required
@@ -517,15 +516,9 @@ def test_sonarcloud_connection(request):
             })
             
     except requests.exceptions.RequestException as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Network error: {str(e)}'
-        })
+        return _error_response('Network error when contacting SonarCloud API', exc=e, status=502)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Error testing connection: {str(e)}'
-        })
+        return _error_response('Error testing connection', exc=e)
 
 
 @login_required
@@ -686,15 +679,9 @@ def link_user_to_developer(request, user_id):
         })
         
     except User.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': 'User not found'
-        }, status=404)
+        return JsonResponse({'success': False, 'message': 'User not found'}, status=404)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        return _error_response('Error linking user to developer', exc=e)
 
 
 @login_required
@@ -721,15 +708,9 @@ def unlink_user_from_developer(request, user_id):
         })
         
     except User.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': 'User not found'
-        }, status=404)
+        return JsonResponse({'success': False, 'message': 'User not found'}, status=404)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        return _error_response('Error unlinking user from developer', exc=e)
 
 
 @login_required
@@ -767,10 +748,7 @@ def save_ossindex_config(request):
         })
         
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Error saving configuration: {str(e)}'
-        })
+        return _error_response('Error saving configuration', exc=e)
 
 
 @login_required
@@ -809,10 +787,7 @@ def test_ossindex_connection(request):
             })
             
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Error testing connection: {str(e)}'
-        })
+        return _error_response('Error testing connection', exc=e)
 
 
 @login_required
@@ -839,7 +814,4 @@ def get_ossindex_config(request):
             })
             
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Error loading configuration: {str(e)}'
-        })
+        return _error_response('Error loading configuration', exc=e)
