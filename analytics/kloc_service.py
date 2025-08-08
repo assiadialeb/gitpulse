@@ -7,6 +7,8 @@ import subprocess
 import logging
 from typing import Dict, Optional
 from datetime import datetime
+from pathlib import Path
+from .sanitization import assert_safe_repo_path
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +103,11 @@ class KLOCService:
                 'calculated_at': datetime
             }
         """
-        if not os.path.exists(repo_path):
+        try:
+            # Validate repository path strictly to avoid path traversal
+            safe_repo_path = assert_safe_repo_path(repo_path)
+        except Exception as e:
+            logger.error(f"Invalid repository path: {repo_path} - {e}")
             logger.error(f"Repository path does not exist: {repo_path}")
             return {
                 'kloc': 0.0,
@@ -113,7 +119,7 @@ class KLOCService:
         try:
             # Change to repository directory
             original_cwd = os.getcwd()
-            os.chdir(repo_path)
+            os.chdir(str(safe_repo_path))
             
             # Get list of tracked files
             result = subprocess.run(
@@ -188,7 +194,7 @@ class KLOCService:
             # Calculate KLOC
             kloc = total_lines / 1000.0
             
-            logger.info(f"Calculated KLOC for {repo_path}: {kloc:.2f} KLOC ({total_lines} lines)")
+            logger.info(f"Calculated KLOC for {safe_repo_path}: {kloc:.2f} KLOC ({total_lines} lines)")
             
             return {
                 'kloc': kloc,
@@ -198,7 +204,7 @@ class KLOCService:
             }
             
         except subprocess.TimeoutExpired:
-            logger.error(f"Timeout calculating KLOC for {repo_path}")
+            logger.error(f"Timeout calculating KLOC for {safe_repo_path}")
             return {
                 'kloc': 0.0,
                 'total_lines': 0,
@@ -206,7 +212,7 @@ class KLOCService:
                 'calculated_at': datetime.now()
             }
         except Exception as e:
-            logger.error(f"Error calculating KLOC for {repo_path}: {e}")
+            logger.error(f"Error calculating KLOC for {safe_repo_path}: {e}")
             return {
                 'kloc': 0.0,
                 'total_lines': 0,

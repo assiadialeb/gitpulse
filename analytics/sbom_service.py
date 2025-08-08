@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from .models import SBOM, SBOMComponent, SBOMVulnerability
 from management.models import OSSIndexConfig
+from .sanitization import assert_safe_repo_path
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class SBOMService:
         """
         logger.info(f"Generating SBOM for {self.repository_full_name} at {repo_path}")
         # Validate repository path before using it
-        self._assert_safe_repo_path(repo_path)
+        assert_safe_repo_path(repo_path)
         
         # Prepare environment variables
         env = os.environ.copy()
@@ -130,7 +131,7 @@ class SBOMService:
             Basic SBOM data
         """
         logger.info(f"Creating basic SBOM for {self.repository_full_name}")
-        self._assert_safe_repo_path(repo_path)
+        assert_safe_repo_path(repo_path)
         
         # Try to detect dependencies manually
         components = []
@@ -404,7 +405,7 @@ class SBOMService:
             List of license information
         """
         try:
-            self._assert_safe_repo_path(repo_path)
+            assert_safe_repo_path(repo_path)
             # Check if cargo-license is available
             result = subprocess.run(['cargo', 'license', '--version'], 
                                   capture_output=True, text=True)
@@ -443,31 +444,5 @@ class SBOMService:
             return [] 
 
     def _assert_safe_repo_path(self, repo_path: str) -> None:
-        """Validate that repo_path is a safe, existing directory and looks like a git repo."""
-        if not isinstance(repo_path, str) or not repo_path:
-            raise Exception("Invalid repository path")
-        if '\x00' in repo_path:
-            raise Exception("Invalid null byte in path")
-        repo_path_obj = Path(repo_path).resolve()
-        if not repo_path_obj.is_absolute():
-            raise Exception("Repository path must be absolute")
-        if not repo_path_obj.is_dir():
-            raise Exception("Repository path must be an existing directory")
-        # Ensure path is within an allowed base directory (system temp or configured work dir)
-        import tempfile
-        allowed_base_paths = [Path(tempfile.gettempdir()).resolve()]
-        work_dir = os.environ.get('GITPULSE_WORK_DIR')
-        if work_dir:
-            allowed_base_paths.append(Path(work_dir).resolve())
-
-        def _is_within(base: Path, path: Path) -> bool:
-            try:
-                path.relative_to(base)
-                return True
-            except Exception:
-                return False
-
-        if not any(_is_within(base, repo_path_obj) or repo_path_obj == base for base in allowed_base_paths):
-            raise Exception("Repository path is outside allowed directories")
-        # Do not inspect arbitrary deeper paths to avoid path-expression sinks
-        # The directory containment checks above are sufficient for safety
+        """Deprecated: Use analytics.sanitization.assert_safe_repo_path instead."""
+        assert_safe_repo_path(repo_path)

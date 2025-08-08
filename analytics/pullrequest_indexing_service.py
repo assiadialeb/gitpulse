@@ -341,19 +341,7 @@ class PullRequestIndexingService:
             entity_type = 'pull_requests'
             state = IndexingState.objects(repository_id=repository_id, entity_type=entity_type).first()
             
-            # Optimized date range - use intelligent indexing service
-            from .intelligent_indexing_service import IntelligentIndexingService
-            
-            indexing_service = IntelligentIndexingService(
-                repository_id=repository_id,
-                entity_type=entity_type,
-                github_token=github_token
-            )
-            
-            since, until = indexing_service.get_indexing_date_range()
-            
-            logger.info(f"Indexing period: {since.strftime('%Y-%m-%d')} to {until.strftime('%Y-%m-%d')}")
-
+            # Get GitHub token before initializing intelligent indexing service
             github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
             if not github_token:
                 github_token = GitHubTokenService._get_user_token(user_id)
@@ -362,6 +350,19 @@ class PullRequestIndexingService:
             if not github_token:
                 logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
                 return {'status': 'skipped', 'reason': 'No GitHub token available', 'repository_id': repository_id}
+
+            # Optimized date range - use intelligent indexing service
+            from .intelligent_indexing_service import IntelligentIndexingService
+
+            indexing_service = IntelligentIndexingService(
+                repository_id=repository_id,
+                entity_type=entity_type,
+                github_token=github_token
+            )
+
+            since, until = indexing_service.get_indexing_date_range()
+
+            logger.info(f"Indexing period: {since.strftime('%Y-%m-%d')} to {until.strftime('%Y-%m-%d')}")
 
             # Vérifier la rate limit
             headers = {'Authorization': f'token {github_token}'}

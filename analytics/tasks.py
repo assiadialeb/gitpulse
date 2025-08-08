@@ -348,9 +348,16 @@ def background_indexing_task(repository_id: int, user_id: int, task_id: Optional
                 from .models import RepositoryKLOCHistory
                 import tempfile
                 import os
+                from .sanitization import assert_safe_repo_path
                 
                 # Get repository path (same as GitService)
-                repo_path = os.path.join(tempfile.gettempdir(), f"gitpulse_{repository.full_name.replace('/', '_')}")
+                repo_path_unsanitized = os.path.join(tempfile.gettempdir(), f"gitpulse_{repository.full_name.replace('/', '_')}")
+                try:
+                    repo_path_obj = assert_safe_repo_path(repo_path_unsanitized)
+                    repo_path = str(repo_path_obj)
+                except Exception as path_err:
+                    logger.error(f"Unsafe repository path derived for KLOC: {repo_path_unsanitized} - {path_err}")
+                    repo_path = repo_path_unsanitized
                 
                 if os.path.exists(repo_path):
                     logger.info(f"Calculating KLOC for {repository.full_name}")
