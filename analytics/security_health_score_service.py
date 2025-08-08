@@ -87,19 +87,46 @@ class SecurityHealthScoreService:
             score_surface = total_weight / kloc
             
             # Apply exponential decay function (higher vulnerabilities = lower score)
-            shs_score = 100 * math.exp(-self.alpha * score_surface)
+            current_shs = 100 * math.exp(-self.alpha * score_surface)
+            current_shs = round(current_shs, 1)
             
-            # Get delta from previous analysis
-            delta_shs = self._calculate_delta_shs(repository_full_name, shs_score)
+            # Check if we have a recent calculation (within last hour) to avoid duplicates
+            from datetime import timedelta
+            from django.utils import timezone
             
-            # Save to history
-            self._save_shs_history(
-                repository_full_name, repository_id, shs_score, 
-                delta_shs, severity_counts, kloc
-            )
+            recent_calculation = SecurityHealthHistory.objects.filter(
+                repository_full_name=repository_full_name
+            ).order_by('-calculated_at').first()
+            
+            should_save_new = True
+            if recent_calculation:
+                time_diff = timezone.now() - recent_calculation.calculated_at
+                # If the last calculation was within the last hour and the score is the same, don't save again
+                if time_diff < timedelta(hours=1) and abs(recent_calculation.shs_score - current_shs) < 0.1:
+                    should_save_new = False
+                    # Use the existing calculation
+                    return {
+                        'shs_score': recent_calculation.shs_score,
+                        'status': 'calculated',
+                        'message': f'Score calculated from {len(vulnerabilities)} vulnerabilities',
+                        'total_vulnerabilities': len(vulnerabilities),
+                        'severity_counts': dict(severity_counts),
+                        'kloc': kloc,
+                        'delta_shs': recent_calculation.delta_shs
+                    }
+            
+            # Get delta from previous analysis (before saving new one)
+            delta_shs = self._calculate_delta_shs(repository_full_name, current_shs)
+            
+            # Save to history only if needed
+            if should_save_new:
+                self._save_shs_history(
+                    repository_full_name, repository_id, current_shs, 
+                    delta_shs, severity_counts, kloc
+                )
             
             return {
-                'shs_score': round(shs_score, 1),
+                'shs_score': current_shs,
                 'status': 'calculated',
                 'message': f'Score calculated from {len(vulnerabilities)} vulnerabilities',
                 'total_vulnerabilities': len(vulnerabilities),

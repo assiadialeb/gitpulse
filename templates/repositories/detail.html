@@ -377,7 +377,7 @@
                                 <div class="mt-3 space-y-2 text-xs">
                                     <div class="flex justify-between items-center">
                                         <span class="text-medium-gray">Security Health Score</span>
-                                        <span class="font-medium {% if codeql_metrics.delta_shs > 0 %}text-green-500{% elif codeql_metrics.delta_shs < 0 %}text-red-500{% else %}text-orange-500{% endif %}">
+                                        <span class="font-medium {% if codeql_metrics.shs_score >= 70 %}text-green-500{% elif codeql_metrics.shs_score >= 50 %}text-orange-500{% else %}text-red-500{% endif %}">
                                             {{ codeql_metrics.shs_display }}
                                         </span>
                                     </div>

@@ -373,9 +373,9 @@ class CodeQLIndexingService:
             
             # Get latest vulnerabilities for additional info
             # Validate before querying to prevent NoSQL injection
-            
+            assert_safe_repository_full_name(repository_full_name)
             vulnerabilities = list(CodeQLVulnerability.objects(
-                repository_full_name=assert_safe_repository_full_name(repository_full_name)
+                repository_full_name=repository_full_name
             ))
             
             if shs_result['status'] == 'not_available':
@@ -394,9 +394,9 @@ class CodeQLIndexingService:
                 shs_display = f"{shs_result['shs_score']}/100"
                 # Show trend starting from the 2nd analysis (stable if delta == 0)
                 # Validate before querying history collection as well
-               
+                assert_safe_repository_full_name(repository_full_name)
                 history_count = SecurityHealthHistory.objects(
-                    repository_full_name=assert_safe_repository_full_name(repository_full_name)
+                    repository_full_name=repository_full_name
                 ).count()
                 if history_count >= 2:
                     delta_text = f" ({shs_result['delta_shs']:+.1f})"
