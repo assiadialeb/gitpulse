@@ -373,9 +373,9 @@ class CodeQLIndexingService:
             
             # Get latest vulnerabilities for additional info
             # Validate before querying to prevent NoSQL injection
-            assert_safe_repository_full_name(repository_full_name)
+         
             vulnerabilities = list(CodeQLVulnerability.objects(
-                repository_full_name=repository_full_name
+                repository_full_name=   assert_safe_repository_full_name(repository_full_name)
             ))
             
             if shs_result['status'] == 'not_available':
