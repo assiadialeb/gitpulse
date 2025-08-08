@@ -18,6 +18,7 @@ from analytics.license_analysis_service import LicenseAnalysisService
 from analytics.llm_service import LLMService
 from analytics.sonarcloud_service import SonarCloudService
 from analytics.codeql_indexing_service import get_codeql_indexing_service_for_user
+from analytics.codeql_service import get_codeql_service_for_user
 
 
 def _get_sonarcloud_metrics(repository_id: int):
@@ -1589,17 +1590,70 @@ def repository_codeql_analysis(request, repo_id):
             except Exception as e:
                 logger.warning(f"Could not fetch detailed vulnerability data: {e}")
         
-        # Add status information
-        if codeql_metrics['total_vulnerabilities'] == 0 and codeql_metrics.get('latest_analysis') is None:
+        # Recompute open vulnerability counts to ensure consistency in slide-over
+        try:
+            from analytics.models import CodeQLVulnerability
+            open_qs = CodeQLVulnerability.objects(
+                repository_full_name=repository.full_name,
+                state='open'
+            )
+            total_open = open_qs.count()
+            severity_counts = {
+                'critical': open_qs.filter(severity='critical').count(),
+                'high': open_qs.filter(severity='high').count(),
+                'medium': open_qs.filter(severity='medium').count(),
+                'low': open_qs.filter(severity='low').count(),
+            }
+            codeql_metrics['total_vulnerabilities'] = total_open
+            codeql_metrics['severity_counts'] = severity_counts
+        except Exception:
+            pass
+
+        # Add status information based on recomputed counts
+        if codeql_metrics.get('total_vulnerabilities', 0) == 0 and codeql_metrics.get('latest_analysis') is None:
             codeql_metrics['status'] = 'not_available'
         else:
             codeql_metrics['status'] = 'available'
-        
+
         # Add repository KLOC
         codeql_metrics['kloc'] = repository.kloc or 0.0
         
         # Add vulnerabilities to metrics
         codeql_metrics['vulnerabilities'] = vulnerabilities
+
+        # Build real trend timeline of OPEN vulnerabilities (last 30 days or filtered range)
+        from analytics.codeql_service import CodeQLService
+        codeql_service = get_codeql_service_for_user(request.user.id)
+        start_param = request.GET.get('from')
+        end_param = request.GET.get('to')
+        start_dt = None
+        end_dt = None
+        try:
+            if start_param:
+                start_dt = datetime.fromisoformat(start_param)
+            if end_param:
+                # support YYYY-MM-DD
+                end_dt = datetime.fromisoformat(end_param)
+        except Exception:
+            start_dt = None
+            end_dt = None
+
+        if codeql_service:
+            timeline = codeql_service.get_open_vulnerabilities_timeline(
+                repository.full_name, start_dt, end_dt
+            )
+        else:
+            timeline = {'labels': [], 'series': {'critical': [], 'high': [], 'medium': [], 'low': []}}
+
+        # Ensure JSON strings for safe embedding in data-attributes
+        codeql_metrics['trend_labels'] = json.dumps(timeline.get('labels', []))
+        series = timeline.get('series', {})
+        codeql_metrics['trend_series'] = {
+            'critical': json.dumps(series.get('critical', [])),
+            'high': json.dumps(series.get('high', [])),
+            'medium': json.dumps(series.get('medium', [])),
+            'low': json.dumps(series.get('low', [])),
+        }
         
         logger.info(f"Retrieved CodeQL analysis for {repository.full_name}: {len(vulnerabilities)} vulnerabilities")
         

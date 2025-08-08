@@ -108,6 +108,15 @@
                     <span class="ml-2 text-gray-600">Loading chart...</span>
                 </div>
                 <canvas id="codeql-chart" height="300" class="hidden"></canvas>
+                <!-- Embed trend data for the parent loader to read safely -->
+                <div id="codeql-trend"
+                     class="hidden"
+                     data-labels='{{ codeql_data.trend_labels|default:"[]"|safe }}'
+                     data-critical='{{ codeql_data.trend_series.critical|default:"[]"|safe }}'
+                     data-high='{{ codeql_data.trend_series.high|default:"[]"|safe }}'
+                     data-medium='{{ codeql_data.trend_series.medium|default:"[]"|safe }}'
+                     data-low='{{ codeql_data.trend_series.low|default:"[]"|safe }}'>
+                </div>
             </div>
         </div>
 
@@ -251,12 +260,4 @@
     {% endif %}
 </div>
 
-<script>
-// Show the chart canvas after loading
-setTimeout(() => {
-    const chartCanvas = document.getElementById('codeql-chart');
-    if (chartCanvas) {
-        chartCanvas.classList.remove('hidden');
-    }
-}, 50);
-</script>
+<!-- No inline chart init here; parent loader initializes using embedded data -->

@@ -2029,44 +2029,21 @@ function loadCodeQLAnalysis() {
                     
                     console.log('Creating CodeQL chart with data:', { totalVulns, critical, high, medium, low });
                     
-                    // Generate dummy trend data (in real implementation, this would come from API)
-                    const last30Days = Array.from({length: 30}, (_, i) => {
-                        const date = new Date();
-                        date.setDate(date.getDate() - (29 - i));
-                        return date.toISOString().split('T')[0];
-                    });
+                    // Read real trend data embedded in the loaded partial
+                    const trendEl = content.querySelector('#codeql-trend');
+                    const labels = trendEl ? JSON.parse(trendEl.dataset.labels || '[]') : [];
+                    const seriesCritical = trendEl ? JSON.parse(trendEl.dataset.critical || '[]') : [];
+                    const seriesHigh = trendEl ? JSON.parse(trendEl.dataset.high || '[]') : [];
+                    const seriesMedium = trendEl ? JSON.parse(trendEl.dataset.medium || '[]') : [];
+                    const seriesLow = trendEl ? JSON.parse(trendEl.dataset.low || '[]') : [];
                     
                     const chartData = {
-                        labels: last30Days.map(date => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+                        labels: labels.map(date => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
                         datasets: [
-                            {
-                                label: 'Critical',
-                                data: last30Days.map(() => critical + Math.random() * 2 - 1),
-                                borderColor: '#DC2626',
-                                backgroundColor: 'rgba(220, 38, 38, 0.1)',
-                                tension: 0.4
-                            },
-                            {
-                                label: 'High',
-                                data: last30Days.map(() => high + Math.random() * 3 - 1.5),
-                                borderColor: '#EA580C',
-                                backgroundColor: 'rgba(234, 88, 12, 0.1)',
-                                tension: 0.4
-                            },
-                            {
-                                label: 'Medium',
-                                data: last30Days.map(() => medium + Math.random() * 5 - 2.5),
-                                borderColor: '#CA8A04',
-                                backgroundColor: 'rgba(202, 138, 4, 0.1)',
-                                tension: 0.4
-                            },
-                            {
-                                label: 'Low',
-                                data: last30Days.map(() => low + Math.random() * 3 - 1.5),
-                                borderColor: '#2563EB',
-                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                                tension: 0.4
-                            }
+                            { label: 'Critical', data: seriesCritical, borderColor: '#DC2626', backgroundColor: 'rgba(220, 38, 38, 0.1)', tension: 0.4 },
+                            { label: 'High', data: seriesHigh, borderColor: '#EA580C', backgroundColor: 'rgba(234, 88, 12, 0.1)', tension: 0.4 },
+                            { label: 'Medium', data: seriesMedium, borderColor: '#CA8A04', backgroundColor: 'rgba(202, 138, 4, 0.1)', tension: 0.4 },
+                            { label: 'Low', data: seriesLow, borderColor: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.1)', tension: 0.4 }
                         ]
                     };
                     

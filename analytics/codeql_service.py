@@ -470,6 +470,106 @@ class CodeQLService:
             'total_new_vulnerabilities': len(vulnerabilities)
         }
 
+    def get_open_vulnerabilities_timeline(self, repo_full_name: str, start_date: Optional[datetime] = None,
+                                          end_date: Optional[datetime] = None) -> Dict:
+        """
+        Compute the daily count of OPEN vulnerabilities per severity over a date range.
+        A vulnerability is considered open on a day D if:
+          created_at <= end_of(D) and not fixed/dismissed before end_of(D).
+
+        Args:
+            repo_full_name: repository identifier
+            start_date: inclusive start (date or datetime); defaults to 30 days ago (UTC) at 00:00
+            end_date: inclusive end; defaults to today (UTC) at 23:59:59
+
+        Returns:
+            {
+              'labels': ['2025-07-01', ...],
+              'series': {
+                 'critical': [..], 'high': [..], 'medium': [..], 'low': [..]
+              }
+            }
+        """
+        # Normalize dates to UTC midnight boundaries
+        now_utc = datetime.now(dt_timezone.utc)
+        if end_date is None:
+            end_date = now_utc
+        if start_date is None:
+            start_date = end_date - timedelta(days=30)
+
+        # Convert to date objects
+        if isinstance(start_date, datetime):
+            start_day = start_date.date()
+        else:
+            start_day = start_date
+        if isinstance(end_date, datetime):
+            end_day = end_date.date()
+        else:
+            end_day = end_date
+
+        # Pre-build labels
+        num_days = (end_day - start_day).days + 1
+        labels = [(start_day + timedelta(days=i)) for i in range(max(num_days, 0))]
+
+        # Initialize counters
+        series = {
+            'critical': [0] * len(labels),
+            'high': [0] * len(labels),
+            'medium': [0] * len(labels),
+            'low': [0] * len(labels),
+        }
+
+        if not labels:
+            return {'labels': [], 'series': series}
+
+        # Fetch all vulnerabilities that could overlap the window
+        # Include ones created before end_day and not closed before start_day
+        window_start_dt = datetime.combine(start_day, datetime.min.time(), tzinfo=dt_timezone.utc)
+        window_end_dt = datetime.combine(end_day, datetime.max.time(), tzinfo=dt_timezone.utc)
+
+        vulns = CodeQLVulnerability.objects(
+            repository_full_name=repo_full_name,
+            created_at__lte=window_end_dt
+        )
+
+        # Accumulate active intervals per vuln
+        for v in vulns:
+            sev = (v.severity or 'low').lower()
+            if sev not in series:
+                continue
+
+            # Active from max(created_at.date, start_day)
+            v_created_day = (v.created_at.astimezone(dt_timezone.utc).date()
+                             if v.created_at else start_day)
+            active_start = max(v_created_day, start_day)
+
+            # Closed at min(fixed_at, dismissed_at) if present; treat closure on that day as no longer open
+            closed_dt = None
+            if v.fixed_at:
+                closed_dt = v.fixed_at
+            if v.dismissed_at and (closed_dt is None or v.dismissed_at < closed_dt):
+                closed_dt = v.dismissed_at
+
+            if closed_dt is not None:
+                closed_day = closed_dt.astimezone(dt_timezone.utc).date()
+                # Active through the day before closed_day
+                active_end = min(end_day, closed_day - timedelta(days=1))
+            else:
+                active_end = end_day
+
+            if active_end < active_start:
+                continue
+
+            # Add +1 for each day in [active_start, active_end]
+            start_idx = (active_start - start_day).days
+            end_idx = (active_end - start_day).days
+            for idx in range(start_idx, end_idx + 1):
+                series[sev][idx] += 1
+
+        # Format labels as ISO dates
+        label_strs = [d.isoformat() for d in labels]
+        return {'labels': label_strs, 'series': series}
+
 
 def get_codeql_service_for_user(user_id: int) -> Optional[CodeQLService]:
     """
