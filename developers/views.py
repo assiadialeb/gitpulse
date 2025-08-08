@@ -11,12 +11,27 @@ import json
 import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+import logging
+import uuid
 
 from analytics.models import Developer, DeveloperAlias
 
 from analytics.commit_classifier import get_commit_type_stats
 from .github_teams_service import GitHubTeamsService
+logger = logging.getLogger(__name__)
 
+def _error_response(user_message: str, exc: Exception = None, status: int = 500):
+    """Return a safe JSON error with a correlation id; log full details server-side."""
+    error_id = str(uuid.uuid4())
+    if exc is not None:
+        logger.exception(f"{user_message} [error_id={error_id}]")
+    else:
+        logger.error(f"{user_message} [error_id={error_id}]")
+    return JsonResponse({
+        'success': False,
+        'message': user_message,
+        'error_id': error_id
+    }, status=status)
 
 
 
@@ -597,10 +612,7 @@ def merge_developers(request):
             })
             
         except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Error during merge: {str(e)}'
-            }, status=500)
+            return _error_response('Error during merge operation', exc=e)
             
     except json.JSONDecodeError:
         return JsonResponse({
@@ -608,10 +620,7 @@ def merge_developers(request):
             'error': 'Invalid JSON data'
         }, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'Unexpected error: {str(e)}'
-        }, status=500)
+        return _error_response('Unexpected error while merging developers', exc=e)
 
 
 def _calculate_detailed_quality_metrics(commits):
@@ -1105,10 +1114,7 @@ def remove_developer_alias(request, developer_id, alias_id):
         })
         
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'Error removing alias: {str(e)}'
-        }, status=500)
+        return _error_response('Error removing alias', exc=e)
 
 
 @login_required
@@ -1244,10 +1250,7 @@ def create_developer_from_aliases(request):
             'error': 'Invalid JSON data'
         }, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'Unexpected error: {str(e)}'
-        }, status=500)
+        return _error_response('Unexpected error while creating developer from aliases', exc=e)
 
 
 # Helper for legend colors
@@ -1427,7 +1430,9 @@ def sync_github_teams(request):
             messages.error(request, f"Sync failed: {result.get('error', 'Unknown error')}")
             
     except Exception as e:
-        messages.error(request, f"Sync failed with exception: {str(e)}")
+        err_id = str(uuid.uuid4())
+        logger.exception(f"Sync GitHub teams failed [error_id={err_id}]")
+        messages.error(request, f"Sync failed due to an internal error (ref: {err_id})")
     
     # Redirect back to teams tab
     print(f"DEBUG: Redirecting to /developers/?tab=teams")

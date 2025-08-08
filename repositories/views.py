@@ -19,7 +19,17 @@ from analytics.llm_service import LLMService
 from analytics.sonarcloud_service import SonarCloudService
 from analytics.codeql_indexing_service import get_codeql_indexing_service_for_user
 from analytics.codeql_service import get_codeql_service_for_user
+import logging
+import uuid
+logger = logging.getLogger(__name__)
 
+def _error_response(user_message: str, exc: Exception = None, status: int = 500):
+    error_id = str(uuid.uuid4())
+    if exc is not None:
+        logger.exception(f"{user_message} [error_id={error_id}]")
+    else:
+        logger.error(f"{user_message} [error_id={error_id}]")
+    return JsonResponse({'success': False, 'message': user_message, 'error_id': error_id}, status=status)
 
 def _get_sonarcloud_metrics(repository_id: int):
     """Get latest SonarCloud metrics for a repository"""
@@ -446,14 +456,8 @@ def repository_sonarcloud_temporal(request, repo_id):
         })
         
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error getting SonarCloud temporal analysis for repository {repo_id}: {e}")
-        
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        logger.error(f"Error getting SonarCloud temporal analysis for repository {repo_id}")
+        return _error_response('Error retrieving SonarCloud temporal analysis', exc=e)
 
 
 @login_required
@@ -533,7 +537,7 @@ def search_repositories(request):
         return JsonResponse({'repositories': filtered_repos})
         
     except Exception as e:
-        return JsonResponse({'error': f'Error searching repositories: {str(e)}'}, status=500)
+        return _error_response('Error searching repositories', exc=e)
 
 
 @login_required
@@ -585,7 +589,7 @@ def index_repository(request):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid repository data'})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': f'Error indexing repository: {str(e)}'})
+        return _error_response('Error indexing repository', exc=e)
 
 
 @login_required
@@ -617,7 +621,7 @@ def start_indexing(request, repo_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'error': f'Error starting indexing: {str(e)}'})
+        return _error_response('Error starting indexing', exc=e)
 
 
 @login_required
@@ -688,7 +692,7 @@ def delete_repository(request, repo_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'error': f'Error deleting repository: {str(e)}'})
+        return _error_response('Error deleting repository', exc=e)
 
 
 @login_required
@@ -710,7 +714,7 @@ def api_repository_pr_health_metrics(request, repo_id):
     except Repository.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Repository not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return _error_response('Error retrieving PR health metrics', exc=e)
 
 
 @login_required
@@ -731,7 +735,7 @@ def api_repository_developer_activity(request, repo_id):
     except Repository.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Repository not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return _error_response('Error retrieving developer activity', exc=e)
 
 
 @login_required
@@ -749,7 +753,7 @@ def api_repository_commit_quality(request, repo_id):
     except Repository.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Repository not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return _error_response('Error retrieving commit quality metrics', exc=e)
 
 
 @login_required
@@ -767,7 +771,7 @@ def api_repository_commit_types(request, repo_id):
     except Repository.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Repository not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return _error_response('Error retrieving commit type distribution', exc=e)
 
 
 @login_required
@@ -805,7 +809,7 @@ def index_repositories(request):
             added += 1
         return JsonResponse({'success': True, 'added': added, 'skipped': skipped})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': f'Error adding repositories: {str(e)}'})
+        return _error_response('Error adding repositories', exc=e)
 
 
 @login_required
@@ -827,13 +831,8 @@ def repository_licensing_analysis(request, repo_id):
         })
         
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error in licensing analysis: {e}")
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        logger.error("Error in licensing analysis")
+        return _error_response('Internal server error during licensing analysis', exc=e)
 
 
 @login_required
@@ -885,13 +884,8 @@ def repository_llm_license_analysis(request, repo_id):
             })
         
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error in LLM license analysis: {e}")
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        logger.error("Error in LLM license analysis")
+        return _error_response('Internal server error during LLM license analysis', exc=e)
 
 
 @login_required
@@ -944,11 +938,8 @@ def repository_llm_license_verdict(request, repo_id):
         })
         
     except Exception as e:
-        logger.error(f"Error in LLM license verdict for repo {repo_id}: {e}")
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        logger.error(f"Error in LLM license verdict for repo {repo_id}")
+        return _error_response('Internal server error during LLM license verdict', exc=e)
 
 
 @login_required
