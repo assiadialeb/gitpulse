@@ -4,6 +4,7 @@ Management command for full commit backfill using Git local (no rate limits)
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from repositories.models import Repository
+from analytics.sanitization import assert_safe_repository_full_name
 from django_q.tasks import async_task
 import logging
 
@@ -55,7 +56,14 @@ class Command(BaseCommand):
             
             # Check current commit count
             from analytics.models import Commit
-            current_commits = Commit.objects(repository_full_name=repo.full_name).count()
+            # Validate repository_full_name before using it in Mongo queries
+            try:
+                assert_safe_repository_full_name(repo.full_name)
+            except Exception:
+                self.stdout.write(self.style.ERROR("  ❌ Invalid repository name; skipping commit count"))
+                current_commits = 0
+            else:
+                current_commits = Commit.objects(repository_full_name=repo.full_name).count()
             self.stdout.write(f"  📊 Current commits in DB: {current_commits}")
             
             if not dry_run:

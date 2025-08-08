@@ -6,6 +6,7 @@ from django.utils import timezone
 from repositories.models import Repository
 from analytics.codeql_indexing_service import get_codeql_indexing_service_for_user
 from analytics.models import CodeQLVulnerability
+from analytics.sanitization import assert_safe_repository_full_name
 import logging
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,12 @@ class Command(BaseCommand):
         verbose = options['verbose']
         clear = options['clear']
         dry_run = options['dry_run']
+
+        # Validate user-supplied repository name to prevent NoSQL injection
+        try:
+            assert_safe_repository_full_name(repo_name)
+        except Exception:
+            raise CommandError('Invalid repository name format. Expected "owner/repo" with safe characters.')
         
         # Set up console logging for this command
         console_handler = logging.StreamHandler(self.stdout)
@@ -90,6 +97,7 @@ class Command(BaseCommand):
     def _find_repository(self, repo_name):
         """Find repository by name"""
         try:
+            assert_safe_repository_full_name(repo_name)
             repository = Repository.objects.get(full_name=repo_name)
             self.stdout.write(f'Found repository: {repository.full_name} (ID: {repository.id})')
             return repository
@@ -101,6 +109,7 @@ class Command(BaseCommand):
 
     def _clear_existing_data(self, repo_name):
         """Clear existing CodeQL data for repository"""
+        assert_safe_repository_full_name(repo_name)
         existing_count = CodeQLVulnerability.objects(repository_full_name=repo_name).count()
         if existing_count > 0:
             self.stdout.write(f'Clearing {existing_count} existing CodeQL vulnerabilities...')
@@ -167,6 +176,7 @@ class Command(BaseCommand):
         self.stdout.write('='*60)
         
         # Get all vulnerabilities for this repository
+        assert_safe_repository_full_name(repo_name)
         vulnerabilities = list(CodeQLVulnerability.objects(repository_full_name=repo_name))
         
         if not vulnerabilities:
@@ -226,6 +236,7 @@ class Command(BaseCommand):
         self.stdout.write(f'Force reindex: {"Yes" if force else "No"}')
         
         # Check existing data
+        assert_safe_repository_full_name(repository.full_name)
         existing_count = CodeQLVulnerability.objects(repository_full_name=repository.full_name).count()
         self.stdout.write(f'Existing vulnerabilities: {existing_count}')
         
