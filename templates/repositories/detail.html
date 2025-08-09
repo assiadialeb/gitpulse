@@ -2315,6 +2315,93 @@ function displayCommitsList(data) {
     `;
 }
 
+// Markdown formatting function
+function formatMarkdown(text) {
+    if (!text) return '';
+    
+    let result = text;
+    
+    // Headers
+    result = result.replace(/^### (.*$)/gim, '<h3 class="text-base font-bold mb-2 text-primary-green">$1</h3>');
+    result = result.replace(/^## (.*$)/gim, '<h2 class="text-lg font-bold mb-2 text-primary-blue">$1</h2>');
+    result = result.replace(/^# (.*$)/gim, '<h1 class="text-xl font-bold mb-2 text-primary-green">$1</h1>');
+    
+    // Bold and italic
+    result = result.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>');
+    result = result.replace(/\*(.*?)\*/g, '<em class="italic text-gray-700">$1</em>');
+    
+    // Code blocks
+    result = result.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-100 p-2 rounded text-xs overflow-x-auto my-2 border border-gray-200"><code class="text-gray-800">$1</code></pre>');
+    result = result.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs text-gray-800 border border-gray-200">$1</code>');
+    
+    // Links
+    result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-primary-blue hover:text-primary-green underline">$1</a>');
+    
+    // Lists - handle both unordered and ordered lists
+    result = result.replace(/^(\s*)[*\-] (.*$)/gim, function(match, spaces, content) {
+        const indent = spaces.length;
+        return `<li class="ml-${Math.max(4, indent + 4)} text-sm text-gray-700">• ${content}</li>`;
+    });
+    
+    result = result.replace(/^(\s*)(\d+)\. (.*$)/gim, function(match, spaces, number, content) {
+        const indent = spaces.length;
+        return `<li class="ml-${Math.max(4, indent + 4)} text-sm text-gray-700">${number}. ${content}</li>`;
+    });
+    
+    // Wrap list items in ul/ol tags
+    result = result.replace(/(<li[^>]*>.*<\/li>)/gs, '<ul class="mb-2">$1</ul>');
+    
+    // Line breaks and paragraphs
+    result = result.replace(/\n\n+/g, '</p><p class="mb-2 text-gray-700">');
+    result = result.replace(/\n/g, '<br>');
+    
+    // Wrap in paragraph tags if not already wrapped
+    if (!result.includes('<p>')) {
+        result = result.replace(/^(.+)$/gm, '<p class="mb-2 text-gray-700">$1</p>');
+    }
+    
+    // Clean up empty paragraphs
+    result = result.replace(/<p class="mb-2"><\/p>/g, '');
+    result = result.replace(/<p class="mb-2"><br><\/p>/g, '');
+    
+    return result;
+}
+
+// Tooltip positioning function
+function adjustTooltipPosition() {
+    document.querySelectorAll('.tooltip-content').forEach(tooltip => {
+        const rect = tooltip.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        
+        // Check if tooltip goes off-screen vertically
+        if (rect.top < 0) {
+            // Position below instead of above
+            tooltip.classList.remove('bottom-full');
+            tooltip.classList.add('top-full');
+            tooltip.classList.remove('mb-2');
+            tooltip.classList.add('mt-2');
+            
+            // Adjust arrow position
+            const arrow = tooltip.querySelector('div:last-child');
+            if (arrow) {
+                arrow.classList.remove('top-full');
+                arrow.classList.add('bottom-full');
+                arrow.classList.remove('border-t-white');
+                arrow.classList.add('border-b-white');
+            }
+        }
+        
+        // Check if tooltip goes off-screen horizontally
+        if (rect.left < 0) {
+            tooltip.style.left = '0px';
+        } else if (rect.right > viewportWidth) {
+            tooltip.style.left = 'auto';
+            tooltip.style.right = '0px';
+        }
+    });
+}
+
 // Releases List Functions
 function openReleasesList() {
     document.body.classList.add('overflow-hidden');
@@ -2398,6 +2485,13 @@ function displayReleasesList(data) {
     const content = document.getElementById('releases-content');
     const { releases, pagination, filters } = data;
     
+    // Add tooltip positioning event listeners after content is loaded
+    setTimeout(() => {
+        document.querySelectorAll('.group').forEach(group => {
+            group.addEventListener('mouseenter', adjustTooltipPosition);
+        });
+    }, 100);
+    
     if (releases.length === 0) {
         content.innerHTML = `
             <div class="text-center p-8">
@@ -2439,7 +2533,20 @@ function displayReleasesList(data) {
                     <div class="text-xs text-gray-500">${time}</div>
                 </td>
                 <td class="py-3 px-4">
-                    <div class="text-sm text-gray-900">${release.assets_count}</div>
+                    <div class="text-sm text-gray-900 max-w-xs relative group">
+                        <div class="cursor-help">
+                            ${release.body ? release.body.substring(0, 100) + (release.body.length > 100 ? '...' : '') : 'No release notes'}
+                        </div>
+                        ${release.body ? `
+                            <div class="absolute bottom-full left-0 mb-2 w-80 sm:w-96 bg-white border border-gray-200 text-gray-800 text-xs rounded-xl p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-soft tooltip-content" style="max-height: 300px; overflow: hidden;">
+                                <div class="font-semibold mb-3 text-primary-green border-b border-gray-100 pb-2">Release Notes</div>
+                                <div class="prose prose-sm">
+                                    ${formatMarkdown(release.body)}
+                                </div>
+                                <div class="absolute top-full left-6 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-white"></div>
+                            </div>
+                        ` : ''}
+                    </div>
                 </td>
                 <td class="py-3 px-4">
                     <div class="flex flex-wrap gap-1">
@@ -2503,7 +2610,7 @@ function displayReleasesList(data) {
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Release</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assets</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Release Notes</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
@@ -2910,5 +3017,39 @@ function displayDeploymentsList(data) {
         </div>
     </div>
 </div>
+
+<style>
+    /* Custom scrollbar for tooltip */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: #374151;
+        border-radius: 3px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #6b7280;
+        border-radius: 3px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+    }
+    
+    /* Tooltip positioning improvements */
+    .group:hover .group-hover\:opacity-100 {
+        opacity: 1;
+    }
+    
+    /* Ensure tooltip doesn't go off-screen */
+    @media (max-width: 640px) {
+        .group:hover .group-hover\:opacity-100 {
+            left: auto !important;
+            right: 0 !important;
+        }
+    }
+</style>
 
 {% endblock content %} 

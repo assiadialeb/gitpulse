@@ -1257,9 +1257,8 @@ def repository_releases_list(request, repo_id):
                 'published_at': release.published_at.isoformat() if release.published_at else None,
                 'draft': release.draft,
                 'prerelease': release.prerelease,
-                'body': release.body,
+                'body': release.body or '',
                 'html_url': release.html_url,
-                'assets_count': len(release.assets) if release.assets else 0,
                 'url': release.html_url,
             })
         
