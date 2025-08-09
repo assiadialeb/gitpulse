@@ -161,6 +161,9 @@
             <div class="bg-white border border-gray-200 rounded-lg p-4">
                 <p class="text-sm text-gray-600 mb-4">Timeline data: {{ temporal_data.metrics_timeline|length|default:0 }} data points</p>
                 
+                <!-- Embed timeline JSON for the parent page to read safely -->
+                {{ temporal_data.metrics_timeline|json_script:"sonarcloud-timeline-json" }}
+                
                 <!-- Chart Container -->
                 <div class="relative h-64 bg-gray-50 rounded p-2">
                     <canvas id="sonarcloud-chart" style="width: 100%; height: 100%;"></canvas>

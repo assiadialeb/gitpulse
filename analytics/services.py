@@ -19,7 +19,6 @@ def cleanup_application_data(application_id: int) -> Dict:
         'commits_deleted': 0,
         'sync_logs_deleted': 0,
         'repository_stats_deleted': 0,
-        'quality_metrics_deleted': 0,
         'total_deleted': 0
     }
     
@@ -36,26 +35,13 @@ def cleanup_application_data(application_id: int) -> Dict:
         repo_stats_deleted = RepositoryStats.objects.filter(application_id=application_id).delete()
         results['repository_stats_deleted'] = repo_stats_deleted
         
-        # Delete all quality metrics for this application
-        from pymongo import MongoClient
-        client = MongoClient('localhost', 27017)
-        db = client['gitpulse']
-        quality_collection = db['developer_quality_metrics']
-        
-        # Application model no longer exists, delete by application_id if it exists in quality metrics
-        quality_result = quality_collection.delete_many({
-            'application_id': application_id
-        })
-        results['quality_metrics_deleted'] = int(quality_result.deleted_count)
-        
-        client.close()
+        # Quality metrics are calculated in real-time, no cleanup needed
         
         # Calculate total
         results['total_deleted'] = (
             results['commits_deleted'] + 
             results['sync_logs_deleted'] + 
-            results['repository_stats_deleted'] +
-            results['quality_metrics_deleted']
+            results['repository_stats_deleted']
         )
         
         return results
@@ -80,7 +66,6 @@ def cleanup_repository_data(repository_full_name: str) -> Dict:
         'commits_deleted': 0,
         'sync_logs_deleted': 0,
         'repository_stats_deleted': 0,
-        'quality_metrics_deleted': 0,
         'total_deleted': 0
     }
     
@@ -97,25 +82,13 @@ def cleanup_repository_data(repository_full_name: str) -> Dict:
         repo_stats_deleted = RepositoryStats.objects.filter(repository_full_name=repository_full_name).delete()
         results['repository_stats_deleted'] = repo_stats_deleted
         
-        # Delete quality metrics for this repository
-        from pymongo import MongoClient
-        client = MongoClient('localhost', 27017)
-        db = client['gitpulse']
-        quality_collection = db['developer_quality_metrics']
-        
-        quality_result = quality_collection.delete_many({
-            'repository': repository_full_name
-        })
-        results['quality_metrics_deleted'] = int(quality_result.deleted_count)
-        
-        client.close()
+        # Quality metrics are calculated in real-time, no cleanup needed
         
         # Calculate total
         results['total_deleted'] = (
             results['commits_deleted'] + 
             results['sync_logs_deleted'] + 
-            results['repository_stats_deleted'] +
-            results['quality_metrics_deleted']
+            results['repository_stats_deleted']
         )
         
         return results

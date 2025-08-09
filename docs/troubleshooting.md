@@ -105,7 +105,8 @@ python manage.py shell -c "from analytics.tasks import release_indexing_all_repo
 python manage.py shell -c "from analytics.tasks import fetch_all_pull_requests_task; print(fetch_all_pull_requests_task())"
 
 # Test quality analysis
-python manage.py shell -c "from analytics.tasks import quality_analysis_all_repos_task; print(quality_analysis_all_repos_task())"
+# Quality analysis task removed - metrics are calculated in real-time
+# python manage.py shell -c "from analytics.tasks import quality_analysis_all_repos_task; print(quality_analysis_all_repos_task())"
 
 # Test developer grouping
 python manage.py shell -c "from analytics.tasks import group_developer_identities_task; print(group_developer_identities_task())"
@@ -148,7 +149,7 @@ python manage.py cleanup_old_tasks
 | Commit Indexing | `daily_indexing_all_repos_task` | Index commits for all repos |
 | PR Indexing | `fetch_all_pull_requests_task` | Fetch closed PRs |
 | Release Indexing | `release_indexing_all_repos_task` | Index GitHub releases |
-| Quality Analysis | `quality_analysis_all_repos_task` | Analyze commit quality |
+| ~~Quality Analysis~~ | ~~`quality_analysis_all_repos_task`~~ | ~~Analyze commit quality~~ (removed - calculated in real-time) |
 | Developer Grouping | `group_developer_identities_task` | Group developer identities |
 
 ### Old Functions (Removed)
@@ -157,7 +158,7 @@ python manage.py cleanup_old_tasks
 |--------------|--------------|
 | `release_indexing_all_apps_task` | `release_indexing_all_repos_task` |
 | `daily_indexing_all_apps_task` | `daily_indexing_all_repos_task` |
-| `quality_analysis_all_apps_task` | `quality_analysis_all_repos_task` |
+| ~~`quality_analysis_all_apps_task`~~ | ~~`quality_analysis_all_repos_task`~~ (removed) |
 
 ## ⚠️ Prevention Tips
 

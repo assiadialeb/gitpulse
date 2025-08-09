@@ -1476,11 +1476,15 @@ def repository_sonarcloud_analysis(request, repo_id):
             except ValueError:
                 pass
         
-        # Get latest metrics from SonarCloud service (same as main page)
-        from analytics.sonarcloud_service import SonarCloudService
+        # Fetch latest metrics and real temporal analysis from service
         sonar_service = SonarCloudService()
-        
         latest_metrics = sonar_service.get_latest_metrics(repo_id)
+        temporal_data = sonar_service.get_temporal_analysis(
+            repository_id=repo_id,
+            repository_full_name=repository.full_name,
+            from_date=from_date,
+            to_date=to_date
+        )
         
         # Prepare data for template
         current_metrics = {
@@ -1492,26 +1496,6 @@ def repository_sonarcloud_analysis(request, repo_id):
             'reliability_rating': getattr(latest_metrics, 'reliability_rating', 'N/A'),
             'security_rating': getattr(latest_metrics, 'security_rating', 'N/A'),
             'quality_gate': getattr(latest_metrics, 'quality_gate', 'N/A')
-        }
-        
-        # Create temporal data structure for compatibility
-        temporal_data = {
-            'metrics_timeline': [
-                {'date': '2025-01-01T00:00:00', 'metric': 'bugs', 'value': current_metrics['bugs']},
-                {'date': '2025-01-01T00:00:00', 'metric': 'vulnerabilities', 'value': current_metrics['vulnerabilities']},
-                {'date': '2025-01-01T00:00:00', 'metric': 'code_smells', 'value': current_metrics['code_smells']},
-                {'date': '2025-01-01T00:00:00', 'metric': 'coverage', 'value': current_metrics['coverage']},
-                {'date': '2025-01-01T00:00:00', 'metric': 'maintainability_rating', 'value': current_metrics['maintainability_rating']},
-                {'date': '2025-01-01T00:00:00', 'metric': 'reliability_rating', 'value': current_metrics['reliability_rating']},
-                {'date': '2025-01-01T00:00:00', 'metric': 'security_rating', 'value': current_metrics['security_rating']}
-            ],
-            'trends': {
-                'quality_gate_trend': 'stable',
-                'maintainability_trend': 'stable',
-                'reliability_trend': 'stable',
-                'security_trend': 'stable'
-            },
-            'issues_timeline': []
         }
         
         return render(request, 'repositories/sonarcloud_analysis.html', {

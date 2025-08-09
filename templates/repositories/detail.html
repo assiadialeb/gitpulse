@@ -1842,83 +1842,194 @@ function loadSonarCloudAnalysis() {
                         current.setDate(current.getDate() + 1); // Daily intervals
                     }
                     
-                    // Create temporal data for line chart
-                    const chartData = {
-                        labels: dates,
-                        datasets: [
-                            {
-                                label: 'Bugs',
-                                data: dates.map(() => bugs + Math.random() * 10 - 5),
-                                borderColor: '#EF4444',
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                tension: 0.4
-                            },
-                            {
-                                label: 'Vulnerabilities',
-                                data: dates.map(() => vulnerabilities + Math.random() * 2 - 1),
-                                borderColor: '#F97316',
-                                backgroundColor: 'rgba(249, 115, 22, 0.1)',
-                                tension: 0.4
-                            },
-                            {
-                                label: 'Code Smells',
-                                data: dates.map(() => codeSmells + Math.random() * 20 - 10),
-                                borderColor: '#EAB308',
-                                backgroundColor: 'rgba(234, 179, 8, 0.1)',
-                                tension: 0.4
-                            },
-                            {
-                                label: 'Coverage',
-                                data: dates.map(() => coverage + Math.random() * 10 - 5),
-                                borderColor: '#10B981',
-                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                tension: 0.4
-                            }
-                        ]
-                    };
+                    // Create temporal data for line chart using real SonarCloud data if available
+                    let chartData;
                     
-                    sonarCloudChart = new Chart(ctx, {
-                        type: 'line',
-                        data: chartData,
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { 
-                                    display: true,
-                                    position: 'top',
-                                    labels: {
-                                        usePointStyle: true,
-                                        padding: 10,
-                                        font: { size: 11 }
-                                    }
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            const value = context.parsed.y;
-                                            if (context.dataset.label === 'Coverage') {
-                                                return 'Coverage: ' + value.toFixed(1) + '%';
-                                            }
-                                            return context.dataset.label + ': ' + value;
-                                        }
-                                    }
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: { font: { size: 10 } }
-                                },
-                                x: {
-                                    ticks: { font: { size: 10 } }
-                                }
+                    // Prefer embedded JSON timeline from the loaded partial
+                    try {
+                        const jsonEl = content.querySelector('#sonarcloud-timeline-json');
+                        if (jsonEl && jsonEl.textContent) {
+                            const embeddedTimeline = JSON.parse(jsonEl.textContent || '[]');
+                            if (Array.isArray(embeddedTimeline) && embeddedTimeline.length > 0) {
+                                chartData = processRealTimelineData(embeddedTimeline, dates);
+                                createChart(chartData);
+                                return;
                             }
                         }
-                    });
+                    } catch (e) {
+                        console.warn('Failed to parse embedded SonarCloud timeline JSON:', e);
+                    }
                     
-                    console.log('Chart created successfully');
-                    document.getElementById('chart-loading').style.display = 'none';
+                    // Fallback: Try to fetch real temporal data first
+                    const temporalUrl = `/repositories/api/${repositoryId}/sonarcloud-temporal/?from=${startDate}&to=${endDate}`;
+                    fetch(temporalUrl)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success && data.data.metrics_timeline && data.data.metrics_timeline.length > 0) {
+                                // Use real temporal data
+                                chartData = processRealTimelineData(data.data.metrics_timeline, dates);
+                            } else {
+                                // Fallback to static data (no random variation)
+                                chartData = createStaticChartData(bugs, vulnerabilities, codeSmells, coverage, dates);
+                            }
+                            createChart(chartData);
+                        })
+                        .catch(error => {
+                            console.log('Using static chart data due to API error:', error);
+                            chartData = createStaticChartData(bugs, vulnerabilities, codeSmells, coverage, dates);
+                            createChart(chartData);
+                        });
+                    
+                    // Don't create chart here - it will be created in the fetch callback
+                    return;
+                    
+                    function processRealTimelineData(metricsTimeline, dateRange) {
+                        // Group metrics by date and type
+                        const metricsByDate = {};
+                        
+                        metricsTimeline.forEach(point => {
+                            const date = point.date.split('T')[0]; // Extract date part only
+                            if (!metricsByDate[date]) {
+                                metricsByDate[date] = {};
+                            }
+                            metricsByDate[date][point.metric] = point.value;
+                        });
+                        
+                        // Create datasets for each metric type
+                        const datasets = [];
+                        const metricTypes = ['bugs', 'vulnerabilities', 'code_smells', 'coverage'];
+                        
+                        metricTypes.forEach(metricType => {
+                            const data = dateRange.map(date => {
+                                const value = metricsByDate[date]?.[metricType];
+                                return value !== undefined ? value : null;
+                            });
+                            
+                            // Only add dataset if we have data
+                            if (data.some(v => v !== null)) {
+                                const dataset = {
+                                    label: formatMetricLabel(metricType),
+                                    data: data,
+                                    borderColor: getMetricColor(metricType),
+                                    backgroundColor: getMetricColor(metricType, 0.1),
+                                    tension: 0.4,
+                                    spanGaps: true
+                                };
+                                datasets.push(dataset);
+                            }
+                        });
+                        
+                        return {
+                            labels: dateRange.map(date => formatDate(date)),
+                            datasets: datasets
+                        };
+                    }
+                    
+                    function createStaticChartData(bugs, vulnerabilities, codeSmells, coverage, dates) {
+                        return {
+                            labels: dates.map(date => formatDate(date)),
+                            datasets: [
+                                {
+                                    label: 'Bugs',
+                                    data: dates.map(() => bugs),
+                                    borderColor: '#EF4444',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                    tension: 0.4
+                                },
+                                {
+                                    label: 'Vulnerabilities',
+                                    data: dates.map(() => vulnerabilities),
+                                    borderColor: '#F97316',
+                                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                                    tension: 0.4
+                                },
+                                {
+                                    label: 'Code Smells',
+                                    data: dates.map(() => codeSmells),
+                                    borderColor: '#EAB308',
+                                    backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                                    tension: 0.4
+                                },
+                                {
+                                    label: 'Coverage',
+                                    data: dates.map(() => coverage),
+                                    borderColor: '#10B981',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    tension: 0.4
+                                }
+                            ]
+                        };
+                    }
+                    
+                    function formatMetricLabel(metricType) {
+                        const labels = {
+                            'bugs': 'Bugs',
+                            'vulnerabilities': 'Vulnerabilities',
+                            'code_smells': 'Code Smells',
+                            'coverage': 'Coverage (%)'
+                        };
+                        return labels[metricType] || metricType;
+                    }
+                    
+                    function getMetricColor(metricType, alpha = 1) {
+                        const colors = {
+                            'bugs': `rgba(239, 68, 68, ${alpha})`, // red
+                            'vulnerabilities': `rgba(249, 115, 22, ${alpha})`, // orange
+                            'code_smells': `rgba(234, 179, 8, ${alpha})`, // yellow
+                            'coverage': `rgba(16, 185, 129, ${alpha})` // green
+                        };
+                        return colors[metricType] || `rgba(156, 163, 175, ${alpha})`; // gray default
+                    }
+                    
+                    function formatDate(dateStr) {
+                        const date = new Date(dateStr);
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    }
+                    
+                    function createChart(chartData) {
+                        sonarCloudChart = new Chart(ctx, {
+                            type: 'line',
+                            data: chartData,
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { 
+                                        display: true,
+                                        position: 'top',
+                                        labels: {
+                                            usePointStyle: true,
+                                            padding: 10,
+                                            font: { size: 11 }
+                                        }
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                const value = context.parsed.y;
+                                                if (context.dataset.label === 'Coverage') {
+                                                    return 'Coverage: ' + value.toFixed(1) + '%';
+                                                }
+                                                return context.dataset.label + ': ' + value;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: { font: { size: 10 } }
+                                    },
+                                    x: {
+                                        ticks: { font: { size: 10 } }
+                                    }
+                                }
+                            }
+                        });
+                        
+                        console.log('Chart created successfully');
+                        document.getElementById('chart-loading').style.display = 'none';
+                    }
                 } else {
                     console.error('Cannot create chart - ctx:', ctx, 'Chart:', typeof Chart);
                     document.getElementById('chart-loading').innerHTML = '<div class="text-sm text-red-600">Failed to load chart</div>';

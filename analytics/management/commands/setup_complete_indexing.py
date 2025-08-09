@@ -61,7 +61,7 @@ class Command(BaseCommand):
         self._setup_commit_indexing(hour, minute, spread)
         self._setup_pr_indexing(hour, minute, spread)
         self._setup_release_indexing(hour, minute, spread)
-        self._setup_quality_analysis(hour, minute, spread)
+        # Quality analysis removed - metrics are calculated in real-time
         self._setup_developer_grouping(hour, minute, spread)
         self._setup_sbom_generation(hour, minute, spread)
         
@@ -79,7 +79,6 @@ class Command(BaseCommand):
                 'daily_indexing_all_repos',
                 'daily_pr_indexing',
                 'daily_release_indexing', 
-                'daily_quality_analysis',
                 'daily_developer_grouping',
                 'daily_sbom_generation'
             ]
@@ -178,43 +177,6 @@ class Command(BaseCommand):
             self.style.SUCCESS(f'✓ Release indexing scheduled at {next_run.strftime("%H:%M")}')
         )
     
-    def _setup_quality_analysis(self, hour, minute, spread):
-        """Setup daily quality analysis"""
-        schedule_name = "daily_quality_analysis"
-        # Calculate time with proper hour/minute handling
-        if spread:
-            # Add 45 minutes to the base time
-            adjusted_hour = hour
-            adjusted_minute = minute + 45
-            if adjusted_minute >= 60:
-                adjusted_hour = (adjusted_hour + 1) % 24
-                adjusted_minute = adjusted_minute % 60
-        else:
-            adjusted_hour = hour
-            adjusted_minute = minute
-        next_run = self._get_next_run_time(adjusted_hour, adjusted_minute)
-        
-        schedule, created = Schedule.objects.get_or_create(
-            name=schedule_name,
-            defaults={
-                'func': 'analytics.tasks.quality_analysis_all_repos_task',
-                'schedule_type': Schedule.DAILY,
-                'repeats': -1,
-                'next_run': next_run,
-            }
-        )
-        
-        if not created:
-            schedule.func = 'analytics.tasks.quality_analysis_all_repos_task'
-            schedule.schedule_type = Schedule.DAILY
-            schedule.repeats = -1
-            schedule.next_run = next_run
-            schedule.save()
-        
-        self.stdout.write(
-            self.style.SUCCESS(f'✓ Quality analysis scheduled at {next_run.strftime("%H:%M")}')
-        )
-    
     def _setup_developer_grouping(self, hour, minute, spread):
         """Setup daily developer grouping"""
         schedule_name = "daily_developer_grouping"
@@ -304,7 +266,6 @@ class Command(BaseCommand):
                 'daily_indexing_all_repos',
                 'daily_pr_indexing',
                 'daily_release_indexing',
-                'daily_quality_analysis', 
                 'daily_developer_grouping',
                 'daily_sbom_generation'
             ]
@@ -323,8 +284,7 @@ class Command(BaseCommand):
         self.stdout.write('1. Commit indexing (02:00)')
         self.stdout.write('2. PR indexing (02:15)') 
         self.stdout.write('3. Release indexing (02:30)')
-        self.stdout.write('4. Quality analysis (02:45)')
-        self.stdout.write('5. Developer grouping (03:00)')
-        self.stdout.write('6. SBOM generation (03:30)')
+        self.stdout.write('4. Developer grouping (03:00)')
+        self.stdout.write('5. SBOM generation (03:30)')
         self.stdout.write('')
         self.stdout.write('💡 Use --spread to distribute tasks across different times') 

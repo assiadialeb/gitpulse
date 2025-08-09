@@ -3,6 +3,9 @@
 {% block title %}SonarCloud Analytics - {{ repository.name }}{% endblock title %}
 
 {% block content %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <div class="fixed inset-0 overflow-hidden z-50" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
     <div class="absolute inset-0 overflow-hidden">
         <!-- Background overlay -->
@@ -150,7 +153,15 @@
                             <div class="mb-8">
                                 <h3 class="text-lg font-medium text-gray-900 mb-4">Metrics Timeline</h3>
                                 <div class="bg-white border border-gray-200 rounded-lg p-4">
-                                    <canvas id="sonarcloud-timeline-chart" width="400" height="200"></canvas>
+                                    <div class="mb-4">
+                                        <p class="text-sm text-gray-600">Timeline data: <span id="data-points-count">0</span> data points</p>
+                                    </div>
+                                    <div class="relative h-64">
+                                        <canvas id="sonarcloud-timeline-chart" width="400" height="200"></canvas>
+                                        <div id="chart-loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+                                            <div class="text-sm text-gray-600">Loading chart...</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -183,6 +194,8 @@
 </div>
 
 <script>
+let sonarCloudChart = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     const repositoryId = {{ repository.id }};
     const startDate = '{{ start_date }}';
@@ -265,8 +278,151 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function updateTimelineChart(metricsTimeline) {
-        // This would create a chart using Chart.js or similar
         console.log('Timeline data:', metricsTimeline);
+        
+        // Update data points count
+        document.getElementById('data-points-count').textContent = metricsTimeline.length;
+        
+        if (!metricsTimeline || metricsTimeline.length === 0) {
+            document.getElementById('chart-loading').innerHTML = '<div class="text-sm text-gray-600">No data available</div>';
+            return;
+        }
+        
+        // Destroy existing chart if it exists
+        if (sonarCloudChart) {
+            sonarCloudChart.destroy();
+        }
+        
+        // Process timeline data for Chart.js
+        const chartData = processTimelineData(metricsTimeline);
+        
+        // Create new chart
+        const ctx = document.getElementById('sonarcloud-timeline-chart');
+        if (ctx && typeof Chart !== 'undefined') {
+            sonarCloudChart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 10,
+                                font: { size: 11 }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed.y;
+                                    if (context.dataset.label === 'Coverage') {
+                                        return 'Coverage: ' + value.toFixed(1) + '%';
+                                    }
+                                    return context.dataset.label + ': ' + value;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { font: { size: 10 } }
+                        },
+                        x: {
+                            ticks: { font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+            
+            // Hide loading
+            document.getElementById('chart-loading').style.display = 'none';
+        }
+    }
+    
+    function processTimelineData(metricsTimeline) {
+        // Group metrics by date and type
+        const metricsByDate = {};
+        
+        metricsTimeline.forEach(point => {
+            const date = point.date.split('T')[0]; // Extract date part only
+            if (!metricsByDate[date]) {
+                metricsByDate[date] = {};
+            }
+            metricsByDate[date][point.metric] = point.value;
+        });
+        
+        // Sort dates
+        const sortedDates = Object.keys(metricsByDate).sort();
+        
+        // Create datasets for each metric type
+        const datasets = [];
+        const metricTypes = ['bugs', 'vulnerabilities', 'code_smells', 'coverage', 'maintainability_rating', 'reliability_rating', 'security_rating'];
+        
+        metricTypes.forEach(metricType => {
+            const data = sortedDates.map(date => {
+                const value = metricsByDate[date]?.[metricType];
+                return value !== undefined ? value : null;
+            });
+            
+            // Only add dataset if we have data
+            if (data.some(v => v !== null)) {
+                const dataset = {
+                    label: formatMetricLabel(metricType),
+                    data: data,
+                    borderColor: getMetricColor(metricType),
+                    backgroundColor: getMetricColor(metricType, 0.1),
+                    tension: 0.4,
+                    spanGaps: true
+                };
+                
+                if (metricType === 'coverage') {
+                    dataset.yAxisID = 'y1';
+                }
+                
+                datasets.push(dataset);
+            }
+        });
+        
+        return {
+            labels: sortedDates.map(date => formatDate(date)),
+            datasets: datasets
+        };
+    }
+    
+    function formatMetricLabel(metricType) {
+        const labels = {
+            'bugs': 'Bugs',
+            'vulnerabilities': 'Vulnerabilities',
+            'code_smells': 'Code Smells',
+            'coverage': 'Coverage (%)',
+            'maintainability_rating': 'Maintainability',
+            'reliability_rating': 'Reliability',
+            'security_rating': 'Security'
+        };
+        return labels[metricType] || metricType;
+    }
+    
+    function getMetricColor(metricType, alpha = 1) {
+        const colors = {
+            'bugs': `rgba(239, 68, 68, ${alpha})`, // red
+            'vulnerabilities': `rgba(249, 115, 22, ${alpha})`, // orange
+            'code_smells': `rgba(234, 179, 8, ${alpha})`, // yellow
+            'coverage': `rgba(16, 185, 129, ${alpha})`, // green
+            'maintainability_rating': `rgba(59, 130, 246, ${alpha})`, // blue
+            'reliability_rating': `rgba(139, 92, 246, ${alpha})`, // purple
+            'security_rating': `rgba(236, 72, 153, ${alpha})` // pink
+        };
+        return colors[metricType] || `rgba(156, 163, 175, ${alpha})`; // gray default
+    }
+    
+    function formatDate(dateStr) {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
     
     function updateIssuesAnalysis(issuesTimeline) {

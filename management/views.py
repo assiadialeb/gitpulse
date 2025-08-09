@@ -132,7 +132,7 @@ def logs_management(request):
         'analytics.tasks.daily_indexing_all_repos_task': 'Daily Indexing',
         'analytics.tasks.fetch_all_pull_requests_task': 'Pull Requests Indexing',
         'analytics.tasks.release_indexing_all_repos_task': 'Releases Indexing',
-        'analytics.tasks.quality_analysis_all_repos_task': 'Quality Analysis',
+        # Quality analysis removed - metrics are calculated in real-time
         'analytics.tasks.group_developer_identities_task': 'Developer Grouping',
     }
     
@@ -176,7 +176,7 @@ def logs_management(request):
         'analytics.tasks.daily_indexing_all_repos_task',
         'analytics.tasks.fetch_all_pull_requests_task',
         'analytics.tasks.release_indexing_all_repos_task',
-        'analytics.tasks.quality_analysis_all_repos_task',
+        # Quality analysis removed - metrics are calculated in real-time
         'analytics.tasks.group_developer_identities_task',
     ]
     

@@ -65,7 +65,7 @@ for s in schedules:
 
 ### Analytics Tasks
 - `release_indexing_all_repos_task()` - Index releases for all repos
-- `quality_analysis_all_repos_task()` - Quality analysis for all repos
+- ~~`quality_analysis_all_repos_task()`~~ - Quality analysis for all repos (removed - metrics calculated in real-time)
 - `fetch_all_pull_requests_task()` - Fetch PRs for all repos
 
 ## 🎯 Benefits
