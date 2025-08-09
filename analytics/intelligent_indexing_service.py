@@ -82,18 +82,19 @@ class IntelligentIndexingService:
             logger.info(f"Indexing already running for {self.repository.full_name} - {self.entity_type}")
             return False
         
-        # Don't index too frequently
-        if self.state.last_run_at:
-            last_run_at = self.state.last_run_at
-            # Ensure last_run_at is timezone-aware for comparison
-            if last_run_at.tzinfo is None:
-                last_run_at = timezone.make_aware(last_run_at)
-            
-            time_since_last = timezone.now() - last_run_at
-            if time_since_last < timedelta(minutes=min_interval_minutes):
-                logger.info(f"Too soon to re-index {self.repository.full_name} - {self.entity_type} "
-                           f"(last run {time_since_last.total_seconds()/60:.1f} minutes ago)")
-                return False
+        # Temporarily disable time check for debugging
+        # # Don't index too frequently
+        # if self.state.last_run_at:
+        #     last_run_at = self.state.last_run_at
+        #     # Ensure last_run_at is timezone-aware for comparison
+        #     if last_run_at.tzinfo is None:
+        #         last_run_at = timezone.make_aware(last_run_at)
+        #     
+        #     time_since_last = timezone.now() - last_run_at
+        #     if time_since_last < timedelta(minutes=min_interval_minutes):
+        #         logger.info(f"Too soon to re-index {self.repository.full_name} - {self.entity_type} "
+        #                    f"(last run {time_since_last.total_seconds()/60:.1f} minutes ago)")
+        #         return False
         
         # Don't retry failed tasks too many times
         if self.state.status == 'error' and self.state.retry_count >= self.state.max_retries:

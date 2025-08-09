@@ -157,8 +157,7 @@ class Command(BaseCommand):
             try:
                 task_id = async_task(
                     'analytics.tasks.index_commits_intelligent_task',
-                    repo_id,
-                    options['batch_size']
+                    repo_id
                 )
                 self.stdout.write(
                     self.style.SUCCESS(f'Commit indexing task scheduled with ID: {task_id}')

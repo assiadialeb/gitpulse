@@ -249,6 +249,13 @@ class GitSyncService:
             
             logger.error(f"Error syncing {repo_full_name}: {e}")
             raise
+        finally:
+            # Always clean up the cloned repository after syncing (success or failure)
+            try:
+                self.git_service.cleanup_repository(repo_full_name)
+                logger.info(f"Cleaned up cloned repository for {repo_full_name}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup cloned repository for {repo_full_name}: {cleanup_error}")
     
     def _process_commits(self, commits_data: List[Dict], repo_full_name: str, 
                         application_id: int = None) -> Dict:

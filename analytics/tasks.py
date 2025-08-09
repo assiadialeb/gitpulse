@@ -1541,6 +1541,13 @@ def index_commits_git_local_task(repository_id):
             # Handle specific sync errors gracefully
             error_msg = str(sync_error).lower()
             
+            # Clean up the cloned repository even on error
+            try:
+                sync_service.cleanup()
+                logger.info(f"Cleaned up cloned repository for {repository.full_name} after error")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup cloned repository for {repository.full_name} after error: {cleanup_error}")
+            
             if 'repository not found' in error_msg or 'private' in error_msg:
                 logger.warning(f"Repository {repository.full_name} is private or not found - skipping")
                 return {
@@ -1596,33 +1603,36 @@ def index_commits_git_local_task(repository_id):
         logger.info(f"Repository {repository.full_name} marked as indexed")
         final_result['is_indexed_updated'] = True
         
+        # Clean up the cloned repository after indexing is complete
+        try:
+            sync_service.cleanup()
+            logger.info(f"Successfully cleaned up cloned repository for {repository.full_name}")
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to cleanup cloned repository for {repository.full_name}: {cleanup_error}")
+            final_result['cleanup_error'] = str(cleanup_error)
+        
         logger.info(f"Git local commit indexing completed for repository {repository_id}: {final_result}")
         return final_result
         
     except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Git local commit indexing task failed for repository {repository_id}: {error_msg}")
+        logger.error(f"Git local commit indexing failed for repository {repository_id}: {e}")
         
-        # Return error result instead of raising (to avoid task retry loops)
-        if 'tmp_pack' in error_msg.lower() or 'lfs' in error_msg.lower():
-            return {
-                'status': 'error',
-                'error_type': 'git_lfs_or_large_files',
-                'error_message': f"Repository may contain LFS files or be too large for local cloning: {error_msg}",
-                'repository_id': repository_id,
-                'repository_full_name': getattr(repository, 'full_name', f'ID:{repository_id}'),
-                'indexing_service': 'git_local',
-                'suggestion': 'Consider using GitHub API indexing for this repository'
-            }
-        else:
-            return {
-                'status': 'error',
-                'error_type': 'general_error',
-                'error_message': error_msg,
-                'repository_id': repository_id,
-                'repository_full_name': getattr(repository, 'full_name', f'ID:{repository_id}'),
-                'indexing_service': 'git_local'
-            }
+        # Clean up the cloned repository even on unexpected errors
+        try:
+            if 'sync_service' in locals():
+                sync_service.cleanup()
+                logger.info(f"Cleaned up cloned repository for repository {repository_id} after unexpected error")
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to cleanup cloned repository for repository {repository_id} after unexpected error: {cleanup_error}")
+        
+        return {
+            'status': 'failed',
+            'reason': f'Unexpected error: {str(e)}',
+            'repository_id': repository_id,
+            'repository_full_name': getattr(repository, 'full_name', 'unknown') if 'repository' in locals() else 'unknown',
+            'indexing_service': 'git_local',
+            'error': str(e)
+        }
 
 
 def index_all_commits_task():
@@ -2132,8 +2142,13 @@ def generate_sbom_task(repository_id: int, force_generate: bool = False):
         
         # Cleanup temporary repository
         try:
+            # Clean up the repository directory
             shutil.rmtree(repo_path)
             logger.info(f"Successfully cleaned up temporary repository at {repo_path}")
+            
+            # Also cleanup the GitService cache for this repository
+            git_service.cleanup_repository(repository.full_name)
+            logger.info(f"Successfully cleaned up GitService cache for {repository.full_name}")
         except Exception as e:
             logger.warning(f"Failed to cleanup repo path {repo_path}: {e}")
         
