@@ -582,58 +582,6 @@ class SBOMComponent(Document):
         return f"{self.name}@{self.version}"
 
 
-class SBOMVulnerability(Document):
-    """MongoDB document for storing SBOM vulnerabilities"""
-    # Link to SBOM
-    sbom_id = fields.ReferenceField(SBOM, required=True)
-    
-    # Vulnerability identification
-    vuln_id = fields.StringField(required=True)  # CVE ID or other identifier
-    source_name = fields.StringField(required=True)  # "ossindex", "nvd", etc.
-    
-    # Vulnerability details
-    title = fields.StringField()
-    description = fields.StringField()
-    severity = fields.StringField(choices=['critical', 'high', 'medium', 'low', 'info'])
-    cvss_score = fields.FloatField()
-    cvss_vector = fields.StringField()
-    
-    # Affected component
-    affected_component_purl = fields.StringField(required=True)
-    affected_component_name = fields.StringField(required=True)
-    affected_component_version = fields.StringField(required=True)
-    
-    # References
-    references = fields.ListField(fields.DictField())
-    
-    # Ratings
-    ratings = fields.ListField(fields.DictField())
-    
-    # Metadata
-    published_date = fields.DateTimeField()
-    updated_date = fields.DateTimeField()
-    
-    # Raw data
-    raw_vulnerability = fields.DictField(required=True)
-    
-    # Metadata
-    created_at = fields.DateTimeField(default=lambda: datetime.now(dt_timezone.utc))
-    
-    meta = {
-        'collection': 'sbom_vulnerabilities',
-        'indexes': [
-            'sbom_id',
-            'vuln_id',
-            'severity',
-            'affected_component_purl',
-            ('sbom_id', 'severity'),
-        ]
-    }
-    
-    def __str__(self):
-        return f"{self.vuln_id} - {self.affected_component_name}@{self.affected_component_version}" 
-
-
 class SonarCloudMetrics(Document):
     """SonarCloud quality metrics for repositories"""
     

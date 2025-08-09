@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 from .models import Repository
-from analytics.models import PullRequest, Deployment, Release, SBOM, SBOMComponent, SBOMVulnerability, SonarCloudMetrics, IndexingState, RepositoryStats, SyncLog
+from analytics.models import PullRequest, Deployment, Release, SBOM, SBOMComponent, SonarCloudMetrics, IndexingState, RepositoryStats, SyncLog
 from django.utils import timezone
 import logging
 
@@ -58,7 +58,6 @@ class RepositoryCascadeDeleteTest(TestCase):
             # Clean up any SBOM-related data
             for sbom in SBOM.objects(repository_full_name=repo_name):
                 SBOMComponent.objects(sbom_id=sbom).delete()
-                SBOMVulnerability.objects(sbom_id=sbom).delete()
         
         # Also clean up any test repositories from Django
         Repository.objects.filter(name__startswith='test-repo').delete()
@@ -66,7 +65,6 @@ class RepositoryCascadeDeleteTest(TestCase):
         # Clean up any orphaned SBOM components and vulnerabilities
         # This ensures a completely clean state for tests
         SBOMComponent.objects.all().delete()
-        SBOMVulnerability.objects.all().delete()
         
         logger.info("Finished cleaning up existing test data.")
     
@@ -103,8 +101,8 @@ class RepositoryCascadeDeleteTest(TestCase):
             serial_number='test-uuid',
             version=1,
             generated_at=timezone.now(),
-            tool_name='cdxgen',
-            tool_version='1.0.0',
+            tool_name='GitHub Dependency Graph',
+            tool_version='unknown',
             raw_sbom={'components': [], 'metadata': {}}
         )
         
@@ -119,15 +117,7 @@ class RepositoryCascadeDeleteTest(TestCase):
         )
         
         # Create SBOMVulnerability
-        SBOMVulnerability.objects.create(
-            sbom_id=sbom,
-            vuln_id='CVE-2023-1234',
-            source_name='ossindex',
-            affected_component_purl='pkg:npm/test-component@1.0.0',
-            affected_component_name='test-component',
-            affected_component_version='1.0.0',
-            raw_vulnerability={'id': 'CVE-2023-1234', 'source': 'ossindex'}
-        )
+        # SBOMVulnerability removed - vulnerabilities come from CodeQL now
         
         # Create SonarCloudMetrics
         SonarCloudMetrics.objects.create(
@@ -188,7 +178,6 @@ class RepositoryCascadeDeleteTest(TestCase):
         # We check that our specific SBOM components are deleted by checking the count
         # after cleanup, which should be 0 for our test data
         self.assertEqual(SBOMComponent.objects.count(), 0)
-        self.assertEqual(SBOMVulnerability.objects.count(), 0)
         
         # Verify repository is deleted from Django
         self.assertEqual(Repository.objects.filter(id=self.repository.id).count(), 0)

@@ -82,7 +82,6 @@ class Repository(models.Model):
         - Release (repository_full_name)
         - SBOM (repository_full_name)
         - SBOMComponent (via sbom_id reference)
-        - SBOMVulnerability (via sbom_id reference)
         - SonarCloudMetrics (repository_full_name)
         - IndexingState (repository_full_name)
         - RepositoryStats (repository_full_name)
@@ -125,25 +124,22 @@ class Repository(models.Model):
                 except Exception as e:
                     logger.error(f"❌ Failed to delete {model_path} for {self.full_name}: {e}")
             
-            # Clean up referenced collections (SBOM components/vulnerabilities)
+            # Clean up referenced collections (SBOM components)
             try:
-                from analytics.models import SBOM, SBOMComponent, SBOMVulnerability
+                from analytics.models import SBOM, SBOMComponent
                 
                 # SAFE: Only get SBOMs for THIS specific repository
                 sboms = list(SBOM.objects(repository_full_name=self.full_name))
                 sbom_count = len(sboms)
                 logger.info(f"📦 Found {sbom_count} SBOMs for {self.full_name}")
                 
-                # Delete components and vulnerabilities for each SBOM
+                # Delete components for each SBOM
                 for sbom in sboms:
-                    # SAFE: Only delete components/vulnerabilities for THIS specific SBOM
+                    # SAFE: Only delete components for THIS specific SBOM
                     component_deleted = SBOMComponent.objects(sbom_id=sbom).delete()
-                    vulnerability_deleted = SBOMVulnerability.objects(sbom_id=sbom).delete()
                     
                     if component_deleted > 0:
                         logger.info(f"✅ Deleted {component_deleted} SBOMComponent records for SBOM {sbom.id}")
-                    if vulnerability_deleted > 0:
-                        logger.info(f"✅ Deleted {vulnerability_deleted} SBOMVulnerability records for SBOM {sbom.id}")
                 
                 # Now delete the SBOMs themselves
                 sbom_deleted = SBOM.objects(repository_full_name=self.full_name).delete()

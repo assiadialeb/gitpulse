@@ -2101,9 +2101,6 @@ def generate_sbom_task(repository_id: int, force_generate: bool = False):
         from repositories.models import Repository
         from .models import SBOM
         from .sbom_service import SBOMService
-        from .git_service import GitService
-        from .github_token_service import GitHubTokenService
-        import shutil
         
         # Get repository
         repository = Repository.objects.get(id=repository_id)
@@ -2122,35 +2119,15 @@ def generate_sbom_task(repository_id: int, force_generate: bool = False):
                     'repository_id': repository_id
                 }
         
-        # Get GitHub token for cloning
-        github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
-        if not github_token:
-            github_token = GitHubTokenService._get_user_token(user_id)
-        
-        # Clone repository
-        git_service = GitService()
-        repo_path = git_service.clone_repository(
-            repository.clone_url,
-            repository.full_name,
-            github_token
-        )
-        
-        # Generate SBOM
+        # Fetch SBOM via GitHub API (SPDX preferred)
         sbom_service = SBOMService(repository.full_name, user_id)
-        sbom_data = sbom_service.generate_sbom(repo_path)
-        sbom = sbom_service.process_sbom(sbom_data)
-        
-        # Cleanup temporary repository
-        try:
-            # Clean up the repository directory
-            shutil.rmtree(repo_path)
-            logger.info(f"Successfully cleaned up temporary repository at {repo_path}")
-            
-            # Also cleanup the GitService cache for this repository
-            git_service.cleanup_repository(repository.full_name)
-            logger.info(f"Successfully cleaned up GitService cache for {repository.full_name}")
-        except Exception as e:
-            logger.warning(f"Failed to cleanup repo path {repo_path}: {e}")
+        sbom_doc = sbom_service.fetch_github_sbom(user_id)
+        if isinstance(sbom_doc, dict) and ('spdxVersion' in sbom_doc or sbom_doc.get('SPDXID')):
+            # SPDX from GitHub Dependency Graph
+            sbom = sbom_service.process_spdx_sbom(sbom_doc)
+        else:
+            # Assume CycloneDX-compatible document
+            sbom = sbom_service.process_sbom(sbom_doc)
         
         logger.info(f"Successfully generated SBOM for {repository.full_name}")
         return {
@@ -2159,7 +2136,7 @@ def generate_sbom_task(repository_id: int, force_generate: bool = False):
             'repository_full_name': repository.full_name,
             'sbom_id': str(sbom.id),
             'component_count': sbom.component_count,
-            'vulnerability_count': sbom.vulnerability_count
+            'vulnerability_count': 0
         }
         
     except Exception as e:

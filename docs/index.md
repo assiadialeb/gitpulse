@@ -119,7 +119,6 @@ This project is licensed under the AGPL v3 License - see the [LICENSE](licence/g
 - Built with [Django](https://djangoproject.com)
 - UI powered by [DaisyUI](https://daisyui.com)
 - Documentation with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
-- SBOM generation with [@cyclonedx/cdxgen](https://github.com/CycloneDX/cdxgen)
 - And yes, way too much JavaScript 😅
 - Backends provided by [Postgresql](https://www.postgresql.org) and [MongoDB](https://www.mongodb.com)
 - AI feature provided by [Ollama](https://ollama.org)

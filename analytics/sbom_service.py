@@ -1,5 +1,5 @@
 """
-SBOM generation service using cdxgen
+SBOM service using GitHub Dependency Graph API (SPDX) with CycloneDX fallback processing
 """
 import logging
 import json
@@ -8,255 +8,128 @@ import subprocess
 import tempfile
 import shutil
 from datetime import datetime, timezone as dt_timezone
-from typing import Dict, List, Optional
-from pathlib import Path
+from typing import Dict, Optional
 from django.utils import timezone
+import requests
 
-from .models import SBOM, SBOMComponent, SBOMVulnerability
-from management.models import OSSIndexConfig
-from .sanitization import assert_safe_repo_path
+from .models import SBOM, SBOMComponent
+from .github_token_service import GitHubTokenService
 
 logger = logging.getLogger(__name__)
 
 
 class SBOMService:
-    """Service for generating and processing SBOMs"""
+    """Service for retrieving and processing SBOMs"""
     
     def __init__(self, repository_full_name: str, user_id: int):
         self.repository_full_name = repository_full_name
         self.user_id = user_id
-        self.oss_config = OSSIndexConfig.get_config()
     
-    def generate_sbom(self, repo_path: str) -> Dict:
+    def fetch_github_sbom(self, user_id: int) -> Dict:
+        """Fetch SBOM from GitHub Dependency Graph API as SPDX JSON.
+        Returns the parsed SBOM document (SPDX or CycloneDX if GitHub returns that).
         """
-        Generate SBOM using cdxgen with vulnerability scanning
-        
-        Args:
-            repo_path: Path to the cloned repository
-            
-        Returns:
-            Dictionary with SBOM data and metadata
-        """
-        logger.info(f"Generating SBOM for {self.repository_full_name} at {repo_path}")
-        # Validate repository path before using it
-        assert_safe_repo_path(repo_path)
-        
-        # Prepare environment variables
-        env = os.environ.copy()
-        if self.oss_config.email:
-            env['OSSINDEX_USERNAME'] = self.oss_config.email
-        if self.oss_config.api_token:
-            env['OSSINDEX_TOKEN'] = self.oss_config.api_token
-        #tweak for macos    
-        env["HTTP_PROXY"] = ""
-        env["HTTPS_PROXY"] = ""
-        env["NO_PROXY"] = "*"
-        # Create temporary directory for SBOM output
-        with tempfile.TemporaryDirectory() as temp_dir:
-            sbom_file = os.path.join(temp_dir, "sbom.json")
-            
-            # Build cdxgen command
-            cmd = [
-                'npx', '@cyclonedx/cdxgen',
-                '--no-install-deps',
-                '--include-vulnerabilities',
-                '--profile', 'license-compliance',
-                '-o', sbom_file,
-                '.'
-            ]
-            
-            logger.info(f"Executing cdxgen command: {' '.join(cmd)}")
-            
-            try:
-                # Execute cdxgen
-                result = subprocess.run(
-                    cmd,
-                    env=env,
-                    capture_output=True,
-                    text=True,
-                    timeout=1800,  # 30 minutes timeout
-                    cwd=repo_path
-                )
-                
-                if result.returncode != 0:
-                    logger.error(f"cdxgen failed: {result.stderr}")
-                    # Check if it's a recursion error
-                    if "RecursionError" in result.stderr or "maximum recursion depth exceeded" in result.stderr:
-                        logger.warning("cdxgen failed due to recursion error, creating basic SBOM")
-                        return self._create_basic_sbom(repo_path)
-                    else:
-                        logger.warning("cdxgen failed, creating basic SBOM as fallback")
-                        return self._create_basic_sbom(repo_path)
-                
-                # Read generated SBOM
-                if os.path.exists(sbom_file):
-                    with open(sbom_file, 'r') as f:
-                        sbom_data = json.load(f)
-                    
-                    # Check if SBOM has components
-                    components = sbom_data.get('components', [])
-                    logger.info(f"cdxgen generated SBOM with {len(components)} components")
-                    
-                    if not components:
-                        logger.warning("cdxgen generated empty SBOM, creating basic SBOM")
-                        return self._create_basic_sbom(repo_path)
-                    
-                    logger.info(f"Successfully generated SBOM with {len(components)} components")
-                    return sbom_data
-                else:
-                    logger.warning("SBOM file not generated, creating basic SBOM")
-                    return self._create_basic_sbom(repo_path)
-                    
-            except subprocess.TimeoutExpired:
-                logger.error("cdxgen timed out after 30 minutes")
-                raise Exception("SBOM generation timed out")
-            except Exception as e:
-                logger.error(f"Error generating SBOM: {e}")
-                # Try to create basic SBOM as fallback
-                try:
-                    logger.info("Attempting to create basic SBOM as fallback")
-                    return self._create_basic_sbom(repo_path)
-                except Exception as fallback_error:
-                    logger.error(f"Failed to create basic SBOM: {fallback_error}")
-                    raise
-    
-    def _create_basic_sbom(self, repo_path: str) -> Dict:
-        """
-        Create a basic SBOM when cdxgen fails
-        
-        Args:
-            repo_path: Path to the cloned repository
-            
-        Returns:
-            Basic SBOM data
-        """
-        logger.info(f"Creating basic SBOM for {self.repository_full_name}")
-        assert_safe_repo_path(repo_path)
-        
-        # Try to detect dependencies manually
-        components = []
-        
-        # Check for Python dependencies
-        requirements_file = os.path.join(repo_path, "requirements.txt")
-        if os.path.exists(requirements_file):
-            try:
-                with open(requirements_file, 'r') as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith('#'):
-                            # Parse package name and version
-                            if '==' in line:
-                                name, version = line.split('==', 1)
-                            elif '>=' in line:
-                                name, version = line.split('>=', 1)
-                            elif '<=' in line:
-                                name, version = line.split('<=', 1)
-                            else:
-                                name = line
-                                version = "unknown"
-                            
-                            components.append({
-                                "bom-ref": f"pkg:pypi/{name}@{version}",
-                                "group": "",
-                                "name": name,
-                                "version": version,
-                                "purl": f"pkg:pypi/{name}@{version}",
-                                "type": "library",
-                                "scope": "required"
-                            })
-            except Exception as e:
-                logger.warning(f"Failed to parse requirements.txt: {e}")
-        
-        # Check for Node.js dependencies
-        package_json_file = os.path.join(repo_path, "package.json")
-        if os.path.exists(package_json_file):
-            try:
-                with open(package_json_file, 'r') as f:
-                    package_data = json.load(f)
-                    dependencies = package_data.get('dependencies', {})
-                    dev_dependencies = package_data.get('devDependencies', {})
-                    
-                    for name, version in dependencies.items():
-                        components.append({
-                            "bom-ref": f"pkg:npm/{name}@{version}",
-                            "group": "",
-                            "name": name,
-                            "version": version,
-                            "purl": f"pkg:npm/{name}@{version}",
-                            "type": "library",
-                            "scope": "required"
-                        })
-                    
-                    for name, version in dev_dependencies.items():
-                        components.append({
-                            "bom-ref": f"pkg:npm/{name}@{version}",
-                            "group": "",
-                            "name": name,
-                            "version": version,
-                            "purl": f"pkg:npm/{name}@{version}",
-                            "type": "library",
-                            "scope": "optional"
-                        })
-            except Exception as e:
-                logger.warning(f"Failed to parse package.json: {e}")
-        
-        # Check for Rust dependencies
-        cargo_toml_file = os.path.join(repo_path, "Cargo.toml")
-        if os.path.exists(cargo_toml_file):
-            try:
-                # Try to extract licenses using cargo-license
-                rust_licenses = self._extract_rust_licenses(repo_path)
-                if rust_licenses:
-                    logger.info(f"Extracted {len(rust_licenses)} Rust licenses")
-                    # Add license information to components
-                    for i, component in enumerate(components):
-                        if i < len(rust_licenses):
-                            component['licenses'] = [rust_licenses[i]]
-            except Exception as e:
-                logger.warning(f"Failed to extract Rust licenses: {e}")
-        
-        # Create basic SBOM structure
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
-        
-        sbom_data = {
-            "bomFormat": "CycloneDX",
-            "specVersion": "1.6",
-            "serialNumber": f"urn:uuid:{self._generate_uuid()}",
-            "version": 1,
-            "metadata": {
-                "timestamp": now.isoformat(),
-                "tools": {
-                    "components": [
-                        {
-                            "group": "@cyclonedx",
-                            "name": "cdxgen",
-                            "version": "11.4.4",
-                            "purl": "pkg:npm/@cyclonedx/cdxgen@11.4.4",
-                            "type": "application",
-                            "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.4.4"
-                        }
-                    ]
-                },
-                "authors": [
-                    {
-                        "name": "GitPulse SBOM Generator"
-                    }
-                ],
-                "lifecycles": [
-                    {
-                        "phase": "build"
-                    }
-                ]
-            },
-            "components": components,
-            "services": [],
-            "dependencies": [],
-            "annotations": []
+        logger.info("Fetching SBOM from GitHub API for %s", self.repository_full_name)
+        try:
+            owner, repo = self.repository_full_name.split('/', 1)
+        except ValueError:
+            raise ValueError(f"Invalid repository_full_name: {self.repository_full_name}")
+
+        token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+        if not token:
+            token = GitHubTokenService._get_user_token(user_id)
+        if not token:
+            raise RuntimeError("GitHub token not found for SBOM fetch")
+
+        url = f"https://api.github.com/repos/{owner}/{repo}/dependency-graph/sbom"
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Accept': 'application/vnd.github+json',
         }
-        
-        logger.info(f"Created basic SBOM with {len(components)} components")
-        return sbom_data
+
+        resp = requests.get(url, headers=headers, timeout=30)
+        if resp.status_code == 202:
+            # GitHub may be generating the SBOM; caller can retry later
+            raise RuntimeError("GitHub SBOM generation in progress (202)")
+        if resp.status_code != 200:
+            raise RuntimeError(f"GitHub SBOM API error {resp.status_code}: {resp.text[:200]}")
+
+        data = resp.json()
+        # Some variants return the SBOM document under 'sbom'
+        sbom_doc = data.get('sbom', data)
+        if isinstance(sbom_doc, str):
+            try:
+                sbom_doc = json.loads(sbom_doc)
+            except Exception:
+                raise RuntimeError("Failed to parse SBOM string from GitHub API")
+        return sbom_doc
+
+    def process_spdx_sbom(self, spdx_data: Dict) -> SBOM:
+        """Process SPDX 2.3 SBOM from GitHub into our storage schema."""
+        logger.info("Processing SPDX SBOM for %s", self.repository_full_name)
+
+        # Metadata
+        created_at = spdx_data.get('creationInfo', {}).get('created')
+        if created_at:
+            # Replace Z with +00:00 for fromisoformat
+            ts = created_at.replace('Z', '+00:00')
+            try:
+                generated_at = datetime.fromisoformat(ts)
+                if generated_at.tzinfo is None:
+                    generated_at = timezone.make_aware(generated_at)
+            except Exception:
+                generated_at = timezone.now()
+        else:
+            generated_at = timezone.now()
+
+        tool_name = 'GitHub Dependency Graph'
+        creators = spdx_data.get('creationInfo', {}).get('creators', [])
+        for c in creators:
+            if isinstance(c, str) and c.startswith('Tool: '):
+                tool_name = c.replace('Tool: ', '').strip()
+                break
+
+        sbom = SBOM(
+            repository_full_name=self.repository_full_name,
+            bom_format='SPDX',
+            spec_version=spdx_data.get('spdxVersion', 'SPDX-2.3'),
+            serial_number=spdx_data.get('documentNamespace') or f"urn:uuid:{self._generate_uuid()}",
+            version=1,
+            generated_at=generated_at,
+            tool_name=tool_name,
+            tool_version='unknown',
+            component_count=len(spdx_data.get('packages', [])),
+            vulnerability_count=0,
+            raw_sbom=spdx_data,
+        )
+        sbom.save()
+
+        # Components mapping
+        for pkg in spdx_data.get('packages', []):
+            # Resolve purl from externalRefs if present
+            purl = None
+            for ref in pkg.get('externalRefs', []) or []:
+                if ref.get('referenceType') == 'purl' or ref.get('referenceCategory') == 'PACKAGE-MANAGER':
+                    purl = ref.get('referenceLocator') or purl
+            component = SBOMComponent(
+                sbom_id=sbom,
+                group=None,
+                name=pkg.get('name'),
+                version=pkg.get('versionInfo') or 'unknown',
+                purl=purl or '',
+                bom_ref=pkg.get('SPDXID') or (purl or pkg.get('name')),
+                component_type='library',
+                scope='required',
+                licenses=[{'license': {'id': pkg.get('licenseConcluded')}}] if pkg.get('licenseConcluded') else [],
+                hashes=[],
+                properties=[],
+                evidence={},
+                tags=[],
+            )
+            component.save()
+
+        logger.info("Stored SPDX SBOM: %d components", sbom.component_count)
+        return sbom
     
     def _generate_uuid(self) -> str:
         """Generate a UUID for SBOM serial number"""
@@ -268,7 +141,7 @@ class SBOMService:
         Process and store SBOM data in MongoDB
         
         Args:
-            sbom_data: Raw SBOM data from cdxgen
+            sbom_data: Raw SBOM data (CycloneDX)
             
         Returns:
             SBOM document
@@ -301,7 +174,7 @@ class SBOMService:
             serial_number=sbom_data.get('serialNumber'),
             version=sbom_data.get('version'),
             generated_at=generated_at,
-            tool_name=tool_info.get('name', 'cdxgen'),
+            tool_name=tool_info.get('name', 'unknown'),
             tool_version=tool_info.get('version', 'unknown'),
             component_count=len(sbom_data.get('components', [])),
             raw_sbom=sbom_data
@@ -327,39 +200,8 @@ class SBOMService:
             )
             component.save()
         
-        # Process vulnerabilities (if present)
-        vulnerabilities = sbom_data.get('vulnerabilities', [])
-        for vuln_data in vulnerabilities:
-            # Extract affected component info
-            affected = vuln_data.get('affects', [{}])[0]
-            affected_ref = affected.get('ref')
-            
-            # Find component by bom-ref
-            component = SBOMComponent.objects(sbom_id=sbom, bom_ref=affected_ref).first()
-            
-            if component:
-                vulnerability = SBOMVulnerability(
-                    sbom_id=sbom,
-                    vuln_id=vuln_data.get('id'),
-                    source_name=vuln_data.get('source', {}).get('name'),
-                    title=vuln_data.get('title'),
-                    description=vuln_data.get('description'),
-                    severity=vuln_data.get('ratings', [{}])[0].get('severity'),
-                    cvss_score=vuln_data.get('ratings', [{}])[0].get('score'),
-                    cvss_vector=vuln_data.get('ratings', [{}])[0].get('vector'),
-                    affected_component_purl=component.purl,
-                    affected_component_name=component.name,
-                    affected_component_version=component.version,
-                    references=vuln_data.get('references', []),
-                    ratings=vuln_data.get('ratings', []),
-                    published_date=self._parse_timezone_aware_date(vuln_data.get('published')) if vuln_data.get('published') else None,
-                    updated_date=self._parse_timezone_aware_date(vuln_data.get('updated')) if vuln_data.get('updated') else None,
-                    raw_vulnerability=vuln_data
-                )
-                vulnerability.save()
-        
-        # Update vulnerability count
-        sbom.vulnerability_count = len(vulnerabilities)
+        # Vulnerabilities no longer processed (handled by CodeQL)
+        sbom.vulnerability_count = 0
         sbom.save()
         
         logger.info(f"Processed SBOM with {sbom.component_count} components and {sbom.vulnerability_count} vulnerabilities")

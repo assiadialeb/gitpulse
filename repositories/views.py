@@ -272,23 +272,14 @@ def repository_detail(request, repo_id):
         avg_files_changed = round(float(commit_change_stats.get('avg_files_changed', 0)), 2)
         nb_commits = int(commit_change_stats.get('nb_commits', 0))
         
-        # Get SBOM vulnerability data
-        from analytics.models import SBOM, SBOMVulnerability
+        # Get SBOM data (no longer using SBOMVulnerability; vulnerabilities come from CodeQL)
+        from analytics.models import SBOM
         # Get all SBOMs for this repository (full_name already validated above)
         assert_safe_repository_full_name(repository.full_name)
         all_sboms = SBOM.objects(repository_full_name=repository.full_name).order_by('-generated_at')
         
-        # Find the best SBOM (prefer one with vulnerabilities, then most recent)
-        sbom = None
-        for potential_sbom in all_sboms:
-            vulnerabilities_count = SBOMVulnerability.objects(sbom_id=potential_sbom.id).count()
-            if vulnerabilities_count > 0:
-                sbom = potential_sbom
-                break
-        
-        # If no SBOM with vulnerabilities, take the most recent one
-        if not sbom and all_sboms:
-            sbom = all_sboms[0]
+        # Choose the most recent SBOM if available
+        sbom = all_sboms[0] if all_sboms else None
         vulnerability_stats = {
             'total_vulnerabilities': 0,
             'severity_counts': {},
@@ -319,16 +310,8 @@ def repository_detail(request, repo_id):
                     pass
             
             if sbom_in_range:
-                vulnerabilities = SBOMVulnerability.objects(sbom_id=sbom)
+                # We only expose CodeQL vulnerabilities now; keep SBOM presence as a flag
                 vulnerability_stats['has_sbom'] = True
-                vulnerability_stats['total_vulnerabilities'] = len(vulnerabilities)
-                
-                # Count by severity
-                severity_counts = {}
-                for vuln in vulnerabilities:
-                    severity = vuln.severity or 'unknown'
-                    severity_counts[severity] = severity_counts.get(severity, 0) + 1
-                vulnerability_stats['severity_counts'] = severity_counts
         
         # Get SonarCloud metrics
         from repositories.views import _get_sonarcloud_metrics
@@ -1004,14 +987,15 @@ def repository_vulnerabilities_analysis(request, repo_id):
         elif end_date:
             filters['end_date'] = end_date
         
+        # Deprecated: vulnerabilities now come from CodeQL; return empty list with SBOM metadata
         return JsonResponse({
             'status': 'success',
-            'vulnerabilities': vulnerabilities,
-            'total_vulnerabilities': len(vulnerabilities),
-            'severity_counts': severity_counts,
-            'sbom_generated': sbom.generated_at.isoformat() if sbom.generated_at else None,
+            'vulnerabilities': [],
+            'total_vulnerabilities': 0,
+            'severity_counts': {},
+            'sbom_generated': sbom.generated_at.isoformat() if (sbom and sbom.generated_at) else None,
             'filters': filters,
-            'note': 'Vulnerabilities represent current state of dependencies, filtered by SBOM generation date'
+            'note': 'Dependency vulnerabilities removed; CodeQL provides vulnerabilities now'
         })
         
     except Exception as e:
