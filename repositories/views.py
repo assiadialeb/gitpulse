@@ -1558,6 +1558,43 @@ def repository_codeql_analysis(request, repo_id):
                 ).order_by('-created_at').limit(50)
                 
                 for vuln in vuln_objects:
+                    # Resolve developer name who introduced the vulnerability from commit_sha if available
+                    introduced_by = None
+                    try:
+                        if getattr(vuln, 'commit_sha', None):
+                            from analytics.models import Commit, DeveloperAlias
+                            # Find commit and resolve alias to developer
+                            commit = Commit.objects(sha=vuln.commit_sha).first()
+                            if commit:
+                                introduced_by = commit.author_name or commit.committer_name
+                                # Try developer alias resolution by name then email
+                                alias = None
+                                if introduced_by:
+                                    alias = DeveloperAlias.objects.filter(name__iexact=introduced_by).first()
+                                if not alias and commit.author_email:
+                                    alias = DeveloperAlias.objects.filter(email__iexact=commit.author_email).first()
+                                if alias and getattr(alias, 'developer', None):
+                                    introduced_by = alias.developer.primary_name
+                    except Exception:
+                        introduced_by = None
+
+                    # Resolve developer name who fixed the vulnerability from fixed_commit_sha if available
+                    fixed_by = None
+                    try:
+                        if getattr(vuln, 'fixed_commit_sha', None):
+                            from analytics.models import Commit, DeveloperAlias
+                            fixed_commit = Commit.objects(sha=vuln.fixed_commit_sha).first()
+                            if fixed_commit:
+                                fixed_by = fixed_commit.author_name or fixed_commit.committer_name
+                                alias = None
+                                if fixed_by:
+                                    alias = DeveloperAlias.objects.filter(name__iexact=fixed_by).first()
+                                if not alias and fixed_commit.author_email:
+                                    alias = DeveloperAlias.objects.filter(email__iexact=fixed_commit.author_email).first()
+                                if alias and getattr(alias, 'developer', None):
+                                    fixed_by = alias.developer.primary_name
+                    except Exception:
+                        fixed_by = None
                     vulnerabilities.append({
                         'rule_id': vuln.rule_id,
                         'rule_name': vuln.rule_name,
@@ -1572,7 +1609,9 @@ def repository_codeql_analysis(request, repo_id):
                         'dismissed_reason': vuln.dismissed_reason,
                         'html_url': vuln.html_url,
                         'get_age_days': vuln.get_age_days(),
-                        'created_at': vuln.created_at
+                        'created_at': vuln.created_at,
+                        'introduced_by': introduced_by,
+                        'fixed_by': fixed_by
                     })
                     
             except Exception as e:

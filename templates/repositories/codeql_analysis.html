@@ -156,6 +156,8 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rule</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Introduced By</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fixed By</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
@@ -174,6 +176,20 @@
                                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 mt-1">
                                                 {{ vuln.cwe_id }}
                                             </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        {% if vuln.introduced_by %}
+                                            <div class="text-sm text-gray-900">{{ vuln.introduced_by }}</div>
+                                        {% else %}
+                                            <span class="text-sm text-gray-400">Unknown</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        {% if vuln.fixed_by %}
+                                            <div class="text-sm text-gray-900">{{ vuln.fixed_by }}</div>
+                                        {% else %}
+                                            <span class="text-sm text-gray-400">—</span>
                                         {% endif %}
                                     </td>
                                     <td class="py-3 px-4">

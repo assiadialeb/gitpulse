@@ -746,6 +746,11 @@ class CodeQLVulnerability(Document):
     dismissed_at = fields.DateTimeField(null=True)
     fixed_at = fields.DateTimeField(null=True)
     
+    # Commit information
+    commit_sha = fields.StringField(max_length=40, null=True)
+    fixed_commit_sha = fields.StringField(max_length=40, null=True)
+    ref = fields.StringField(max_length=255, null=True)
+    
     # GitHub metadata
     html_url = fields.URLField(max_length=500)
     number = fields.IntField()  # GitHub alert number

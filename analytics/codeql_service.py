@@ -160,6 +160,21 @@ class CodeQLService:
         
         logger.info(f"Fetched {len(all_alerts)} total CodeQL alerts for {repo_full_name}")
         return all_alerts, True
+
+    def fetch_alert_instances(self, repo_full_name: str, alert_number: int) -> Tuple[List[Dict], bool]:
+        """
+        Fetch instances for a given CodeQL alert. Used to determine fixed commit.
+        """
+        url = f"{self.base_url}/repos/{repo_full_name}/code-scanning/alerts/{alert_number}/instances"
+        data, success = self._make_request(url)
+        if not success or data is None:
+            return [], False
+        if isinstance(data, dict):
+            return [data], True
+        if isinstance(data, list):
+            return data, True
+        logger.error(f"Unexpected response format for instances of alert {alert_number} in {repo_full_name}")
+        return [], False
     
     def process_codeql_alert(self, alert_data: Dict, repo_full_name: str) -> Optional[CodeQLVulnerability]:
         """
@@ -203,8 +218,10 @@ class CodeQLService:
                     alert_data['fixed_at'].replace('Z', '+00:00')
                 )
             
-            # Extract location information
+            # Extract location and commit information
             location = most_recent_instance.get('location', {})
+            commit_sha = most_recent_instance.get('commit_sha')
+            ref = most_recent_instance.get('ref')
             
             # Determine severity using security-specific field when present
             mapped_severity = self.map_github_severity(rule_info)
@@ -228,6 +245,20 @@ class CodeQLService:
                     normalized_dismissed_reason = tmp
             
             # Create vulnerability instance
+            # Determine fixed commit sha if available (only when fixed and we have an alert number)
+            fixed_commit_sha = None
+            try:
+                if (alert_data.get('state') or '').lower() == 'fixed' and alert_number:
+                    instances, ok = self.fetch_alert_instances(repo_full_name, alert_number)
+                    if ok and instances:
+                        # Prefer latest instance with state fixed
+                        fixed_instances = [i for i in instances if (i.get('state') or '').lower() == 'fixed']
+                        if fixed_instances:
+                            # Instances do not always include timestamps; fall back to last in list
+                            fixed_commit_sha = (fixed_instances[-1] or {}).get('commit_sha')
+            except Exception as e:
+                logger.warning(f"Could not determine fixed commit sha for alert {alert_number} in {repo_full_name}: {e}")
+
             vulnerability = CodeQLVulnerability(
                 repository_full_name=repo_full_name,
                 vulnerability_id=str(alert_data.get('id', alert_number)),
@@ -252,6 +283,9 @@ class CodeQLService:
                 updated_at=updated_at or datetime.now(dt_timezone.utc),
                 dismissed_at=dismissed_at,
                 fixed_at=fixed_at,
+                commit_sha=commit_sha,
+                fixed_commit_sha=fixed_commit_sha,
+                ref=ref,
                 html_url=alert_data.get('html_url'),
                 number=alert_number,
                 tool_name='CodeQL',

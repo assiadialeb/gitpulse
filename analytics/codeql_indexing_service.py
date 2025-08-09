@@ -291,6 +291,14 @@ class CodeQLIndexingService:
             existing.end_line = new_data.end_line
             existing.start_column = new_data.start_column
             existing.end_column = new_data.end_column
+
+        # Update commit metadata when provided
+        if getattr(new_data, 'commit_sha', None):
+            existing.commit_sha = new_data.commit_sha
+        if getattr(new_data, 'fixed_commit_sha', None):
+            existing.fixed_commit_sha = new_data.fixed_commit_sha
+        if getattr(new_data, 'ref', None):
+            existing.ref = new_data.ref
         
         existing.save()
     
