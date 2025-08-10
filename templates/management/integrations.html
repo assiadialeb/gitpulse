@@ -45,14 +45,7 @@
                                     <path d="M22.406 10.9a7.088 7.088 0 00-3.377-2.358v-.085c0-4.035-3.156-7.324-7.047-7.324-3.893 0-7.05 3.282-7.05 7.325v.1C2.081 9.492 0 12.268 0 15.542c0 4.035 3.159 7.325 7.05 7.325a6.907 6.907 0 004.952-2.108 6.885 6.885 0 004.947 2.108c3.884 0 7.051-3.282 7.051-7.325a7.572 7.572 0 00-1.594-4.643zM16.95 21.014c-2.903 0-5.267-2.456-5.267-5.474a.91.91 0 00-.89-.924.906.906 0 00-.892.925c0 1.368.367 2.651.994 3.748a5.156 5.156 0 01-3.845 1.733c-2.904 0-5.27-2.457-5.27-5.474 0-3.016 2.366-5.473 5.27-5.473.63 0 1.241.117 1.827.335.007 0 .013.007.02.007.203.071.489.21.578.287a.858.858 0 001.249-.1.942.942 0 00-.097-1.3c-.39-.342-.995-.575-1.144-.63a6.814 6.814 0 00-2.425-.443c-.113 0-.225 0-.338.007.12-2.916 2.433-5.247 5.27-5.247 2.903 0 5.267 2.456 5.267 5.474a5.569 5.569 0 01-2.215 4.463.948.948 0 00-.21 1.283c.171.25.45.39.727.39a.86.86 0 00.516-.172 7.381 7.381 0 002.709-4.02c2.035.785 3.449 2.829 3.449 5.139-.007 3.01-2.371 5.466-5.283 5.466z"/>
                                 </svg>
                             </div>
-                        {% elif integration.name == 'OSS Index' %}
-                            <div class="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-                                <svg class="h-6 w-6" viewBox="0 0 24 24" role="img" xmlns="http://www.w3.org/2000/svg">
-                                    <title>OSS Index icon</title>
-                                    <!-- Hexagon with white stroke and blue fill -->
-                                    <path d="M12 2L20 7V17L12 22L4 17V7L12 2Z" stroke="white" stroke-width="2" fill="#3B82F6"/>
-                                </svg>
-                            </div>
+                        
                         {% else %}
                             <div class="h-10 w-10 rounded-full bg-gray-400 flex items-center justify-center">
                                 <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,15 +109,7 @@
                                 class="flex-1 btn btn-outline btn-sm">
                             Test Connection
                         </button>
-                    {% elif integration.name == 'OSS Index' %}
-                        <button onclick="openOSSIndexConfigModal()" 
-                                class="flex-1 btn btn-outline btn-sm">
-                            Configure
-                        </button>
-                        <button onclick="testOSSIndexConnection()" 
-                                class="flex-1 btn btn-outline btn-sm">
-                            Test Connection
-                        </button>
+                    
                     {% else %}
                         <button onclick="configureIntegration('{{ integration.name }}')" 
                                 class="flex-1 btn btn-outline btn-sm">
@@ -187,45 +172,7 @@
     </div>
 </div>
 
-<!-- OSS Index Configuration Modal -->
-<div id="ossindex-config-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div class="mt-3">
-            {% csrf_token %}
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-medium text-gray-900">OSS Index Configuration</h3>
-                <button onclick="closeOSSIndexConfigModal()" class="text-gray-400 hover:text-gray-600">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            
-            <div id="ossindex-config-content" class="space-y-4">
-                <div>
-                    <label for="ossindex-email" class="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" id="ossindex-email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter OSS Index account email">
-                    <p class="mt-1 text-xs text-gray-500">Your OSS Index account email</p>
-                </div>
-                
-                <div>
-                    <label for="ossindex-api-token" class="block text-sm font-medium text-gray-700">API Token</label>
-                    <input type="password" id="ossindex-api-token" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter OSS Index API Token">
-                    <p class="mt-1 text-xs text-gray-500">Get your token from <a href="https://ossindex.sonatype.org/" target="_blank" class="text-blue-600 hover:text-blue-800">OSS Index</a></p>
-                </div>
-            </div>
-            
-            <div class="flex justify-end space-x-3 mt-6">
-                <button onclick="closeOSSIndexConfigModal()" class="btn btn-outline btn-sm">
-                    Cancel
-                </button>
-                <button onclick="saveOSSIndexConfig()" class="btn btn-primary btn-sm">
-                    Save Configuration
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- OSS Index integration removed -->
 
 <!-- GitHub Configuration Modal -->
 <div id="github-config-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
@@ -486,139 +433,7 @@ function testSonarCloudConnection() {
     });
 }
 
-function openOSSIndexConfigModal() {
-    // Show modal
-    document.getElementById('ossindex-config-modal').classList.remove('hidden');
-    
-    // Get CSRF token from modal
-    const csrfToken = document.querySelector('#ossindex-config-modal [name=csrfmiddlewaretoken]');
-    if (!csrfToken) {
-        console.error('CSRF token not found in modal');
-        alert('Error: CSRF token not found');
-        return;
-    }
-    
-    console.log('Loading OSS Index configuration...');
-    
-    // Load current configuration
-    fetch('{% url "management:get_ossindex_config" %}', {
-        method: 'GET',
-        headers: {
-            'X-CSRFToken': csrfToken.value,
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('OSS Index config response:', data);
-        if (data.success) {
-            document.getElementById('ossindex-email').value = data.config.email || '';
-            document.getElementById('ossindex-api-token').value = data.config.api_token || '';
-            console.log('Configuration loaded successfully');
-        } else {
-            console.error('Error in response:', data.message);
-            // Don't show alert for missing config, just clear fields
-            document.getElementById('ossindex-email').value = '';
-            document.getElementById('ossindex-api-token').value = '';
-        }
-    })
-    .catch(error => {
-        console.error('Error loading configuration:', error);
-        // Don't show alert for missing config, just clear fields
-        document.getElementById('ossindex-email').value = '';
-        document.getElementById('ossindex-api-token').value = '';
-    });
-}
-
-function closeOSSIndexConfigModal() {
-    document.getElementById('ossindex-config-modal').classList.add('hidden');
-}
-
-function saveOSSIndexConfig() {
-    const email = document.getElementById('ossindex-email').value.trim();
-    const apiToken = document.getElementById('ossindex-api-token').value.trim();
-    
-    if (!email) {
-        alert('Please enter an email address');
-        return;
-    }
-    
-    if (!apiToken) {
-        alert('Please enter an API token');
-        return;
-    }
-    
-    // Get CSRF token
-    const csrfToken = document.querySelector('#ossindex-config-modal [name=csrfmiddlewaretoken]');
-    if (!csrfToken) {
-        alert('Error: CSRF token not found');
-        return;
-    }
-    
-    // Create form data
-    const formData = new FormData();
-    formData.append('email', email);
-    formData.append('api_token', apiToken);
-    
-    // Save configuration
-    fetch('{% url "management:save_ossindex_config" %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': csrfToken.value,
-        },
-        body: formData,
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            closeOSSIndexConfigModal();
-            alert('✅ ' + data.message);
-            location.reload();
-        } else {
-            alert('❌ ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error saving configuration:', error);
-        alert('❌ Error saving configuration: ' + error.message);
-    });
-}
-
-function testOSSIndexConnection() {
-    const button = event.target;
-    const originalText = button.textContent;
-    button.textContent = 'Testing...';
-    button.disabled = true;
-    
-    fetch('{% url "management:test_ossindex_connection" %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ ' + data.message);
-        } else {
-            alert('❌ ' + data.message);
-        }
-    })
-    .catch(error => {
-        alert('❌ Error testing connection: ' + error.message);
-    })
-    .finally(() => {
-        button.textContent = originalText;
-        button.disabled = false;
-    });
-}
+// OSS Index integration removed
 
 function testGitHubConnection() {
     const button = event.target;

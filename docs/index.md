@@ -39,7 +39,7 @@ I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs
 
 ⚡ Live GitHub Sync: Realtime updates powered by the GitHub API, no manual refresh.
 
-🎯 Integrations: Many integrations OSS Index, Github, CycloneDX and more to come (sonarqube, Snyk...)
+🎯 Integrations: GitHub, CycloneDX (SBOM via GitHub), and more to come (sonarqube, Snyk...)
 
 ---
 
