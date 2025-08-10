@@ -466,6 +466,9 @@ class PullRequest(Document):
     deletions_count = fields.IntField(default=0)  # Lignes supprimées
     changed_files_count = fields.IntField(default=0)  # Nombre de fichiers modifiés
     
+    # Commit linkage cached on PR for performance (list of commit SHAs)
+    commit_shas = fields.ListField(fields.StringField(max_length=40), default=list)
+    
     payload = fields.DictField()  # Raw PR payload (optionnel)
 
     meta = {

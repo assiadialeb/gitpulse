@@ -10,7 +10,7 @@ from django.utils import timezone
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
 
-from .models import PullRequest
+from .models import PullRequest, Commit
 from .intelligent_indexing_service import IntelligentIndexingService
 
 logger = logging.getLogger(__name__)
@@ -187,6 +187,17 @@ class PullRequestIndexingService:
                 'assignees_list': [a['login'] for a in pr_data.get('assignees', [])],
                 'labels_list': [l['name'] for l in pr_data.get('labels', [])]
             }
+
+            # Fetch commit SHAs associated with this PR (cache for performance)
+            try:
+                commits_url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/commits"
+                commits_resp = requests.get(commits_url, headers=headers)
+                commits_resp.raise_for_status()
+                commits_data = commits_resp.json()
+                stats['commit_shas'] = [c.get('sha') for c in commits_data if c.get('sha')]
+            except Exception as e:
+                logger.warning(f"Could not fetch commits for PR #{pr_number}: {e}")
+                stats['commit_shas'] = []
             
             return stats
             
@@ -302,6 +313,9 @@ class PullRequestIndexingService:
                     pr.additions_count = pr_data.get('additions_count', 0)
                     pr.deletions_count = pr_data.get('deletions_count', 0)
                     pr.changed_files_count = pr_data.get('changed_files_count', 0)
+                    # Cache commit SHAs on the PR for fast access in UI/queries
+                    pr.commit_shas = pr_data.get('commit_shas', []) or []
+
                     pr.payload = pr_data.get('payload', {})
                     pr.save()
                     
@@ -310,6 +324,19 @@ class PullRequestIndexingService:
                         logger.debug(f"Created new PR #{pr_number}")
                     else:
                         logger.debug(f"Updated existing PR #{pr_number}")
+
+                    # Update linked commits (if present) with PR linkage
+                    if pr.commit_shas:
+                        for sha in pr.commit_shas:
+                            try:
+                                commit = Commit.objects(sha=sha).first()
+                                if commit:
+                                    commit.pull_request_number = pr_number
+                                    commit.pull_request_url = pr.url
+                                    commit.pull_request_merged_at = merged_at
+                                    commit.save()
+                            except Exception as e:
+                                logger.debug(f"Could not update commit {sha} for PR #{pr_number}: {e}")
                         
                 except Exception as e:
                     logger.warning(f"Error saving PR #{pr_number}: {e}")
