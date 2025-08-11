@@ -319,8 +319,18 @@
                                 el.className = 'text-2xl font-bold text-gray-400';
                                 return;
                             }
-                            el.textContent = a.compatible ? '✅ Compatible' : '⚠️ Review';
-                            el.className = a.compatible ? 'text-2xl font-bold text-green-500' : 'text-2xl font-bold text-yellow-500';
+                            const hasWarnings = Array.isArray(a.warnings) && a.warnings.length > 0;
+                            const hasIncompat = Array.isArray(a.incompatible_components) && a.incompatible_components.length > 0;
+                            if (a.compatible === false || hasIncompat) {
+                                el.textContent = '❌ Not Compatible';
+                                el.className = 'text-2xl font-bold text-red-500';
+                            } else if (hasWarnings) {
+                                el.textContent = '⚠️ Caution';
+                                el.className = 'text-2xl font-bold text-yellow-500';
+                            } else {
+                                el.textContent = '✅ Compatible';
+                                el.className = 'text-2xl font-bold text-green-500';
+                            }
                         })
                         .catch(() => {/* keep default */});
                 } catch(e) { /* no-op */ }
@@ -1301,12 +1311,17 @@ function updateLicensingStatus(analysis, withLLM = true) {
     }
     
     // Always show a baseline status immediately from SBOM analysis
-    if (analysis.compatible) {
+    const hasWarnings = Array.isArray(analysis.warnings) && analysis.warnings.length > 0;
+    const hasIncompat = Array.isArray(analysis.incompatible_components) && analysis.incompatible_components.length > 0;
+    if (analysis.compatible === false || hasIncompat) {
+        statusElement.textContent = '❌ Not Compatible';
+        statusElement.className = 'text-2xl font-bold text-red-500';
+    } else if (hasWarnings) {
+        statusElement.textContent = '⚠️ Caution';
+        statusElement.className = 'text-2xl font-bold text-yellow-500';
+    } else {
         statusElement.textContent = '✅ Compatible';
         statusElement.className = 'text-2xl font-bold text-green-500';
-    } else {
-        statusElement.textContent = '⚠️ Review';
-        statusElement.className = 'text-2xl font-bold text-yellow-500';
     }
 
     if (!withLLM) {
