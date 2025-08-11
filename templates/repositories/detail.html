@@ -302,6 +302,30 @@
                     </div>
                 </div>
             </div>
+            <script>
+            (function initLicensingTileImmediately(){
+                try {
+                    const el = document.getElementById('licensing-status');
+                    if (!el) return;
+                    const repoId = {{ repository.id }};
+                    // Baseline (SBOM-based) status only; NO LLM call here
+                    fetch(`/repositories/api/${repoId}/licensing-analysis/`, { credentials: 'same-origin' })
+                        .then(r => r.ok ? r.json() : Promise.reject(r))
+                        .then(d => {
+                            if (!d || !d.success || !d.analysis) return;
+                            const a = d.analysis;
+                            if (!a.has_sbom) {
+                                el.textContent = 'No SBOM';
+                                el.className = 'text-2xl font-bold text-gray-400';
+                                return;
+                            }
+                            el.textContent = a.compatible ? '✅ Compatible' : '⚠️ Review';
+                            el.className = a.compatible ? 'text-2xl font-bold text-green-500' : 'text-2xl font-bold text-yellow-500';
+                        })
+                        .catch(() => {/* keep default */});
+                } catch(e) { /* no-op */ }
+            })();
+            </script>
             
 
             
@@ -779,8 +803,22 @@
 <script>
 // Chart initialization
 {% if repository.is_indexed %}
+// Ensure licensing status initializes regardless of when this script runs
+(function ensureLicensingInit() {
+    const start = () => {
+        if (typeof initLicensingStatus === 'function') {
+            try { initLicensingStatus(); } catch (e) { console.warn('initLicensingStatus error', e); }
+        }
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Note: licensing analysis is now lazy-loaded on slide-over open to avoid double scrolljump and initial cost
+    // Note: licensing slide-over remains lazy-loaded; summary status now initializes independently on page load
     
     // Commit Type Doughnut Chart
     {% if commit_types.counts %}
@@ -1251,7 +1289,7 @@ function displayLicensingAnalysis(analysis) {
 
 
 
-function updateLicensingStatus(analysis) {
+function updateLicensingStatus(analysis, withLLM = true) {
     const statusElement = document.getElementById('licensing-status');
     
     console.log('updateLicensingStatus called with analysis:', analysis);
@@ -1262,10 +1300,20 @@ function updateLicensingStatus(analysis) {
         return;
     }
     
-    // Show loading state for LLM verdict
-    statusElement.textContent = '🤖 Analyzing...';
-    statusElement.className = 'text-2xl font-bold text-purple-500';
+    // Always show a baseline status immediately from SBOM analysis
+    if (analysis.compatible) {
+        statusElement.textContent = '✅ Compatible';
+        statusElement.className = 'text-2xl font-bold text-green-500';
+    } else {
+        statusElement.textContent = '⚠️ Review';
+        statusElement.className = 'text-2xl font-bold text-yellow-500';
+    }
+
+    if (!withLLM) {
+        return;
+    }
     
+    // Fetch LLM verdict in background; keep baseline text until verdict arrives
     console.log('Starting LLM verdict request...');
     
     // Add timeout to prevent infinite loading
@@ -1367,6 +1415,43 @@ function loadLLMAnalysis() {
                 </div>
             `;
         });
+
+// Initialize licensing status on page load; baseline first, then upgrade with LLM verdict
+function initLicensingStatus() {
+    const statusElement = document.getElementById('licensing-status');
+    if (!statusElement) return;
+    
+    // Quick loading hint
+    statusElement.textContent = 'Analyzing...';
+    statusElement.className = 'text-2xl font-bold text-gray-500';
+    
+    // Baseline (no LLM)
+    fetch(`/repositories/api/{{ repository.id }}/licensing-analysis/`, { credentials: 'same-origin' })
+        .then(response => response.ok ? response.json() : Promise.reject(new Error('HTTP ' + response.status)))
+        .then(data => {
+            if (data && data.success && data.analysis) {
+                updateLicensingStatus(data.analysis, false);
+            }
+        })
+        .catch(err => {
+            console.warn('Licensing status init (baseline) failed:', err);
+            statusElement.textContent = 'N/A';
+            statusElement.className = 'text-2xl font-bold text-gray-400';
+        });
+
+    // LLM verdict (upgrade)
+    fetch(`/repositories/api/{{ repository.id }}/llm-license-verdict/`, { credentials: 'same-origin' })
+        .then(response => response.ok ? response.json() : Promise.reject(new Error('HTTP ' + response.status)))
+        .then(data => {
+            if (data && data.success && typeof data.verdict === 'string') {
+                statusElement.textContent = data.verdict;
+                statusElement.className = 'text-2xl font-bold';
+            }
+        })
+        .catch(err => {
+            console.warn('Licensing LLM verdict init failed:', err);
+        });
+}
 }
 
 function displayLLMAnalysis(analysis, licenses) {

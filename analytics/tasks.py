@@ -21,6 +21,7 @@ from .commit_indexing_service import CommitIndexingService
 from .pullrequest_indexing_service import PullRequestIndexingService
 from .release_indexing_service import ReleaseIndexingService
 from analytics.models import IndexingState
+from .sanitization import assert_safe_repository_full_name
 
 logger = logging.getLogger(__name__)
 
