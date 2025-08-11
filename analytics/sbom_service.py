@@ -8,12 +8,13 @@ import subprocess
 import tempfile
 import shutil
 from datetime import datetime, timezone as dt_timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from django.utils import timezone
 import requests
 
 from .models import SBOM, SBOMComponent
 from .github_token_service import GitHubTokenService
+from .sanitization import assert_safe_repo_path
 
 logger = logging.getLogger(__name__)
 
