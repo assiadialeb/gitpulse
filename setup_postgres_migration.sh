@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration pour migration vers PostgreSQL existant
-export POSTGRES_DB=gitpulse_new
+export POSTGRES_DB=gitpulse
 export POSTGRES_USER=gitpulse_user
 export POSTGRES_PASSWORD=gitpulse_password
 export POSTGRES_HOST=localhost
