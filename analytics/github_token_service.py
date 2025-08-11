@@ -33,6 +33,42 @@ class GitHubTokenService:
     }
     
     @staticmethod
+    def get_token_for_repository_or_org(repository_full_name: Optional[str] = None, organization: Optional[str] = None) -> Optional[str]:
+        """Resolve token based on repository owner or explicit organization using GitHub App credentials.
+        - If an active `IntegrationConfig` exists for the org with `app_id` and `private_key`,
+          generate a short-lived Installation Access Token via the GitHub App flow and return it.
+        - Otherwise, fallback to legacy OAuth App token (public-only), if configured.
+        """
+        try:
+            if repository_full_name and not organization:
+                try:
+                    organization = repository_full_name.split('/', 1)[0]
+                except Exception:
+                    organization = None
+
+            if organization:
+                from management.models import IntegrationConfig
+                integration = (
+                    IntegrationConfig.objects
+                    .filter(provider='github', github_organization=organization, status='active')
+                    .first()
+                )
+                if integration and integration.app_id and integration.private_key:
+                    token = GitHubTokenService._get_github_app_installation_token(
+                        app_id=integration.app_id.strip(),
+                        private_key_pem=integration.private_key.strip(),
+                        organization=organization,
+                    )
+                    if token:
+                        logger.info("Using GitHub App installation token for org %s", organization)
+                        return token
+        except Exception as e:
+            logger.warning(f"Failed to resolve integration for org {organization}: {e}")
+
+        # Fallback (public repos only if configured)
+        return GitHubTokenService._get_oauth_app_token()
+    
+    @staticmethod
     def get_token_for_operation(operation_type: str, user_id: Optional[int] = None) -> Optional[str]:
         """
         Get the appropriate GitHub token for a specific operation
@@ -78,7 +114,12 @@ class GitHubTokenService:
         Returns:
             GitHub token or None if not available
         """
-        # First try user token (works for both public and private repos)
+        # First attempt: org-specific integration token
+        org_token = GitHubTokenService.get_token_for_repository_or_org(repository_full_name=repo_full_name)
+        if org_token:
+            return org_token
+
+        # Then try user token (works for both public and private repos)
         user_token = GitHubTokenService._get_user_token(user_id)
         if user_token and GitHubTokenService._has_required_scopes(user_id, ['repo']):
             logger.info(f"Using user token for repository access: {repo_full_name}")
@@ -115,6 +156,10 @@ class GitHubTokenService:
             parts = api_endpoint.split('/repos/')
             if len(parts) > 1:
                 repo_full_name = parts[1].split('/')[0] + '/' + parts[1].split('/')[1]
+                # Try org integration first
+                token = GitHubTokenService.get_token_for_repository_or_org(repository_full_name=repo_full_name)
+                if token:
+                    return token
                 return GitHubTokenService.get_token_for_repository_access(user_id, repo_full_name)
         
         # Default to user token for most API calls
@@ -136,6 +181,72 @@ class GitHubTokenService:
             
         except Exception as e:
             logger.error(f"Error getting OAuth App token: {e}")
+            return None
+
+    @staticmethod
+    def _get_github_app_installation_token(app_id: str, private_key_pem: str, organization: str) -> Optional[str]:
+        """Create a GitHub App JWT, find the installation for the org, and return an installation access token."""
+        try:
+            import requests
+            import jwt
+            from datetime import datetime, timedelta, timezone as dt_tz
+
+            # Build JWT for the GitHub App
+            now = datetime.now(dt_tz.utc)
+            payload = {
+                'iat': int((now - timedelta(seconds=60)).timestamp()),  # 60s skew
+                'exp': int((now + timedelta(minutes=9)).timestamp()),    # <10 min
+                'iss': app_id,
+            }
+            app_jwt = jwt.encode(payload, private_key_pem, algorithm='RS256')
+
+            headers = {
+                'Authorization': f'Bearer {app_jwt}',
+                'Accept': 'application/vnd.github+json',
+                'User-Agent': 'GitPulse'
+            }
+
+            # Find installation for the organization
+            installation_id = None
+            page = 1
+            while True:
+                resp = requests.get(
+                    'https://api.github.com/app/installations',
+                    headers=headers,
+                    params={'per_page': 100, 'page': page},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                installs = resp.json()
+                for inst in installs:
+                    account = inst.get('account') or {}
+                    login = (account.get('login') or '').lower()
+                    if login == (organization or '').lower():
+                        installation_id = inst.get('id')
+                        break
+                if installation_id or not installs or len(installs) < 100:
+                    break
+                page += 1
+
+            if not installation_id:
+                logger.warning("No GitHub App installation found for org %s", organization)
+                return None
+
+            # Create installation access token
+            token_resp = requests.post(
+                f'https://api.github.com/app/installations/{installation_id}/access_tokens',
+                headers=headers,
+                timeout=15,
+            )
+            token_resp.raise_for_status()
+            token_data = token_resp.json()
+            token = token_data.get('token')
+            if not token:
+                logger.warning("GitHub did not return an installation token for org %s", organization)
+                return None
+            return token
+        except Exception as e:
+            logger.error(f"Error creating GitHub App installation token for org {organization}: {e}")
             return None
     
     @staticmethod

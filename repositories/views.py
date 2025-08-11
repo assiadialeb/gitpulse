@@ -1617,7 +1617,7 @@ def repository_codeql_analysis(request, repo_id):
 
         # Build real trend timeline of OPEN vulnerabilities (last 30 days or filtered range)
         from analytics.codeql_service import CodeQLService
-        codeql_service = get_codeql_service_for_user(request.user.id)
+        codeql_service = get_codeql_service_for_user(request.user.id, repository.full_name)
         start_param = request.GET.get('from')
         end_param = request.GET.get('to')
         start_dt = None

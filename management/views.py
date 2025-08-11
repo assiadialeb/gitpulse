@@ -226,33 +226,9 @@ def logs_management(request):
 @user_passes_test(is_admin)
 def integrations_management(request):
     """Integrations management section"""
-    from github.models import GitHubApp
+    from allauth.socialaccount.models import SocialApp
     from sonarcloud.models import SonarCloudConfig
-    
-    # Get GitHub configuration
-    github_config = None
-    github_status = 'inactive'
-    
-    try:
-        # Get GitHubApp configuration
-        github_app = GitHubApp.objects.first()
-        
-        if github_app and github_app.client_id and github_app.client_secret:
-            github_config = {
-                'client_id': github_app.client_id,
-                'client_secret': github_app.client_secret[:10] + '...' if github_app.client_secret else 'Not configured',
-            }
-            github_status = 'active'
-        else:
-            github_config = {
-                'client_id': 'Not configured',
-                'client_secret': 'Not configured',
-            }
-    except Exception as e:
-        github_config = {
-            'client_id': 'Error loading config',
-            'client_secret': 'Error loading config',
-        }
+    from .models import IntegrationConfig
     
     # Get SonarCloud configuration
     sonarcloud_config = None
@@ -275,31 +251,43 @@ def integrations_management(request):
             'access_token': 'Error loading config',
         }
     
-    integrations = [
-        {
+    # Build integrations list from IntegrationConfig for GitHub (multi-org)
+    github_integrations = []
+    for ic in IntegrationConfig.objects.filter(provider='github').order_by('github_organization', 'name'):
+        github_integrations.append({
+            'id': ic.id,
             'name': 'GitHub',
-            'status': github_status,
-            'type': 'OAuth',
-            'last_sync': '2024-01-15 10:30:00',  # Placeholder
-            'config': github_config,
-        },
-        {
-            'name': 'SonarCloud',
-            'status': sonarcloud_status,
-            'type': 'API',
-            'last_sync': 'Never',
-            'config': sonarcloud_config,
-        },
-        {
-            'name': 'Slack',
-            'status': 'inactive',
-            'type': 'Coming Soon',
+            'status': ic.status,
+            'type': 'GitHub App',
             'last_sync': 'Never',
             'config': {
-                'webhook_url': 'not_configured',
+                'name': ic.name,
+                'organization': ic.github_organization or '',
+                'app_id': ic.app_id or '',
             }
-        },
-    ]
+        })
+
+    integrations = (
+        github_integrations
+        + [
+            {
+                'name': 'SonarCloud',
+                'status': sonarcloud_status,
+                'type': 'API',
+                'last_sync': 'Never',
+                'config': sonarcloud_config,
+            },
+            {
+                'name': 'Slack',
+                'status': 'inactive',
+                'type': 'Coming Soon',
+                'last_sync': 'Never',
+                'config': {
+                    'webhook_url': 'not_configured',
+                }
+            },
+        ]
+    )
     
     context = {
         'active_section': 'integrations',
@@ -391,6 +379,14 @@ def get_github_config(request):
         
     except Exception as e:
         return _error_response('Error loading configuration', exc=e)
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"]) 
+def save_github_config(request):
+    """Deprecated: Global GitHub OAuth flow removed."""
+    return JsonResponse({'success': False, 'message': 'Global GitHub OAuth is no longer supported. Use GitHub App integrations.'}, status=400)
 
 
 @login_required
@@ -487,6 +483,65 @@ def test_sonarcloud_connection(request):
         return _error_response('Network error when contacting SonarCloud API', exc=e, status=502)
     except Exception as e:
         return _error_response('Error testing connection', exc=e)
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+def save_github_integration_instance(request):
+    """Create or update a GitHub IntegrationConfig instance (org-specific)."""
+    try:
+        from .models import IntegrationConfig
+        integration_id = request.POST.get('id')
+        name = request.POST.get('name', '').strip()
+        organization = request.POST.get('organization', '').strip()
+        app_id = request.POST.get('app_id', '').strip()
+        private_key = request.POST.get('private_key', '').strip()
+        status = request.POST.get('status', 'active').strip() or 'active'
+        if not name:
+            return JsonResponse({'success': False, 'message': 'Name is required'})
+        if not organization:
+            return JsonResponse({'success': False, 'message': 'Organization is required'})
+        if integration_id:
+            ic = IntegrationConfig.objects.get(id=integration_id)
+        else:
+            ic = IntegrationConfig(provider='github')
+        ic.name = name
+        ic.github_organization = organization
+        # On create, require both app_id and private_key. On update, keep existing values if inputs are blank
+        if not integration_id:
+            if not app_id or not private_key:
+                return JsonResponse({'success': False, 'message': 'App ID and Private Key are required'})
+            ic.app_id = app_id
+            ic.private_key = private_key
+        else:
+            if app_id:
+                ic.app_id = app_id
+            if private_key:
+                ic.private_key = private_key
+        ic.status = status
+        ic.save()
+        return JsonResponse({'success': True, 'message': 'GitHub integration saved'})
+    except IntegrationConfig.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Integration not found'}, status=404)
+    except Exception as e:
+        return _error_response('Error saving GitHub integration', exc=e)
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+def delete_github_integration_instance(request, integration_id: int):
+    """Delete a GitHub IntegrationConfig instance."""
+    try:
+        from .models import IntegrationConfig
+        ic = IntegrationConfig.objects.get(id=integration_id)
+        ic.delete()
+        return JsonResponse({'success': True, 'message': 'GitHub integration deleted'})
+    except IntegrationConfig.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Integration not found'}, status=404)
+    except Exception as e:
+        return _error_response('Error deleting GitHub integration', exc=e)
 
 
 @login_required

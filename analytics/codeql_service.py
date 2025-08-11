@@ -605,7 +605,7 @@ class CodeQLService:
         return {'labels': label_strs, 'series': series}
 
 
-def get_codeql_service_for_user(user_id: int) -> Optional[CodeQLService]:
+def get_codeql_service_for_user(user_id: int, repository_full_name: Optional[str] = None) -> Optional[CodeQLService]:
     """
     Get CodeQL service instance with user's GitHub token
     
@@ -615,7 +615,12 @@ def get_codeql_service_for_user(user_id: int) -> Optional[CodeQLService]:
     Returns:
         CodeQLService instance or None if no token available
     """
-    token = GitHubTokenService.get_token_for_operation('code_scanning', user_id)
+    # Prefer org integration when repository is known
+    token = None
+    if repository_full_name:
+        token = GitHubTokenService.get_token_for_repository_or_org(repository_full_name)
+    if not token:
+        token = GitHubTokenService.get_token_for_operation('code_scanning', user_id)
     if not token:
         token = GitHubTokenService._get_user_token(user_id)
     if not token:

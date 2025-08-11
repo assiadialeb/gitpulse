@@ -1,6 +1,6 @@
 {% extends "management/base.html" %}
 
-{% block management_title %}Integrations Management{% endblock %}
+{% block management_title %}Integrations Management{% endblock management_title %}
 
 {% csrf_token %}
 
@@ -14,7 +14,9 @@
                     <h2 class="text-lg font-medium text-gray-900">Integrations</h2>
                     <p class="mt-1 text-sm text-gray-500">Manage external integrations and API connections.</p>
                 </div>
-
+                <div class="flex gap-2">
+                    <button onclick="openGitHubIntegrationModal()" class="btn btn-primary btn-sm">Add GitHub Integration</button>
+                </div>
             </div>
         </div>
     </div>
@@ -22,11 +24,18 @@
     <!-- Integrations Grid -->
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {% for integration in integrations %}
-        <div class="bg-white overflow-hidden shadow rounded-lg" data-integration="{{ integration.name }}" data-config="{{ integration.config|safe }}">
+        <div class="bg-white overflow-hidden shadow rounded-lg"
+             data-integration="{{ integration.config.name|default:integration.name }}"
+             {% if integration.id %} data-integration-id="{{ integration.id }}" {% endif %}
+             {% if integration.type == 'GitHub App' %}
+             data-organization="{{ integration.config.organization|default_if_none:'' }}"
+             data-app-id="{{ integration.config.app_id|default_if_none:'' }}"
+             data-status="{{ integration.status }}"
+             {% endif %}>
             <div class="p-6">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        {% if integration.name == 'GitHub' %}
+                        {% if integration.name|slice:"0:6" == 'GitHub' %}
                             <div class="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center">
                                 <svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
@@ -91,15 +100,9 @@
                 </div>
                 
                 <div class="mt-6 flex space-x-3">
-                    {% if integration.name == 'GitHub' %}
-                        <button onclick="openGitHubConfigModal()" 
-                                class="flex-1 btn btn-outline btn-sm">
-                            Configure
-                        </button>
-                        <button onclick="testGitHubConnection()" 
-                                class="flex-1 btn btn-outline btn-sm">
-                            Test Connection
-                        </button>
+                    {% if integration.type == 'GitHub App' %}
+                        <button onclick="editGitHubIntegration(this)" class="flex-1 btn btn-outline btn-sm">Edit</button>
+                        <button onclick="deleteGitHubIntegration(this)" class="flex-1 btn btn-outline btn-sm text-red-600">Delete</button>
                     {% elif integration.name == 'SonarCloud' %}
                         <button onclick="openSonarCloudConfigModal()" 
                                 class="flex-1 btn btn-outline btn-sm">
@@ -131,10 +134,8 @@
             </div>
         </div>
         {% empty %}
-
         {% endfor %}
     </div>
-
 
 </div>
 
@@ -172,38 +173,35 @@
     </div>
 </div>
 
-<!-- OSS Index integration removed -->
 
-<!-- GitHub Configuration Modal -->
-<div id="github-config-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+<!-- GitHub Integration Instance Modal -->
+<div id="github-integration-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
     <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
         <div class="mt-3">
             {% csrf_token %}
+            <input type="hidden" id="github-integration-id" value="">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-medium text-gray-900">GitHub OAuth Configuration</h3>
-                <button onclick="closeGitHubConfigModal()" class="text-gray-400 hover:text-gray-600">
+                <h3 class="text-lg font-medium text-gray-900">GitHub Integration (GitHub App)</h3>
+                <button onclick="closeGitHubIntegrationModal()" class="text-gray-400 hover:text-gray-600">
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
-            
-            <div id="github-config-content" class="space-y-4">
+            <div class="space-y-4">
                 <div>
-                    <label for="github-client-id" class="block text-sm font-medium text-gray-700">Client ID</label>
-                    <input type="text" id="github-client-id" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter GitHub OAuth App Client ID">
+                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                    <input type="text" id="github-integration-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="e.g., GitHub - Org Foo">
                 </div>
-                
                 <div>
-                    <label for="github-client-secret" class="block text-sm font-medium text-gray-700">Client Secret</label>
-                    <input type="password" id="github-client-secret" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter GitHub OAuth App Client Secret">
+                    <label class="block text-sm font-medium text-gray-700">Organization</label>
+                    <input type="text" id="github-integration-org" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="github organization (owner)">
                 </div>
-                
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Callback URL</label>
                     <div class="mt-1 flex">
-                        <input type="text" id="github-callback-url" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" readonly>
-                        <button onclick="copyCallbackUrl()" class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md hover:bg-gray-200">
+                        <input type="text" id="github-integration-callback-url" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" readonly>
+                        <button onclick="copyIntegrationCallbackUrl()" class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md hover:bg-gray-200">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                             </svg>
@@ -211,18 +209,33 @@
                     </div>
                     <p class="mt-1 text-xs text-gray-500">Copy this URL to your GitHub OAuth App settings</p>
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">App ID</label>
+                    <input type="text" id="github-integration-app-id" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="GitHub App ID">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Private Key (PEM)</label>
+                    <textarea id="github-integration-private-key" rows="5" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="-----BEGIN RSA PRIVATE KEY----- ..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Note</label>
+                    <p class="text-xs text-gray-500">Une fois l’App installée sur l’organisation, GitPulse détectera l’installation via l’API GitHub. Aucune saisie d’Installation ID n’est requise.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Status</label>
+                    <select id="github-integration-status" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
             </div>
-            
             <div class="flex justify-end space-x-3 mt-6">
-                <button onclick="closeGitHubConfigModal()" class="btn btn-outline btn-sm">
-                    Cancel
-                </button>
-                <button onclick="saveGitHubConfig()" class="btn btn-primary btn-sm">
-                    Save Configuration
-                </button>
+                <button onclick="closeGitHubIntegrationModal()" class="btn btn-outline btn-sm">Cancel</button>
+                <button onclick="saveGitHubIntegration()" class="btn btn-primary btn-sm">Save Integration</button>
             </div>
         </div>
     </div>
+    
 </div>
 
 <script>
@@ -291,21 +304,7 @@ function copyCallbackUrl() {
     }, 2000);
 }
 
-function saveGitHubConfig() {
-    const clientId = document.getElementById('github-client-id').value.trim();
-    const clientSecret = document.getElementById('github-client-secret').value.trim();
-    
-    if (!clientId || !clientSecret) {
-        alert('Please fill in both Client ID and Client Secret');
-        return;
-    }
-    
-    // Here you would typically save to backend
-    // For now, just close the modal and show success
-    closeGitHubConfigModal();
-    alert('Configuration saved successfully! Please test the connection.');
-    location.reload();
-}
+function saveGitHubConfig() { /* removed: no longer used in GitHub App-only flow */ }
 
 function configureIntegration(name) {
     alert(`Configure ${name} integration`);
@@ -465,6 +464,103 @@ function testGitHubConnection() {
     });
 }
 
+function openGitHubIntegrationModal() {
+    document.getElementById('github-integration-id').value = '';
+    document.getElementById('github-integration-name').value = '';
+    document.getElementById('github-integration-org').value = '';
+    document.getElementById('github-integration-callback-url').value = getCallbackUrl();
+    document.getElementById('github-integration-app-id').value = '';
+    document.getElementById('github-integration-private-key').value = '';
+    document.getElementById('github-integration-status').value = 'active';
+    document.getElementById('github-integration-modal').classList.remove('hidden');
+}
+
+function closeGitHubIntegrationModal() {
+    document.getElementById('github-integration-modal').classList.add('hidden');
+}
+
+function editGitHubIntegration(button) {
+    const card = button.closest('[data-integration]');
+    const id = card.getAttribute('data-integration-id');
+    const name = card.getAttribute('data-integration') || '';
+    const org = card.getAttribute('data-organization') || '';
+    const appId = card.getAttribute('data-app-id') || '';
+    const status = card.getAttribute('data-status') || 'active';
+    document.getElementById('github-integration-id').value = id || '';
+    document.getElementById('github-integration-name').value = name;
+    document.getElementById('github-integration-org').value = org === 'default' ? '' : org;
+    document.getElementById('github-integration-callback-url').value = getCallbackUrl();
+    document.getElementById('github-integration-app-id').value = appId; // non-secret, can be shown
+    document.getElementById('github-integration-private-key').value = '';
+    document.getElementById('github-integration-status').value = status;
+    document.getElementById('github-integration-modal').classList.remove('hidden');
+}
+
+function saveGitHubIntegration() {
+    const csrfToken = document.querySelector('#github-integration-modal [name=csrfmiddlewaretoken]');
+    if (!csrfToken) { alert('Error: CSRF token not found'); return; }
+    const formData = new FormData();
+    formData.append('id', document.getElementById('github-integration-id').value.trim());
+    formData.append('name', document.getElementById('github-integration-name').value.trim());
+    formData.append('organization', document.getElementById('github-integration-org').value.trim());
+    const appId = document.getElementById('github-integration-app-id').value.trim();
+    const privateKey = document.getElementById('github-integration-private-key').value.trim();
+    formData.append('app_id', appId);
+    formData.append('private_key', privateKey);
+    if (!formData.get('name')) { alert('Name is required'); return; }
+    if (!formData.get('organization')) { alert('Organization is required'); return; }
+    const isCreate = !formData.get('id');
+    if (isCreate) {
+        if (!appId) { alert('App ID is required'); return; }
+        if (!privateKey) { alert('Private Key is required'); return; }
+    }
+    formData.append('status', document.getElementById('github-integration-status').value.trim());
+    fetch('{% url "management:save_github_integration_instance" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken.value },
+        body: formData,
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            closeGitHubIntegrationModal();
+            alert('✅ ' + data.message);
+            location.reload();
+        } else {
+            alert('❌ ' + (data.message || 'Failed to save integration'));
+        }
+    }).catch(err => alert('❌ ' + err.message));
+}
+
+function deleteGitHubIntegration(button) {
+    if (!confirm('Delete this integration?')) return;
+    const card = button.closest('[data-integration]');
+    const id = card.getAttribute('data-integration-id');
+    fetch(`{% url 'management:delete_github_integration_instance' 0 %}`.replace('/0/', `/${id}/`), {
+        method: 'POST',
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            location.reload();
+        } else {
+            alert('❌ ' + (data.message || 'Failed to delete integration'));
+        }
+    }).catch(err => alert('❌ ' + err.message));
+}
+
+function getCallbackUrl() {
+    const globalInput = document.getElementById('github-callback-url');
+    if (globalInput && globalInput.value) {
+        return globalInput.value;
+    }
+    return `${window.location.origin}/accounts/github/login/callback/`;
+}
+
+function copyIntegrationCallbackUrl() {
+    const input = document.getElementById('github-integration-callback-url');
+    input.select();
+    document.execCommand('copy');
+}
+
 function testIntegration(name) {
     alert(`Testing ${name} integration...`);
 }
@@ -476,4 +572,4 @@ function activateIntegration(name) {
     }
 }
 </script>
-{% endblock %} 
+{% endblock management_content %}

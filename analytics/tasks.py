@@ -1239,11 +1239,14 @@ def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
 
         # Récupérer un token GitHub
         from analytics.github_token_service import GitHubTokenService
-        github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+        # Prefer org integration based on repository owner
+        github_token = GitHubTokenService.get_token_for_repository_or_org(repository.full_name)
         if not github_token:
-            github_token = GitHubTokenService._get_user_token(user_id)
+            github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
             if not github_token:
-                github_token = GitHubTokenService._get_oauth_app_token()
+                github_token = GitHubTokenService._get_user_token(user_id)
+                if not github_token:
+                    github_token = GitHubTokenService._get_oauth_app_token()
         if not github_token:
             logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
             return {'status': 'skipped', 'reason': 'No GitHub token available', 'repository_id': repository_id}

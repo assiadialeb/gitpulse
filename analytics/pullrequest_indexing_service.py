@@ -368,12 +368,14 @@ class PullRequestIndexingService:
             entity_type = 'pull_requests'
             state = IndexingState.objects(repository_id=repository_id, entity_type=entity_type).first()
             
-            # Get GitHub token before initializing intelligent indexing service
-            github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+            # Get GitHub token before initializing intelligent indexing service (prefer org integration)
+            github_token = GitHubTokenService.get_token_for_repository_or_org(repository.full_name)
             if not github_token:
-                github_token = GitHubTokenService._get_user_token(user_id)
+                github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
                 if not github_token:
-                    github_token = GitHubTokenService._get_oauth_app_token()
+                    github_token = GitHubTokenService._get_user_token(user_id)
+                    if not github_token:
+                        github_token = GitHubTokenService._get_oauth_app_token()
             if not github_token:
                 logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
                 return {'status': 'skipped', 'reason': 'No GitHub token available', 'repository_id': repository_id}

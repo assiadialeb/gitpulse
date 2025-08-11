@@ -74,7 +74,7 @@ class CodeQLIndexingService:
             state.save()
             
             # Get CodeQL service
-            codeql_service = get_codeql_service_for_user(self.user_id)
+            codeql_service = get_codeql_service_for_user(self.user_id, repository_full_name)
             if not codeql_service:
                 error_msg = f"No GitHub token available for CodeQL analysis (repository: {repository_full_name})"
                 logger.error(error_msg)

@@ -64,6 +64,26 @@ class IntelligentIndexingService:
             )
             state.save()
             logger.info(f"Created new indexing state for {self.repository.full_name} - {self.entity_type}")
+        except IndexingState.MultipleObjectsReturned:
+            # Data consistency guard: if duplicates exist, keep the latest and remove the rest
+            logger.warning(
+                "Found duplicate IndexingState documents for repo_id=%s, entity=%s. Deduplicating...",
+                self.repository_id,
+                self.entity_type,
+            )
+            duplicates = (
+                IndexingState.objects
+                .filter(repository_id=self.repository_id, entity_type=self.entity_type)
+                .order_by('-updated_at')
+            )
+            # Keep the most recently updated one
+            state = duplicates.first()
+            # Delete the others
+            for doc in duplicates[1:]:
+                try:
+                    doc.delete()
+                except Exception as e:
+                    logger.warning("Failed to delete duplicate IndexingState %s: %s", str(getattr(doc, 'id', 'unknown')), e)
         
         return state
     

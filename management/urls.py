@@ -25,7 +25,11 @@ urlpatterns = [
     path('integrations/', views.integrations_management, name='integrations'),
     path('integrations/test-github/', views.test_github_connection, name='test_github_connection'),
     path('integrations/github-config/', views.get_github_config, name='get_github_config'),
+    path('integrations/github-config/save/', views.save_github_config, name='save_github_config'),
     path('integrations/sonarcloud-config/', views.get_sonarcloud_config, name='get_sonarcloud_config'),
     path('integrations/save-sonarcloud/', views.save_sonarcloud_config, name='save_sonarcloud_config'),
     path('integrations/test-sonarcloud/', views.test_sonarcloud_connection, name='test_sonarcloud_connection'),
+    # GitHub org integrations (IntegrationConfig)
+    path('integrations/github/save-instance/', views.save_github_integration_instance, name='save_github_integration_instance'),
+    path('integrations/github/delete-instance/<int:integration_id>/', views.delete_github_integration_instance, name='delete_github_integration_instance'),
 ] 
