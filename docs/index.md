@@ -2,7 +2,6 @@
 
 **GitHub Analytics Dashboard for CTOs, Tech Leads, and Curious Developers**
 
-[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
 [![Django](https://img.shields.io/badge/Django-5.2+-blue.svg)](https://djangoproject.com)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
 
@@ -19,7 +18,6 @@ I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs
 ![GitPulse Dashboard](images/dashboard.png){ width="400" }
 <figcaption>GitPulse Dashboard</figcaption>
 </figure>
-
 
 ---
 
@@ -39,27 +37,12 @@ I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs
 
 ⚡ Live GitHub Sync: Realtime updates powered by the GitHub API, no manual refresh.
 
-🎯 Integrations: GitHub, CycloneDX (SBOM via GitHub), and more to come (sonarqube, Snyk...)
+🎯 Integrations: GitHub, Sonarqube and more to come
 
 ---
 
+## 🚀 Quick Start### Option 1: Docker
 
-
----
-
-## 🏗️ Architecture (briefly)
-
-GitPulse uses a modern but focused tech stack:
-
-- **Backend**: Django 5.2+ (Python 3.12)
-- **Databases**: MongoDB (analytics data) + PostgreSQL (user data)
-- **Task Queue**: Django-Q
-- **UI**: Responsive frontend with DaisyUI
-- **Deployment**: Docker-ready with clean documentation
-
-## 🚀 Quick Start
-
-### Option 1: Docker 
 ⚠️ GitPulse is still in early development. The code and Docker setup are subject to change.
 If you’re looking for a stable deployment method, please wait for the first official release.
 
@@ -70,15 +53,15 @@ cp env.example .env
 docker-compose up -d --build
 ```
 
-### Option 2: Local Installation
+### Option 2: Installation from sources
 
 #### Requirements
+
 - Python >= 3.12
 - PostgreSQL
 - MongoDB
 - Ollama
 - NPM
-
 
 ```bash
 git clone https://github.com/assiadialeb/gitpulse.git
@@ -91,6 +74,7 @@ cp env.example .env
 python manage.py migrate
 python manage.py runserver
 ```
+
 ℹ️ Note: Don’t forget to review and adapt the .env file to match your local environment (e.g., database settings, GitHub token, debug mode, etc.).
 
 ## 🤝 Contributing
@@ -115,6 +99,7 @@ python manage.py runserver
 This project is licensed under the AGPL v3 License - see the [LICENSE](licence/gnu-agpl-v3.0.md) file for details.
 
 ## 🙏 Acknowledgments
+
 - Crafted in [Python](https://python.org)
 - Built with [Django](https://djangoproject.com)
 - UI powered by [DaisyUI](https://daisyui.com)
@@ -124,7 +109,6 @@ This project is licensed under the AGPL v3 License - see the [LICENSE](licence/g
 - AI feature provided by [Ollama](https://ollama.org)
 - Plus countless other amazing Open Source libraries that make this project possible 💜
 
-
 **Crafted with ❤️ (and way too many late nights) for the tech managers community**
 
-[GitHub](https://github.com/assiadialeb/gitpulse) • [Issues](https://github.com/assiadialeb/gitpulse/issues) • [Discussions](https://github.com/assiadialeb/gitpulse/discussions) 
+[GitHub](https://github.com/assiadialeb/gitpulse) • [Issues](https://github.com/assiadialeb/gitpulse/issues) • [Discussions](https://github.com/assiadialeb/gitpulse/discussions)
