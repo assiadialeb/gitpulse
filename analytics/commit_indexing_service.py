@@ -167,9 +167,11 @@ class CommitIndexingService:
 
         # Batch classify commit types with fallback to Ollama (parallelized inside)
         try:
+            logger.info(f"----------Classifying {len(classification_inputs)} commits (batch) via heuristic+Ollama fallback")
             batch_commit_types: List[str] = classify_commits_with_files_batch(classification_inputs)
         except Exception as _batch_err:
             # In case of any batch failure, fallback to per-commit classification
+            logger.warning(f"----------Batch classification failed: {_batch_err}. Falling back to per-commit classification")
             batch_commit_types = []
             for item in classification_inputs:
                 batch_commit_types.append(classify_commit_with_files(item.get('message', ''), item.get('files', [])))
@@ -266,6 +268,7 @@ class CommitIndexingService:
                     # Safe fallback if out-of-range
                     filenames = [file_data.get('filename', '') for file_data in files_data]
                     commit_type = classify_commit_with_files(commit_info.get('message', ''), filenames)
+                logger.debug(f"Commit {sha[:8]} classified as '{commit_type}'")
                 
                 # Create or update commit
                 try:

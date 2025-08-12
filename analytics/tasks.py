@@ -26,7 +26,7 @@ from .sanitization import assert_safe_repository_full_name
 logger = logging.getLogger(__name__)
 
 
-# Removed sync_application_task and sync_repository_task - they used the deprecated Application model
+
 
 
 def retry_failed_syncs_task():
@@ -1176,20 +1176,6 @@ def group_developer_identities_task():
         raise
 
 
-def daily_indexing_all_repos_task():
-    """
-    Tâche planifiée unique : lance l'indexation pour tous les repositories.
-    """
-    from repositories.models import Repository
-    from django.utils import timezone
-    results = []
-    indexed_repos = Repository.objects.all()
-    for repo in indexed_repos:
-        # Lancer l'indexation en asynchrone pour chaque repository
-        task_id = async_task('analytics.tasks.background_indexing_task', repo.id, repo.owner_id, None)
-        results.append({'repo_id': repo.id, 'task_id': task_id, 'repo_name': repo.full_name})
-    return results
-
 
 def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
     """
@@ -1418,8 +1404,6 @@ def index_commits_intelligent_task(repository_id):
             
             # Check if we should skip (simple time-based check instead of complex state)
             from .models import Commit
-            from django.utils import timezone
-            from datetime import timedelta
             
             # Always do a full sync - no artificial limits since constraints are now correct
             # Use FULL sync to get ALL commits in one go (no artificial batching)
@@ -1489,7 +1473,7 @@ def index_commits_intelligent_task(repository_id):
         else:
             # No more batches -> perform KLOC calculation by cloning the repo locally
             try:
-                logger.info(f"Starting KLOC calculation (API flow) for {repository.full_name}")
+                logger.info(f"----------Starting KLOC calculation (API flow) for {repository.full_name}")
                 # Resolve a token suitable for cloning (GitHub App if configured, else user/public)
                 from .github_token_service import GitHubTokenService
                 token = GitHubTokenService.get_token_for_repository_access(user_id, repository.full_name)
@@ -1498,6 +1482,7 @@ def index_commits_intelligent_task(repository_id):
                 from .git_service import GitService
                 git_service = GitService()
                 repo_path = git_service.clone_repository(repository.clone_url, repository.full_name, token)
+                logger.info(f"----------Cloned repository for KLOC: {repository.full_name} at {repo_path}")
 
                 # Validate safe repo path before KLOC
                 from .sanitization import assert_safe_repo_path
@@ -1512,7 +1497,6 @@ def index_commits_intelligent_task(repository_id):
                 kloc_data = KLOCService.calculate_kloc(safe_repo_path or repo_path)
 
                 # Persist KLOC on relational model
-                from django.utils import timezone
                 repository.kloc = kloc_data.get('kloc', 0.0)
                 repository.kloc_calculated_at = timezone.now()
                 repository.save()
