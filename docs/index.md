@@ -104,7 +104,7 @@ This project is licensed under the AGPL v3 License - see the [LICENSE](licence/g
 - UI powered by [DaisyUI](https://daisyui.com)
 - Documentation with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
 - And yes, way too much JavaScript 😅
-- Backends provided by [Postgresql](https://www.postgresql.org) and[MongoDB](https://www.mongodb.com)
+- Backends provided by [Postgresql](https://www.postgresql.org) and [MongoDB](https://www.mongodb.com)
 - AI feature provided by [Ollama](https://ollama.org)
 - Plus countless other amazing Open Source libraries that make this project possible 💜
 
