@@ -890,7 +890,11 @@ let aliasesData = [
 {% if active_tab == 'aliases' %}
 function updateAliasSelection() {
     const checkboxes = document.querySelectorAll('.alias-checkbox:checked');
-    selectedAliases = Array.from(checkboxes).map(cb => cb.value);
+    selectedAliases = Array.from(checkboxes).map(cb => ({
+        name: cb.dataset.name,
+        email: cb.dataset.email,
+        source: cb.dataset.source
+    }));
     
     const createDeveloperActions = document.getElementById('createDeveloperActions');
     const selectedAliasCount = document.getElementById('selectedAliasCount');
@@ -930,8 +934,7 @@ function showCreateDeveloperModal() {
     const selectedAliasesList = document.getElementById('selectedAliasesList');
     selectedAliasesList.innerHTML = '';
     
-    selectedAliases.forEach(index => {
-        const alias = aliasesData[index];
+    selectedAliases.forEach(alias => {
         const div = document.createElement('div');
         div.className = 'flex items-center justify-between p-2 bg-gray-50 rounded';
         div.innerHTML = `
@@ -986,9 +989,8 @@ function showCreateDeveloperModal() {
     
     // Get unique emails from selected aliases
     const uniqueEmails = new Set();
-    selectedAliases.forEach(index => {
-        const alias = aliasesData[index];
-        if (alias.email && !alias.email.startsWith('No email')) {
+    selectedAliases.forEach(alias => {
+        if (alias && alias.email && !alias.email.startsWith('No email')) {
             uniqueEmails.add(alias.email);
         }
     });
@@ -1213,7 +1215,7 @@ function performCreateDeveloper() {
     }
     
     // Prepare data
-    const selectedAliasesData = selectedAliases.map(index => aliasesData[index]);
+    const selectedAliasesData = selectedAliases;
     
     // If merging to existing developer, use the developer's existing email as primary_email
     let finalPrimaryEmail = primaryEmail;
