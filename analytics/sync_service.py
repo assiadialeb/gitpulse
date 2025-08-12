@@ -12,7 +12,9 @@ from mongoengine.errors import NotUniqueError
 from .models import Commit, SyncLog, RepositoryStats
 from .sanitization import assert_safe_repository_full_name
 from .github_service import GitHubService, GitHubAPIError, GitHubRateLimitError
-from repositories.models import Application
+# Note: Legacy 'Application' model has been removed.
+# Any application-centric sync paths have been adapted to use 'Project' if needed,
+# and repository-based indexing should call sync_repository directly.
 from .github_token_service import GitHubTokenService
 from .services import RateLimitService
 
@@ -40,7 +42,7 @@ class SyncService:
     
     def sync_application_repositories(self, application_id: int, sync_type: str = 'incremental') -> Dict:
         """
-        Sync all repositories for an application
+        Sync all repositories for a project (legacy API name kept for backward compatibility)
         
         Args:
             application_id: Application ID to sync
@@ -50,11 +52,12 @@ class SyncService:
             Dictionary with sync results
         """
         try:
-            application = Application.objects.get(id=application_id, owner_id=self.user_id)
-        except Application.DoesNotExist:
-            raise ValueError(f"Application {application_id} not found for user {self.user_id}")
+            from projects.models import Project
+            project = Project.objects.get(id=application_id)
+        except Exception:
+            raise ValueError(f"Project {application_id} not found")
         
-        repositories = application.repositories.all()
+        repositories = project.repositories.all()
         
         results = {
             'application_id': application_id,
@@ -68,7 +71,7 @@ class SyncService:
         for app_repo in repositories:
             try:
                 repo_result = self.sync_repository(
-                    app_repo.github_repo_name,
+                    app_repo.full_name,
                     application_id,
                     sync_type
                 )
@@ -86,7 +89,7 @@ class SyncService:
 
     def sync_application_repositories_with_progress(self, application_id: int, sync_type: str = 'incremental') -> Dict:
         """
-        Sync all repositories for an application with progress tracking
+        Sync all repositories for a project with progress tracking (legacy API name kept)
         
         Args:
             application_id: Application ID to sync
@@ -96,11 +99,12 @@ class SyncService:
             Dictionary with sync results
         """
         try:
-            application = Application.objects.get(id=application_id, owner_id=self.user_id)
-        except Application.DoesNotExist:
-            raise ValueError(f"Application {application_id} not found for user {self.user_id}")
+            from projects.models import Project
+            project = Project.objects.get(id=application_id)
+        except Exception:
+            raise ValueError(f"Project {application_id} not found")
         
-        repositories = application.repositories.all()
+        repositories = project.repositories.all()
         total_repos = repositories.count()
         
         results = {
@@ -115,10 +119,10 @@ class SyncService:
         
         for i, app_repo in enumerate(repositories, 1):
             try:
-                logger.info(f"Syncing repository {i}/{total_repos}: {app_repo.github_repo_name}")
+                logger.info(f"Syncing repository {i}/{total_repos}: {app_repo.full_name}")
                 
                 repo_result = self.sync_repository(
-                    app_repo.github_repo_name,
+                    app_repo.full_name,
                     application_id,
                     sync_type
                 )
@@ -344,6 +348,29 @@ class SyncService:
                 parsed_data = self.github_service.parse_commit_data(
                     commit_data, repo_full_name, application_id
                 )
+                # Ensure files_changed contains EmbeddedDocument instances, not raw dicts
+                try:
+                    from .models import FileChange
+                    raw_file_changes = parsed_data.get('files_changed', []) or []
+                    file_changes_embedded = []
+                    for fc in raw_file_changes:
+                        if isinstance(fc, FileChange):
+                            file_changes_embedded.append(fc)
+                        elif isinstance(fc, dict):
+                            file_changes_embedded.append(
+                                FileChange(
+                                    filename=fc.get('filename', ''),
+                                    additions=int(fc.get('additions', 0) or 0),
+                                    deletions=int(fc.get('deletions', 0) or 0),
+                                    changes=int(fc.get('changes', 0) or 0),
+                                    status=fc.get('status', 'modified'),
+                                    patch=fc.get('patch')
+                                )
+                            )
+                    parsed_data['files_changed'] = file_changes_embedded
+                except Exception:
+                    # On any parsing issue, fallback to empty list to avoid ValidationError
+                    parsed_data['files_changed'] = []
                 
                 if existing_commit:
                     # Update existing commit
