@@ -10,7 +10,7 @@ from mongoengine.errors import NotUniqueError
 
 from .models import Commit, FileChange
 from .intelligent_indexing_service import IntelligentIndexingService
-from .commit_classifier import classify_commit_with_files
+from .commit_classifier import classify_commit_with_files, classify_commits_with_files_batch
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +155,27 @@ class CommitIndexingService:
             Number of commits processed
         """
         processed = 0
-        
+
+        # First pass: prepare batch classification inputs (message + filenames)
+        classification_inputs: List[Dict] = []
         for commit_data in commits:
+            commit_info = commit_data.get('commit', {})
+            files_data = commit_data.get('files', [])
+            message = commit_info.get('message', '')
+            filenames = [file_data.get('filename', '') for file_data in files_data]
+            classification_inputs.append({'message': message, 'files': filenames})
+
+        # Batch classify commit types with fallback to Ollama (parallelized inside)
+        try:
+            batch_commit_types: List[str] = classify_commits_with_files_batch(classification_inputs)
+        except Exception as _batch_err:
+            # In case of any batch failure, fallback to per-commit classification
+            batch_commit_types = []
+            for item in classification_inputs:
+                batch_commit_types.append(classify_commit_with_files(item.get('message', ''), item.get('files', [])))
+
+        # Second pass: persist commits using precomputed types
+        for idx, commit_data in enumerate(commits):
             try:
                 # Extract required fields
                 sha = commit_data.get('sha')
@@ -240,13 +259,13 @@ class CommitIndexingService:
                         except ValueError:
                             logger.warning(f"Could not parse merged_at for PR {pull_request_number}")
                 
-                # Classify commit type
-                # Extract filenames from files_data for classification
-                filenames = [file_data.get('filename', '') for file_data in files_data]
-                commit_type = classify_commit_with_files(
-                    commit_info.get('message', ''),
-                    filenames
-                )
+                # Commit type from batch classification (aligned by index)
+                try:
+                    commit_type = batch_commit_types[idx]
+                except Exception:
+                    # Safe fallback if out-of-range
+                    filenames = [file_data.get('filename', '') for file_data in files_data]
+                    commit_type = classify_commit_with_files(commit_info.get('message', ''), filenames)
                 
                 # Create or update commit
                 try:

@@ -2,8 +2,6 @@
 
 **GitHub Analytics Dashboard for CTOs, Tech Leads, and Curious Developers**
 
-
-
 # 🧭 What is GitPulse?
 
 **GitPulse** is an open-source dashboard designed to analyze developer activity and contribution trends within a GitHub organization.
@@ -41,7 +39,6 @@ I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs
 ---
 
 ## 🚀 Quick Start
-
 
 ### Option 1: Docker
 
@@ -102,13 +99,13 @@ This project is licensed under the AGPL v3 License - see the [LICENSE](licence/g
 
 ## 🙏 Acknowledgments
 
-- Crafted in[Python](https://python.org)
-- Built with[Django](https://djangoproject.com)
-- UI powered by[DaisyUI](https://daisyui.com)
-- Documentation with[MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
+- Crafted in [Python](https://python.org)
+- Built with [Django](https://djangoproject.com)
+- UI powered by [DaisyUI](https://daisyui.com)
+- Documentation with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
 - And yes, way too much JavaScript 😅
-- Backends provided by[Postgresql](https://www.postgresql.org) and[MongoDB](https://www.mongodb.com)
-- AI feature provided by[Ollama](https://ollama.org)
+- Backends provided by [Postgresql](https://www.postgresql.org) and[MongoDB](https://www.mongodb.com)
+- AI feature provided by [Ollama](https://ollama.org)
 - Plus countless other amazing Open Source libraries that make this project possible 💜
 
 **Crafted with ☕️ (and way too many late nights) for the tech managers community**
