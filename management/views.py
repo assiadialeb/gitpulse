@@ -13,6 +13,7 @@ from analytics.models import Developer
 from bson import ObjectId
 import logging
 import uuid
+import requests
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -229,6 +230,7 @@ def integrations_management(request):
     from allauth.socialaccount.models import SocialApp
     from sonarcloud.models import SonarCloudConfig
     from .models import IntegrationConfig
+    from django.contrib.sites.models import Site
     
     # Get SonarCloud configuration
     sonarcloud_config = None
@@ -267,6 +269,26 @@ def integrations_management(request):
             }
         })
 
+    # GitHub SSO (SocialApp) - single instance allowed
+    sso_status = 'inactive'
+    sso_config = {
+        'client_id': 'Not configured',
+        'callback_url': '',
+    }
+    try:
+        site = Site.objects.get_current()
+        sso_app = SocialApp.objects.filter(provider='github', sites=site).first()
+        # Build callback based on current host
+        base_url = request.build_absolute_uri('/').rstrip('/')
+        sso_callback = f"{base_url}/accounts/github/login/callback/"
+        if sso_app and sso_app.client_id and sso_app.secret:
+            sso_status = 'active'
+            sso_config['client_id'] = sso_app.client_id[:10] + '...'
+        sso_config['callback_url'] = sso_callback
+    except Exception:
+        pass
+
+    # Compose main integrations (excluding SSO)
     integrations = (
         github_integrations
         + [
@@ -289,9 +311,21 @@ def integrations_management(request):
         ]
     )
     
+    # SSO integrations (separate rubric)
+    sso_integrations = [
+        {
+            'name': 'SSO GitHub',
+            'status': sso_status,
+            'type': 'OAuth',
+            'last_sync': 'Never',
+            'config': sso_config,
+        }
+    ]
+
     context = {
         'active_section': 'integrations',
         'integrations': integrations,
+        'sso_integrations': sso_integrations,
     }
     return render(request, 'management/integrations.html', context)
 
@@ -387,6 +421,78 @@ def get_github_config(request):
 def save_github_config(request):
     """Deprecated: Global GitHub OAuth flow removed."""
     return JsonResponse({'success': False, 'message': 'Global GitHub OAuth is no longer supported. Use GitHub App integrations.'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def get_sso_github_oauth_config(request):
+    """Return GitHub SSO (allauth SocialApp) config for the current Site."""
+    from allauth.socialaccount.models import SocialApp
+    from django.contrib.sites.models import Site
+    try:
+        site = Site.objects.get_current()
+        app = SocialApp.objects.filter(provider='github', sites=site).first()
+        base_url = request.build_absolute_uri('/').rstrip('/')
+        callback_url = f"{base_url}/accounts/github/login/callback/"
+        if app:
+            return JsonResponse({
+                'success': True,
+                'config': {
+                    'client_id': app.client_id or '',
+                    'client_secret': app.secret or '',
+                    'callback_url': callback_url,
+                    'configured': bool(app.client_id and app.secret),
+                }
+            })
+        else:
+            return JsonResponse({
+                'success': True,
+                'config': {
+                    'client_id': '',
+                    'client_secret': '',
+                    'callback_url': callback_url,
+                    'configured': False,
+                }
+            })
+    except Exception as e:
+        return _error_response('Error loading SSO GitHub configuration', exc=e)
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+def save_sso_github_oauth_config(request):
+    """Create/update the single GitHub SocialApp for current Site; ensure uniqueness per site."""
+    from allauth.socialaccount.models import SocialApp
+    from django.contrib.sites.models import Site
+    try:
+        client_id = request.POST.get('client_id', '').strip()
+        client_secret = request.POST.get('client_secret', '').strip()
+        if not client_id or not client_secret:
+            return JsonResponse({'success': False, 'message': 'Client ID and Client Secret are required'})
+
+        site = Site.objects.get_current()
+
+        # Ensure single SocialApp for provider github on this site
+        apps = list(SocialApp.objects.filter(provider='github', sites=site))
+        if apps:
+            app = apps[0]
+            app.client_id = client_id
+            app.secret = client_secret
+            app.save()
+            # Remove this site from any extra apps for uniqueness
+            for extra in apps[1:]:
+                extra.sites.remove(site)
+        else:
+            app = SocialApp.objects.create(provider='github', name='GitHub')
+            app.client_id = client_id
+            app.secret = client_secret
+            app.save()
+            app.sites.add(site)
+
+        return JsonResponse({'success': True, 'message': 'GitHub SSO configuration saved'})
+    except Exception as e:
+        return _error_response('Error saving SSO GitHub configuration', exc=e)
 
 
 @login_required
@@ -542,6 +648,58 @@ def delete_github_integration_instance(request, integration_id: int):
         return JsonResponse({'success': False, 'message': 'Integration not found'}, status=404)
     except Exception as e:
         return _error_response('Error deleting GitHub integration', exc=e)
+
+
+@login_required
+@user_passes_test(is_admin)
+def list_user_github_orgs(request):
+    """List GitHub organizations accessible to the current user using their OAuth token (if available).
+    Falls back to empty list when no token.
+    """
+    try:
+        from allauth.socialaccount.models import SocialToken, SocialApp, SocialAccount
+        from django.contrib.sites.models import Site
+        user = request.user
+        site = Site.objects.get_current()
+        app = SocialApp.objects.filter(provider='github', sites=site).first()
+        if not app:
+            return JsonResponse({'success': True, 'organizations': []})
+        account = SocialAccount.objects.filter(user=user, provider='github').first()
+        if not account:
+            return JsonResponse({'success': True, 'organizations': []})
+        token_obj = SocialToken.objects.filter(account=account, app=app).first()
+        if not token_obj:
+            return JsonResponse({'success': True, 'organizations': []})
+
+        headers = {
+            'Authorization': f'token {token_obj.token}',
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'GitPulse'
+        }
+        orgs = []
+        page = 1
+        while True:
+            resp = requests.get('https://api.github.com/user/orgs', headers=headers, params={'per_page': 100, 'page': page}, timeout=10)
+            if resp.status_code != 200:
+                break
+            batch = resp.json() or []
+            for org in batch:
+                login = org.get('login')
+                if login:
+                    orgs.append({'login': login, 'type': 'org', 'label': login})
+            if len(batch) < 100:
+                break
+            page += 1
+        # Append user's personal account as last option, if available
+        try:
+            user_login = (account.extra_data or {}).get('login')
+        except Exception:
+            user_login = None
+        if user_login and all(o.get('login') != user_login for o in orgs):
+            orgs.append({'login': user_login, 'type': 'user', 'label': f"{user_login} (personal)"})
+        return JsonResponse({'success': True, 'organizations': orgs})
+    except Exception as e:
+        return _error_response('Error listing GitHub organizations', exc=e)
 
 
 @login_required

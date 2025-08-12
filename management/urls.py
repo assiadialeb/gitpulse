@@ -24,8 +24,14 @@ urlpatterns = [
     # Integrations management
     path('integrations/', views.integrations_management, name='integrations'),
     path('integrations/test-github/', views.test_github_connection, name='test_github_connection'),
+    # Deprecated global github-config endpoints kept for compatibility
     path('integrations/github-config/', views.get_github_config, name='get_github_config'),
     path('integrations/github-config/save/', views.save_github_config, name='save_github_config'),
+    # SSO GitHub (allauth SocialApp)
+    path('integrations/sso-github/config/', views.get_sso_github_oauth_config, name='get_sso_github_oauth_config'),
+    path('integrations/sso-github/save/', views.save_sso_github_oauth_config, name='save_sso_github_oauth_config'),
+    # GitHub user orgs helper
+    path('integrations/github/user-orgs/', views.list_user_github_orgs, name='list_user_github_orgs'),
     path('integrations/sonarcloud-config/', views.get_sonarcloud_config, name='get_sonarcloud_config'),
     path('integrations/save-sonarcloud/', views.save_sonarcloud_config, name='save_sonarcloud_config'),
     path('integrations/test-sonarcloud/', views.test_sonarcloud_connection, name='test_sonarcloud_connection'),
