@@ -40,7 +40,10 @@ I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs
 
 ---
 
-## 🚀 Quick Start### Option 1: Docker
+## 🚀 Quick Start
+
+
+### Option 1: Docker
 
 ⚠️ GitPulse is still in early development. The code and Docker setup are subject to change.
 If you’re looking for a stable deployment method, please wait for the first official release.
