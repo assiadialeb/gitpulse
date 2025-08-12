@@ -131,7 +131,16 @@
                     {% endif %}
                 </ul>
             </div>
-            <a href="{% url 'dashboard' %}" class="text-2xl font-bold gradient-text hover:scale-105 transition-transform duration-300">
+            <a href="{% url 'dashboard' %}" class="text-2xl font-bold gradient-text hover:scale-105 transition-transform duration-300 flex items-center">
+                <svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" class="mr-2">
+                    <defs>
+                        <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
+                    <path stroke="url(#logoGradient)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h4l3 7 4-14 3 7h4"/>
+                </svg>
                 GitPulse
             </a>
         </div>
@@ -239,16 +248,15 @@
     <!-- Footer -->
     <footer class="bg-white border-t border-gray-100 mt-16">
         <div class="container mx-auto px-6 py-8">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="flex items-center space-x-2 mb-4 md:mb-0">
-                    <div class="w-8 h-8 bg-gradient-to-r from-primary-green to-primary-blue rounded-lg flex items-center justify-center">
-                        <span class="text-white font-bold text-sm">GP</span>
-                    </div>
-                    <span class="font-semibold text-dark-gray">GitPulse</span>
-                </div>
-                <div class="text-medium-gray text-sm">
-                    <a href="https://assiadialeb.github.io/gitpulse/licence/gnu-agpl-v3.0.html" target="_blank" rel="noopener" class="hover:text-primary-blue underline">GitPulse is released under AGPL v3 licence</a> — <a href="https://github.com/assiadialeb/gitpulse" target="_blank" rel="noopener" class="inline-flex items-center gap-2 hover:text-primary-green underline">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <div class="flex justify-center items-center">
+                <div class="text-medium-gray text-sm flex items-center space-x-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" class="text-medium-gray">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h4l3 7 4-14 3 7h4"/>
+                    </svg>
+                    <a href="https://assiadialeb.github.io/gitpulse/licence/gnu-agpl-v3.0.html" target="_blank" rel="noopener" class="hover:text-primary-blue underline">GitPulse is released under AGPL v3 licence</a>
+                    <span>—</span>
+                    <a href="https://github.com/assiadialeb/gitpulse" target="_blank" rel="noopener" class="inline-flex items-center hover:text-primary-green underline">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                           <path fill-rule="evenodd"
                             d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 
                                5.47 7.59.4.07.55-.17.55-.38 0-.19
