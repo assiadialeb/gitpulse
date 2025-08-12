@@ -90,11 +90,11 @@ nav:
       - Project Analytics:
           - Overview: user-guide/projects/overview.md
       - Developer Analytics: user-guide/developers.md
-  - Technical Documentation:
-      - Architecture: technical/architecture.md
-      - API Reference: technical/api.md
-      - Management Commands: technical/management-commands.md
-      - Troubleshooting: technical/troubleshooting.md
+#  - Technical Documentation:
+#      - Architecture: technical/architecture.md
+#      - API Reference: technical/api.md
+#      - Management Commands: technical/management-commands.md
+#      - Troubleshooting: technical/troubleshooting.md
   - Deployment:
       - Docker: deployment/docker.md
       - Production: deployment/production.md
