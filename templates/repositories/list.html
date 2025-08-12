@@ -12,12 +12,14 @@
                 <h1 class="text-3xl font-bold text-gray-900">Repositories</h1>
                 <p class="text-gray-600 mt-2">Manage your indexed repositories</p>
             </div>
+            {% if user.is_superuser or user.is_staff %}
             <button onclick="openIndexModal()" class="btn btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
                 Index Repository
             </button>
+            {% endif %}
         </div>
         
 
@@ -192,19 +194,26 @@
                 {% if search_query %}
                     No repositories match your search criteria.
                 {% else %}
-                    Get started by indexing your first repository.
+                    {% if user.is_superuser or user.is_staff %}
+                        Get started by indexing your first repository.
+                    {% else %}
+                        No repositories available. Contact an administrator to add repositories.
+                    {% endif %}
                 {% endif %}
             </p>
+            {% if user.is_superuser or user.is_staff %}
             <button onclick="openIndexModal()" class="btn btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
                 Index Repository
             </button>
+            {% endif %}
         </div>
     {% endif %}
 </div>
 
+{% if user.is_superuser or user.is_staff %}
 <!-- Index Repository Modal -->
 <div id="indexModal" class="modal">
     <div class="modal-box w-11/12 max-w-4xl">
@@ -245,7 +254,9 @@
         </div>
     </div>
 </div>
+{% endif %}
 
+{% if user.is_superuser or user.is_staff %}
 <script>
 let selectedRepositories = new Map();
 let lastRepoResults = [];
@@ -529,5 +540,6 @@ function updateSortIcons() {
     });
 }
 </script>
+{% endif %}
 
 {% endblock %} 

@@ -12,12 +12,14 @@
                 <h1 class="text-3xl font-bold text-gray-900">Projects</h1>
                 <p class="text-gray-600 mt-2">Group repositories into projects for better organization</p>
             </div>
+            {% if user.is_superuser or user.is_staff %}
             <a href="{% url 'projects:create' %}" class="btn btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
                 Create Project
             </a>
+            {% endif %}
         </div>
     </div>
     
@@ -39,10 +41,12 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
                                 </svg>
                             </button>
+                            {% if user.is_superuser or user.is_staff %}
                             <ul class="dropdown-content menu bg-white shadow-lg rounded-lg border border-gray-200 p-2">
                                 <li><a href="{% url 'projects:edit' project.id %}" class="text-sm">Edit</a></li>
                                 <li><a href="{% url 'projects:delete' project.id %}" class="text-sm text-red-600">Delete</a></li>
                             </ul>
+                            {% endif %}
                         </div>
                     </div>
                     
@@ -96,7 +100,11 @@
             </div>
             <h3 class="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
             <p class="text-gray-600 mb-6">
-                Create your first project to group related repositories together.
+                {% if user.is_superuser or user.is_staff %}
+                    Create your first project to group related repositories together.
+                {% else %}
+                    No projects available. Contact an administrator to create projects.
+                {% endif %}
             </p>
             <a href="{% url 'projects:create' %}" class="btn btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

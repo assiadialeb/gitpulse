@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 import logging
 import uuid
+from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -22,6 +23,18 @@ from analytics.sonarcloud_service import SonarCloudService
 from analytics.unified_metrics_service import UnifiedMetricsService
 from .models import Repository
 logger = logging.getLogger(__name__)
+
+def staff_required(view_func):
+    """Decorator to require SuperUser or Staff permissions"""
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('users:login')
+        if not (request.user.is_superuser or request.user.is_staff):
+            messages.error(request, "You don't have permission to perform this action.")
+            return redirect('repositories:list')
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
 
 def _error_response(user_message: str, exc: Exception = None, status: int = 500):
     error_id = str(uuid.uuid4())
@@ -521,6 +534,7 @@ def search_repositories(request):
 
 
 @login_required
+@staff_required
 @require_http_methods(["POST"])
 def index_repository(request):
     """Index a repository"""
@@ -573,6 +587,7 @@ def index_repository(request):
 
 
 @login_required
+@staff_required
 @require_http_methods(["POST"])
 def start_indexing(request, repo_id):
     """Start indexing for a specific repository"""
@@ -605,6 +620,7 @@ def start_indexing(request, repo_id):
 
 
 @login_required
+@staff_required
 @require_http_methods(["POST"])
 def delete_repository(request, repo_id):
     """Delete a repository and all its associated data"""
@@ -755,6 +771,7 @@ def api_repository_commit_types(request, repo_id):
 
 
 @login_required
+@staff_required
 @require_http_methods(["POST"])
 def index_repositories(request):
     """Batch add repositories"""

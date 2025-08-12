@@ -2,8 +2,22 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
+from functools import wraps
 from .models import Project
 from repositories.models import Repository
+
+
+def staff_required(view_func):
+    """Decorator to require SuperUser or Staff permissions"""
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('users:login')
+        if not (request.user.is_superuser or request.user.is_staff):
+            messages.error(request, "You don't have permission to perform this action.")
+            return redirect('projects:list')
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
 
 
 @login_required
@@ -898,6 +912,7 @@ def project_detail(request, project_id):
 
 
 @login_required
+@staff_required
 def project_create(request):
     """Create a new project"""
     if request.method == 'POST':
@@ -931,6 +946,7 @@ def project_create(request):
 
 
 @login_required
+@staff_required
 def project_edit(request, project_id):
     """Edit an existing project"""
     project = get_object_or_404(Project, id=project_id)
@@ -968,6 +984,7 @@ def project_edit(request, project_id):
 
 
 @login_required
+@staff_required
 def project_delete(request, project_id):
     """Delete a project"""
     project = get_object_or_404(Project, id=project_id)
