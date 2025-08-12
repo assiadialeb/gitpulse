@@ -35,56 +35,32 @@
                                 {{ project.name }}
                             </a>
                         </h3>
+                        {% if user.is_superuser or user.is_staff %}
                         <div class="dropdown dropdown-end">
-                            <button class="btn btn-ghost btn-sm">
+                            <button tabindex="0" class="btn btn-ghost btn-sm">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
                                 </svg>
                             </button>
-                            {% if user.is_superuser or user.is_staff %}
-                            <ul class="dropdown-content menu bg-white shadow-lg rounded-lg border border-gray-200 p-2">
+                            <ul tabindex="0" class="dropdown-content menu bg-white shadow-lg rounded-lg border border-gray-200 p-2 w-32">
                                 <li><a href="{% url 'projects:edit' project.id %}" class="text-sm">Edit</a></li>
                                 <li><a href="{% url 'projects:delete' project.id %}" class="text-sm text-red-600">Delete</a></li>
                             </ul>
-                            {% endif %}
                         </div>
+                        {% endif %}
                     </div>
                     
                     {% if project.description %}
                         <p class="text-gray-600 mb-4">{{ project.description }}</p>
                     {% endif %}
                     
-                    <!-- Stats -->
-                    <div class="grid grid-cols-3 gap-4 mb-4">
-                        <div class="text-center">
-                            <div class="text-2xl font-bold text-blue-600">{{ project.get_total_repositories }}</div>
-                            <div class="text-sm text-gray-500">Repositories</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-2xl font-bold text-green-600">{{ project.get_total_commits }}</div>
-                            <div class="text-sm text-gray-500">Commits</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-2xl font-bold text-purple-600">{{ project.get_total_developers }}</div>
-                            <div class="text-sm text-gray-500">Developers</div>
-                        </div>
-                    </div>
-                    
                     <!-- Repository List -->
-                    <div class="border-t pt-4">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Repositories</h4>
-                        <div class="space-y-1">
-                            {% for repo in project.repositories.all|slice:":3" %}
-                                <div class="text-sm text-gray-600 truncate">
-                                    {{ repo.name }}
-                                </div>
-                            {% endfor %}
-                            {% if project.repositories.count > 3 %}
-                                <div class="text-sm text-gray-500">
-                                    +{{ project.repositories.count|add:"-3" }} more
-                                </div>
-                            {% endif %}
-                        </div>
+                    <div class="text-sm text-gray-600">
+                        {% for repo in project.repositories.all %}
+                            {{ repo.name }}{% if not forloop.last %}, {% endif %}
+                        {% empty %}
+                            <span class="text-gray-400">No repositories</span>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
