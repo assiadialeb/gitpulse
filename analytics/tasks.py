@@ -353,47 +353,53 @@ def background_indexing_task(repository_id: int, user_id: int, task_id: Optional
                 
                 # Get repository path (same as GitService)
                 repo_path_unsanitized = os.path.join(tempfile.gettempdir(), f"gitpulse_{repository.full_name.replace('/', '_')}")
-                try:
-                    repo_path_obj = assert_safe_repo_path(repo_path_unsanitized)
-                    repo_path = str(repo_path_obj)
-                except Exception as path_err:
-                    logger.error(f"Unsafe repository path derived for KLOC: {repo_path_unsanitized} - {path_err}")
-                    repo_path = repo_path_unsanitized
-                
-                if os.path.exists(repo_path):
-                    logger.info(f"Calculating KLOC for {repository.full_name}")
-                    kloc_service = KLOCService()
-                    kloc_data = kloc_service.calculate_kloc(repo_path)
-                    
-                    # Update repository with KLOC data
-                    repository.kloc = kloc_data['kloc']
-                    repository.kloc_calculated_at = timezone.now()
-                    repository.save()
-                    
-                    # Save KLOC history
-                    kloc_history = RepositoryKLOCHistory(
-                        repository_full_name=repository.full_name,
-                        repository_id=repository_id,
-                        kloc=kloc_data['kloc'],
-                        total_lines=kloc_data['total_lines'],
-                        language_breakdown=kloc_data['language_breakdown'],
-                        calculated_at=kloc_data['calculated_at'],
-                        total_files=len(kloc_data.get('language_breakdown', {})),
-                        code_files=sum(1 for ext in kloc_data.get('language_breakdown', {}).values() if ext > 0)
-                    )
-                    kloc_history.save()
-                    
-                    logger.info(f"KLOC calculation completed for {repository.full_name}: {kloc_data['kloc']:.2f} KLOC")
-                    
-                    # Add KLOC info to results
-                    results['kloc'] = {
-                        'value': kloc_data['kloc'],
-                        'total_lines': kloc_data['total_lines'],
-                        'languages': len(kloc_data['language_breakdown']),
-                        'calculated_at': kloc_data['calculated_at'].isoformat()
-                    }
+
+                # If no local clone exists, skip quietly (API flow handles KLOC now)
+                if not os.path.exists(repo_path_unsanitized):
+                    logger.info(f"Repository not cloned at {repo_path_unsanitized}, skipping KLOC calculation (no local clone)")
                 else:
-                    logger.warning(f"Repository not cloned at {repo_path}, skipping KLOC calculation")
+                    # Validate path only if it exists
+                    try:
+                        repo_path_obj = assert_safe_repo_path(repo_path_unsanitized)
+                        repo_path = str(repo_path_obj)
+                    except Exception as path_err:
+                        logger.warning(f"Skipping KLOC: unsafe repository path {repo_path_unsanitized} - {path_err}")
+                        repo_path = None
+                    
+                    if repo_path and os.path.exists(repo_path):
+                        logger.info(f"Calculating KLOC for {repository.full_name}")
+                        kloc_service = KLOCService()
+                        kloc_data = kloc_service.calculate_kloc(repo_path)
+
+                        # Update repository with KLOC data
+                        repository.kloc = kloc_data['kloc']
+                        repository.kloc_calculated_at = timezone.now()
+                        repository.save()
+
+                        # Save KLOC history
+                        kloc_history = RepositoryKLOCHistory(
+                            repository_full_name=repository.full_name,
+                            repository_id=repository_id,
+                            kloc=kloc_data['kloc'],
+                            total_lines=kloc_data['total_lines'],
+                            language_breakdown=kloc_data['language_breakdown'],
+                            calculated_at=kloc_data['calculated_at'],
+                            total_files=len(kloc_data.get('language_breakdown', {})),
+                            code_files=sum(1 for ext in kloc_data.get('language_breakdown', {}).values() if ext > 0)
+                        )
+                        kloc_history.save()
+
+                        logger.info(f"KLOC calculation completed for {repository.full_name}: {kloc_data['kloc']:.2f} KLOC")
+
+                        # Add KLOC info to results
+                        results['kloc'] = {
+                            'value': kloc_data['kloc'],
+                            'total_lines': kloc_data['total_lines'],
+                            'languages': len(kloc_data['language_breakdown']),
+                            'calculated_at': kloc_data['calculated_at'].isoformat()
+                        }
+                    else:
+                        logger.info(f"Repository not cloned at {repo_path_unsanitized}, skipping KLOC calculation")
                     
             except Exception as kloc_error:
                 logger.error(f"Error calculating KLOC for {repository.full_name}: {kloc_error}")
@@ -509,7 +515,9 @@ def fetch_all_pull_requests_task(max_pages_per_repo=50, max_repos_per_run=None, 
             break
             
         user_id = repo.owner_id
-        access_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
+        # Prefer org-specific GitHub App token
+        access_token = GitHubTokenService.get_token_for_repository_or_org(repo.full_name) or \
+                       GitHubTokenService.get_token_for_repository_access(user_id, repo.full_name)
         if not access_token:
             logger.warning(f"[Repo {repo.full_name}] No GitHub token found for user {user_id}.")
             results.append({'repo': repo.full_name, 'error': 'No GitHub token'})
@@ -1242,11 +1250,9 @@ def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
         # Prefer org integration based on repository owner
         github_token = GitHubTokenService.get_token_for_repository_or_org(repository.full_name)
         if not github_token:
-            github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
-            if not github_token:
-                github_token = GitHubTokenService._get_user_token(user_id)
-                if not github_token:
-                    github_token = GitHubTokenService._get_oauth_app_token()
+            github_token = GitHubTokenService.get_token_for_repository_or_org(repository.full_name) or \
+                           GitHubTokenService.get_token_for_repository_access(user_id, repository.full_name) or \
+                           GitHubTokenService._get_oauth_app_token()
         if not github_token:
             logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
             return {'status': 'skipped', 'reason': 'No GitHub token available', 'repository_id': repository_id}
@@ -1480,6 +1486,65 @@ def index_commits_intelligent_task(repository_id):
                     name=f'commit_indexing_repo_{repository_id}'
                 )
                 logger.info(f"Created new commit indexing schedule for repository {repository_id}")
+        else:
+            # No more batches -> perform KLOC calculation by cloning the repo locally
+            try:
+                logger.info(f"Starting KLOC calculation (API flow) for {repository.full_name}")
+                # Resolve a token suitable for cloning (GitHub App if configured, else user/public)
+                from .github_token_service import GitHubTokenService
+                token = GitHubTokenService.get_token_for_repository_access(user_id, repository.full_name)
+
+                # Clone repository
+                from .git_service import GitService
+                git_service = GitService()
+                repo_path = git_service.clone_repository(repository.clone_url, repository.full_name, token)
+
+                # Validate safe repo path before KLOC
+                from .sanitization import assert_safe_repo_path
+                try:
+                    safe_repo_path = str(assert_safe_repo_path(repo_path))
+                except Exception as safe_err:
+                    logger.warning(f"Skipping KLOC, repo path not safe: {repo_path} - {safe_err}")
+                    safe_repo_path = None
+
+                # Calculate KLOC
+                from .kloc_service import KLOCService
+                kloc_data = KLOCService.calculate_kloc(safe_repo_path or repo_path)
+
+                # Persist KLOC on relational model
+                from django.utils import timezone
+                repository.kloc = kloc_data.get('kloc', 0.0)
+                repository.kloc_calculated_at = timezone.now()
+                repository.save()
+
+                # Save KLOC history in Mongo
+                try:
+                    from .models import RepositoryKLOCHistory
+                    kloc_history = RepositoryKLOCHistory(
+                        repository_full_name=repository.full_name,
+                        repository_id=repository_id,
+                        kloc=kloc_data.get('kloc', 0.0),
+                        total_lines=kloc_data.get('total_lines', 0),
+                        language_breakdown=kloc_data.get('language_breakdown', {}),
+                        calculated_at=kloc_data.get('calculated_at'),
+                        total_files=len(kloc_data.get('language_breakdown', {})),
+                        code_files=sum(1 for ext_lines in kloc_data.get('language_breakdown', {}).values() if ext_lines > 0)
+                    )
+                    kloc_history.save()
+                except Exception as mongo_err:
+                    logger.warning(f"Failed to save KLOC history for {repository.full_name}: {mongo_err}")
+
+                # Enrich result payload
+                result['kloc'] = {
+                    'value': kloc_data.get('kloc', 0.0),
+                    'total_lines': kloc_data.get('total_lines', 0),
+                    'languages': len(kloc_data.get('language_breakdown', {})),
+                    'calculated_at': (kloc_data.get('calculated_at') or datetime.now(dt_timezone.utc)).isoformat()
+                }
+
+                logger.info(f"KLOC calculation completed (API flow) for {repository.full_name}: {kloc_data.get('kloc', 0.0):.2f} KLOC")
+            except Exception as kloc_err:
+                logger.warning(f"KLOC calculation skipped/failed for {repository.full_name}: {kloc_err}")
         
         # Always mark repository as indexed after processing
         print(f"DEBUG: Marking repository {repository.full_name} as indexed (intelligent task)")
@@ -1743,11 +1808,11 @@ def index_pullrequests_intelligent_task(repository_id=None, args=None, **kwargs)
         import requests
         
         # Get token for rate limit check
-        github_token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
-        if not github_token:
-            github_token = GitHubTokenService._get_user_token(user_id)
-            if not github_token:
-                github_token = GitHubTokenService._get_oauth_app_token()
+        github_token = (
+            GitHubTokenService.get_token_for_repository_or_org(repository.full_name)
+            or GitHubTokenService.get_token_for_repository_access(user_id, repository.full_name)
+            or GitHubTokenService._get_oauth_app_token()
+        )
         
         if github_token:
             # Check rate limit
