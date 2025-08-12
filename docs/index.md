@@ -59,10 +59,10 @@ docker-compose up -d --build
 
 #### Requirements
 
-- Python >= 3.12
+- Python >= 3.11
 - PostgreSQL
 - MongoDB
-- Ollama
+- Ollama (ollama pull gemma3:4b)
 - NPM
 
 ```bash
