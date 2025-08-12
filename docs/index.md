@@ -2,8 +2,7 @@
 
 **GitHub Analytics Dashboard for CTOs, Tech Leads, and Curious Developers**
 
-[![Django](https://img.shields.io/badge/Django-5.2+-blue.svg)](https://djangoproject.com)
-[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
+
 
 # 🧭 What is GitPulse?
 
@@ -100,15 +99,15 @@ This project is licensed under the AGPL v3 License - see the [LICENSE](licence/g
 
 ## 🙏 Acknowledgments
 
-- Crafted in [Python](https://python.org)
-- Built with [Django](https://djangoproject.com)
-- UI powered by [DaisyUI](https://daisyui.com)
-- Documentation with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
+- Crafted in[Python](https://python.org)
+- Built with[Django](https://djangoproject.com)
+- UI powered by[DaisyUI](https://daisyui.com)
+- Documentation with[MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
 - And yes, way too much JavaScript 😅
-- Backends provided by [Postgresql](https://www.postgresql.org) and [MongoDB](https://www.mongodb.com)
-- AI feature provided by [Ollama](https://ollama.org)
+- Backends provided by[Postgresql](https://www.postgresql.org) and[MongoDB](https://www.mongodb.com)
+- AI feature provided by[Ollama](https://ollama.org)
 - Plus countless other amazing Open Source libraries that make this project possible 💜
 
-**Crafted with ❤️ (and way too many late nights) for the tech managers community**
+**Crafted with ☕️ (and way too many late nights) for the tech managers community**
 
 [GitHub](https://github.com/assiadialeb/gitpulse) • [Issues](https://github.com/assiadialeb/gitpulse/issues) • [Discussions](https://github.com/assiadialeb/gitpulse/discussions)
