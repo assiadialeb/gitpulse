@@ -406,7 +406,60 @@ class SonarCloudService:
             
             if backfilled_data:
                 logger.info(f"Using backfilled data for repository {repository_id}")
-                return self._process_backfilled_data(backfilled_data, from_date, to_date)
+                # Build base result from backfilled metrics
+                base_result = self._process_backfilled_data(backfilled_data, from_date, to_date)
+
+                # Derive a reasonable period if none was provided
+                if not from_date or not to_date:
+                    try:
+                        sorted_points = sorted(
+                            [m for m in backfilled_data if getattr(m, 'last_analysis_date', None)],
+                            key=lambda m: m.last_analysis_date
+                        )
+                        if sorted_points:
+                            if not from_date:
+                                from_date = sorted_points[0].last_analysis_date
+                            if not to_date:
+                                to_date = sorted_points[-1].last_analysis_date
+                    except Exception:
+                        pass
+
+                # Even when using backfilled metrics, fetch issues timeline from API
+                project_key = self._get_project_key(repository_full_name)
+                historical_issues = self._fetch_historical_issues(project_key, repository_full_name, from_date, to_date)
+
+                issues_timeline = []
+                org = self._get_organization(repository_full_name)
+                for issue in historical_issues:
+                    issue_key = issue.get('key')
+                    issues_timeline.append({
+                        'date': issue.get('creationDate'),
+                        'type': issue.get('type'),
+                        'severity': issue.get('severity'),
+                        'status': issue.get('status'),
+                        'resolution': issue.get('resolution'),
+                        'key': issue_key,
+                        'message': issue.get('message'),
+                        'rule': issue.get('rule'),
+                        'component': issue.get('component'),
+                        'url': f"https://sonarcloud.io/project/issues?organization={org}&id={project_key}&open={issue_key}" if issue_key and org else None,
+                    })
+
+                # Recalculate trends including issues
+                trends = self._calculate_trends(base_result.get('metrics_timeline', []), issues_timeline)
+
+                return {
+                    'metrics_timeline': base_result.get('metrics_timeline', []),
+                    'issues_timeline': issues_timeline,
+                    'trends': trends,
+                    'period': {
+                        'from': from_date.isoformat() if from_date else None,
+                        'to': to_date.isoformat() if to_date else None
+                    },
+                    'project_key': project_key,
+                    'organization': org,
+                    'data_source': 'backfilled+issues_api'
+                }
             
             # Fallback to API calls if no backfilled data
             logger.info(f"No backfilled data found, using API for repository {repository_id}")
@@ -429,13 +482,20 @@ class SonarCloudService:
             
             # Process historical issues
             issues_timeline = []
+            org = self._get_organization(repository_full_name)
             for issue in historical_issues:
+                issue_key = issue.get('key')
                 issues_timeline.append({
                     'date': issue.get('creationDate'),
                     'type': issue.get('type'),
                     'severity': issue.get('severity'),
                     'status': issue.get('status'),
-                    'resolution': issue.get('resolution')
+                    'resolution': issue.get('resolution'),
+                    'key': issue_key,
+                    'message': issue.get('message'),
+                    'rule': issue.get('rule'),
+                    'component': issue.get('component'),
+                    'url': f"https://sonarcloud.io/project/issues?organization={org}&id={project_key}&open={issue_key}" if issue_key and org else None,
                 })
             
             # Calculate trends
@@ -448,7 +508,9 @@ class SonarCloudService:
                 'period': {
                     'from': from_date.isoformat() if from_date else None,
                     'to': to_date.isoformat() if to_date else None
-                }
+                },
+                'project_key': project_key,
+                'organization': org
             }
             
         except Exception as e:
