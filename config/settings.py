@@ -115,6 +115,11 @@ if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": ":memory:",  # ou os.path.join(BASE_DIR, "test.sqlite3")
+            "OPTIONS": {
+                "timeout": 20,
+            },
+            "ATOMIC_REQUESTS": False,
+            "AUTOCOMMIT": True,
         }
     }
 else:

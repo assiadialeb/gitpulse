@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         ),
         # Safety: ensure table is dropped if it still exists
         migrations.RunSQL(
-            sql="DROP TABLE IF EXISTS management_ossindexconfig CASCADE;",
+            sql="DROP TABLE IF EXISTS management_ossindexconfig;",
             reverse_sql=migrations.RunSQL.noop,
         ),
     ]
