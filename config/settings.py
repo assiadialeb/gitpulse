@@ -13,7 +13,6 @@ import os
 from pathlib import Path
 import mongoengine
 from decouple import config, Csv
-from datetime import datetime
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 

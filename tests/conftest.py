@@ -30,7 +30,7 @@ def django_db_setup(django_db_setup, django_db_blocker):
 def mock_mongodb():
     """Mock MongoDB for all tests (CI-safe: no real Mongo connection)."""
     # Always prevent real connections in tests
-    with patch('mongoengine.connect'), patch('mongoengine.disconnect'):
+    with patch('mongoengine.connect'), patch('mongoengine.disconnect'), patch('mongoengine.get_connection'):
         yield
 
 
@@ -114,11 +114,33 @@ def mock_mongodb_objects():
          patch('analytics.models.Release.objects') as mock_release_objects, \
          patch('analytics.models.SBOM.objects') as mock_sbom_objects, \
          patch('analytics.models.CodeQLVulnerability.objects') as mock_codeql_objects, \
-         patch('analytics.models.IndexingState.objects') as mock_indexing_objects:
+         patch('analytics.models.IndexingState.objects') as mock_indexing_objects, \
+         patch('analytics.models.Developer.objects') as mock_developer_objects, \
+         patch('analytics.models.DeveloperAlias.objects') as mock_developer_alias_objects, \
+         patch('analytics.models.SonarCloudMetrics.objects') as mock_sonar_metrics_objects, \
+         patch('analytics.models.RepositoryStats.objects') as mock_repo_stats_objects, \
+         patch('analytics.models.SyncLog.objects') as mock_sync_log_objects, \
+         patch('analytics.models.RepositoryKLOCHistory.objects') as mock_kloc_history_objects, \
+         patch('analytics.models.SecurityHealthHistory.objects') as mock_sh_history_objects, \
+         patch('analytics.models.Deployment.objects') as mock_deployment_objects:
 
         # Apply the same mock queryset to all objects
-        for mock_objects in [mock_commit_objects, mock_pr_objects, mock_release_objects, 
-                             mock_sbom_objects, mock_codeql_objects, mock_indexing_objects]:
+        for mock_objects in [
+            mock_commit_objects,
+            mock_pr_objects,
+            mock_release_objects,
+            mock_sbom_objects,
+            mock_codeql_objects,
+            mock_indexing_objects,
+            mock_developer_objects,
+            mock_developer_alias_objects,
+            mock_sonar_metrics_objects,
+            mock_repo_stats_objects,
+            mock_sync_log_objects,
+            mock_kloc_history_objects,
+            mock_sh_history_objects,
+            mock_deployment_objects,
+        ]:
             mock_objects.filter.return_value = mock_qs
             mock_objects.first.return_value = None
             mock_objects.count.return_value = 0
