@@ -61,6 +61,8 @@ def register_view(request):
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
+            from django.contrib.auth import authenticate
+            user.backend = 'django.contrib.auth.backends.ModelBackend'
             login(request, user)
             messages.success(request, f'Account created successfully! Welcome, {user.username}!')
             return redirect('users:dashboard')
@@ -85,7 +87,15 @@ def profile_view(request):
     github_user = None
     github_organizations = None
     sync_error = None
-    form = UserProfileForm(instance=request.user.userprofile)
+    
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, instance=request.user.userprofile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profile updated successfully!')
+            return redirect('users:profile')
+    else:
+        form = UserProfileForm(instance=request.user.userprofile)
     github_emails_list = []
     github_emails_api_status = None
     github_emails_api_raw = None
@@ -168,8 +178,8 @@ def profile_view(request):
             })
         if not polar_chart_data:
             polar_chart_data = []
-        from datetime import datetime, timedelta
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        from datetime import datetime, timedelta, timezone as dt_timezone
+        now = datetime.now(dt_timezone.utc).replace(tzinfo=None)
         cutoff = now - timedelta(days=365)
         commits_365d = [c for c in all_commits if c.authored_date and c.authored_date.replace(tzinfo=None) >= cutoff]
         repo_bubbles = {}

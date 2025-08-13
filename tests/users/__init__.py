@@ -1,1 +1,1 @@
-# Users tests package
+# Tests for users app

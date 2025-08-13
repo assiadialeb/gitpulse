@@ -501,6 +501,11 @@ class CodeQLIndexingService:
         if not last_analysis:
             return True  # Never analyzed
         
+        # Ensure last_analysis is timezone-aware
+        if last_analysis.tzinfo is None:
+            # Assume UTC if no timezone info
+            last_analysis = last_analysis.replace(tzinfo=dt_timezone.utc)
+        
         # Reindex if last analysis was more than 24 hours ago
         return (datetime.now(dt_timezone.utc) - last_analysis) > timedelta(days=1)
 
