@@ -38,6 +38,65 @@ def mock_mongodb():
 
 
 @pytest.fixture(autouse=True)
+def setup_django_db(django_db_setup, django_db_blocker):
+    """Setup Django database and ensure tables exist"""
+    with django_db_blocker.unblock():
+        from django.core.management import call_command
+        try:
+            call_command('migrate', verbosity=0)
+        except Exception:
+            # If migrations fail, try to create basic tables
+            from django.db import connection
+            with connection.cursor() as cursor:
+                # Create auth_user table if it doesn't exist
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS auth_user (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        password VARCHAR(128) NOT NULL,
+                        last_login DATETIME NULL,
+                        is_superuser BOOLEAN NOT NULL,
+                        username VARCHAR(150) UNIQUE NOT NULL,
+                        first_name VARCHAR(150) NOT NULL,
+                        last_name VARCHAR(150) NOT NULL,
+                        email VARCHAR(254) NOT NULL,
+                        is_staff BOOLEAN NOT NULL,
+                        is_active BOOLEAN NOT NULL,
+                        date_joined DATETIME NOT NULL
+                    )
+                """)
+                
+                # Create repositories_repository table if it doesn't exist
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS repositories_repository (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name VARCHAR(255) NOT NULL,
+                        full_name VARCHAR(255) UNIQUE NOT NULL,
+                        description TEXT NULL,
+                        private BOOLEAN NOT NULL,
+                        fork BOOLEAN NOT NULL,
+                        language VARCHAR(50) NULL,
+                        stars INTEGER NOT NULL,
+                        forks INTEGER NOT NULL,
+                        size BIGINT NOT NULL,
+                        default_branch VARCHAR(100) NOT NULL,
+                        github_id BIGINT UNIQUE NOT NULL,
+                        html_url VARCHAR(200) NOT NULL,
+                        clone_url VARCHAR(200) NOT NULL,
+                        ssh_url VARCHAR(200) NOT NULL,
+                        is_indexed BOOLEAN NOT NULL,
+                        last_indexed DATETIME NULL,
+                        commit_count INTEGER NOT NULL,
+                        kloc REAL NOT NULL,
+                        kloc_calculated_at DATETIME NULL,
+                        created_at DATETIME NOT NULL,
+                        updated_at DATETIME NOT NULL,
+                        owner_id INTEGER NOT NULL
+                    )
+                """)
+        yield
+
+
+@pytest.fixture(autouse=True)
 def mock_mongodb_objects():
     """Mock MongoDB objects for testing"""
     if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
@@ -49,6 +108,9 @@ def mock_mongodb_objects():
         mock_qs.all.return_value = []
         mock_qs.filter.return_value = mock_qs
         mock_qs.get.return_value = None
+        # Make the mock iterable
+        mock_qs.__iter__ = lambda self: iter([])
+        mock_qs.__len__ = lambda self: 0
         
         # Mock all MongoDB objects with the same mock queryset
         with patch('analytics.models.Commit.objects') as mock_commit_objects, \
@@ -58,7 +120,7 @@ def mock_mongodb_objects():
              patch('analytics.models.CodeQLVulnerability.objects') as mock_codeql_objects, \
              patch('analytics.models.IndexingState.objects') as mock_indexing_objects:
             
-            # Apply the same mock queryset to all objects
+                        # Apply the same mock queryset to all objects
             for mock_objects in [mock_commit_objects, mock_pr_objects, mock_release_objects, 
                                mock_sbom_objects, mock_codeql_objects, mock_indexing_objects]:
                 mock_objects.filter.return_value = mock_qs
@@ -66,6 +128,11 @@ def mock_mongodb_objects():
                 mock_objects.count.return_value = 0
                 mock_objects.all.return_value = []
                 mock_objects.get.return_value = None
+                # Add model attribute with __name__ for UnifiedMetricsService
+                mock_objects.model = Mock()
+                mock_objects.model.__name__ = 'MockModel'
+                # Also configure the filter return value to have the same model
+                mock_objects.filter.return_value.model = mock_objects.model
             
             yield
     else:
@@ -334,7 +401,7 @@ def mock_indexing_state_objects():
 
 
 class BaseTestCase(TestCase):
-    """Base test case with common setup"""
+    """Base test case with common setup (for backward compatibility)"""
     
     def setUp(self):
         super().setUp()

@@ -1,1 +1,1 @@
-# Repositories tests package
+# Tests for repositories app
