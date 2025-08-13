@@ -325,17 +325,24 @@ class TestCommitIndexingService(BaseTestCase):
         assert result == 0
     
     @patch('analytics.commit_indexing_service.requests.get')
-    def test_index_commits_for_repository_success(self, mock_get):
+    @patch('analytics.commit_indexing_service.classify_commits_with_files_batch')
+    def test_index_commits_for_repository_success(self, mock_classify, mock_get):
         """Test successful indexing of commits for a repository"""
         # Patch Repository and Token service to avoid DB and auth
         with patch('repositories.models.Repository.objects') as mock_repo_objects, \
              patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token, \
              patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects, \
-             patch('analytics.models.Commit.objects') as mock_commit_objects:
+             patch('analytics.models.Commit.objects') as mock_commit_objects, \
+             patch('analytics.models.Commit') as mock_commit_class:
             # Ensure Commit.objects(sha=...).first() returns None (new commit)
             commit_qs = Mock()
             commit_qs.first.return_value = None
             mock_commit_objects.return_value = commit_qs
+            
+            # Mock the commit save method to track created commits
+            mock_commit = Mock()
+            mock_commit.save.return_value = None
+            mock_commit_class.return_value = mock_commit
             # Create repository mock first
             mock_repo = Mock()
             mock_repo.id = 1
@@ -385,12 +392,16 @@ class TestCommitIndexingService(BaseTestCase):
                     'message': 'feat: add new feature'
                 },
                 'stats': {'total': 100, 'additions': 80, 'deletions': 20},
-                'files': []
+                'files': [],
+                'html_url': 'https://github.com/test-org/test-repo/commit/abc123def456'
             }
             pulls_response = Mock()
             pulls_response.status_code = 200
             pulls_response.json.return_value = []
             mock_get.side_effect = [list_response, detail_response, pulls_response]
+            
+            # Mock classification to return a valid commit type
+            mock_classify.return_value = ['feature']
         
         # Test indexing
             result = self.service.index_commits_for_repository(
@@ -411,10 +422,16 @@ class TestCommitIndexingService(BaseTestCase):
         with patch('repositories.models.Repository.objects') as mock_repo_objects, \
              patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token, \
              patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects, \
-             patch('analytics.models.Commit.objects') as mock_commit_objects:
+             patch('analytics.models.Commit.objects') as mock_commit_objects, \
+             patch('analytics.models.Commit') as mock_commit_class:
             commit_qs = Mock()
             commit_qs.first.return_value = None
             mock_commit_objects.return_value = commit_qs
+            
+            # Mock the commit save method to track created commits
+            mock_commit = Mock()
+            mock_commit.save.return_value = None
+            mock_commit_class.return_value = mock_commit
             # Create repository mock first
             mock_repo = Mock()
             mock_repo.id = 1
