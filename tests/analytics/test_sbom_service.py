@@ -114,11 +114,18 @@ class TestSBOMService(BaseTestCase):
             self.service.fetch_github_sbom(self.user_id)
    
     @patch('analytics.sbom_service.GitHubTokenService.get_token_for_repository_access')
-    def test_fetch_github_sbom_no_token(self, mock_get_token):
+    @patch('analytics.sbom_service.GitHubTokenService._get_oauth_app_token')
+    @patch('analytics.sbom_service.requests.get')
+    def test_fetch_github_sbom_no_token(self, mock_get, mock_oauth_token, mock_get_token):
         """Test handling when no GitHub token is available"""
-        # Mock no token available
+                # Mock no token available
         mock_get_token.return_value = None
+        mock_oauth_token.return_value = None
         
+        # Mock requests.get to simulate API call
+        mock_get.return_value.status_code = 401
+        mock_get.return_value.text = '{"message":"Bad credentials"}'
+
         # Test the method
         with pytest.raises(RuntimeError, match="GitHub token not found"):
             self.service.fetch_github_sbom(self.user_id)
