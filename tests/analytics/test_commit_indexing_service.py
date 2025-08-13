@@ -326,7 +326,8 @@ class TestCommitIndexingService(BaseTestCase):
     
     @patch('analytics.commit_indexing_service.requests.get')
     @patch('analytics.commit_indexing_service.classify_commits_with_files_batch')
-    def test_index_commits_for_repository_success(self, mock_classify, mock_get):
+    @patch('analytics.commit_indexing_service.FileChange')
+    def test_index_commits_for_repository_success(self, mock_file_change, mock_classify, mock_get):
         """Test successful indexing of commits for a repository"""
         # Patch Repository and Token service to avoid DB and auth
         with patch('repositories.models.Repository.objects') as mock_repo_objects, \
@@ -402,6 +403,9 @@ class TestCommitIndexingService(BaseTestCase):
             
             # Mock classification to return a valid commit type
             mock_classify.return_value = ['feature']
+            
+            # Mock FileChange to avoid MongoDB issues
+            mock_file_change.return_value = Mock()
         
         # Test indexing
             result = self.service.index_commits_for_repository(
