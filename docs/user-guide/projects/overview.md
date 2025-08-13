@@ -24,6 +24,7 @@ Projects in GitPulse represent logical groupings of related repositories. They h
 
 #### Microservices Architecture
 Group repositories by service boundaries:
+
 - **User Service**: Authentication and user management
 - **Payment Service**: Payment processing and billing
 - **Notification Service**: Email and messaging
@@ -31,6 +32,7 @@ Group repositories by service boundaries:
 
 #### Product Lines
 Organize by product or feature areas:
+
 - **Core Platform**: Essential infrastructure and services
 - **Mobile Apps**: iOS and Android applications
 - **Web Applications**: Frontend and backend web services
@@ -38,6 +40,7 @@ Organize by product or feature areas:
 
 #### Team Ownership
 Group by team responsibility:
+
 - **Frontend Team**: UI/UX and client-side development
 - **Backend Team**: API and server-side development
 - **DevOps Team**: Infrastructure and deployment
@@ -50,18 +53,21 @@ Group by team responsibility:
 Projects provide aggregated metrics across all included repositories:
 
 #### Security Health Score (SHS)
+
 - **Weighted Average**: SHS scores weighted by repository size
 - **Portfolio Risk**: Overall security posture assessment
 - **Trend Analysis**: Security improvement across the project
 - **Vulnerability Distribution**: Critical issues across repositories
 
 #### Code Quality Overview
+
 - **Quality Distribution**: SonarCloud ratings across repositories
 - **Technical Debt**: Combined technical debt assessment
 - **Coverage Metrics**: Overall test coverage statistics
 - **Maintainability**: Average maintainability scores
 
 #### Development Activity
+
 - **Total Commits**: Combined commit activity across repositories
 - **Developer Distribution**: Team member activity across services
 - **Activity Patterns**: Peak development times and trends
@@ -70,12 +76,14 @@ Projects provide aggregated metrics across all included repositories:
 ### Team Performance Analysis
 
 #### Developer Insights
+
 - **Cross-Repository Activity**: Developer contributions across services
 - **Expertise Areas**: Which repositories each developer works on
 - **Collaboration Patterns**: Team member interactions
 - **Knowledge Distribution**: Skill spread across the project
 
 #### Team Dynamics
+
 - **Service Ownership**: Clear ownership of different repositories
 - **Cross-Team Collaboration**: Inter-team communication patterns
 - **Knowledge Sharing**: Documentation and code review practices
@@ -84,12 +92,14 @@ Projects provide aggregated metrics across all included repositories:
 ### Portfolio Management
 
 #### Resource Allocation
+
 - **Development Effort**: Time spent on different repositories
 - **Priority Assessment**: Which services need attention
 - **Capacity Planning**: Team capacity across services
 - **Risk Management**: Identifying high-risk areas
 
 #### Strategic Planning
+
 - **Technology Stack**: Programming language distribution
 - **Dependency Analysis**: Shared dependencies across services
 - **Architecture Health**: Service interaction patterns
@@ -175,40 +185,11 @@ Define project-specific metrics:
 ### Common Issues
 
 #### Missing Repository Data
+
 - **Cause**: Repositories not properly indexed
 - **Solution**: Check repository indexing status and permissions
 
-#### Inconsistent Metrics
-- **Cause**: Different analysis settings across repositories
-- **Solution**: Standardize analysis configuration
 
-#### Poor Project Performance
-- **Cause**: Issues across multiple repositories
-- **Solution**: Identify and address systemic problems
-
-### Getting Help
-
-- **Project Reviews**: Regular project health assessments
-- **Team Retrospectives**: Discuss project-level issues
-- **Process Reviews**: Identify improvement opportunities
-- **Training**: Provide training on project analytics
-
-## Advanced Features
-
-### Custom Dashboards
-
-Future versions will support:
-- Custom project dashboards
-- Role-specific views
-- Automated reporting
-- Integration with project management tools
-
-### Integration Options
-
-- **CI/CD Integration**: Project-level deployment tracking
-- **Issue Tracking**: Cross-repository issue management
-- **Monitoring Tools**: Project-level performance monitoring
-- **Reporting Tools**: Automated project reports
 
 ## 📚 Related Documentation
 
