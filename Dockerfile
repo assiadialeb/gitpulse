@@ -10,31 +10,25 @@ WORKDIR /app
 # Install minimal system dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        gcc \
+        curl \
         g++ \
+        gcc \
+        git \
         libpq-dev \
         netcat-traditional \
-        git \
-        curl \
         wget \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Install Python dependencies
+# Install Python dependencies and setup project
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
+# Copy project and setup
 COPY . .
-
-# Create necessary directories
-RUN mkdir -p /app/data /app/logs
-
-# Make startup script executable
-RUN chmod +x start.sh
-
-# Collect static files
-RUN python manage.py collectstatic --noinput
+RUN mkdir -p /app/data /app/logs \
+    && chmod +x start.sh \
+    && python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000
