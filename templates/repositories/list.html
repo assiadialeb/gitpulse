@@ -131,7 +131,7 @@
 
                         <td>
                             {% if repo.is_indexed %}
-                                <span class="badge badge-success">Indexed</span>
+                                <span class="badge badge-success bg-green-100 text-green-800 border-green-200">Indexed</span>
                             {% else %}
                                 <span class="badge badge-warning">Not Indexed</span>
                             {% endif %}
@@ -442,7 +442,7 @@ function updateTable(repositories) {
         if (repo.fork) badges.push('<span class="badge badge-info badge-sm">Fork</span>');
         
         const statusBadge = repo.is_indexed 
-            ? '<span class="badge badge-success">Indexed</span>'
+            ? '<span class="badge badge-success bg-green-100 text-green-800 border-green-200">Indexed</span>'
             : '<span class="badge badge-warning">Not Indexed</span>';
         
         const languageCell = repo.language 
