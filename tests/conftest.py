@@ -203,6 +203,42 @@ def sample_project():
 
 
 @pytest.fixture
+def mock_repository():
+    """Mock repository for testing"""
+    mock_repo = Mock()
+    mock_repo.id = 1
+    mock_repo.full_name = 'test-org/test-repo'
+    mock_repo.name = 'test-repo'
+    mock_repo.owner = 'test-org'
+    mock_repo.description = 'A test repository'
+    mock_repo.private = False
+    mock_repo.fork = False
+    mock_repo.created_at = datetime(2023, 1, 1, tzinfo=timezone.utc)
+    mock_repo.updated_at = datetime(2023, 1, 15, tzinfo=timezone.utc)
+    mock_repo.save.return_value = None
+    return mock_repo
+
+
+@pytest.fixture
+def mock_commit():
+    """Mock commit for testing"""
+    mock_commit = Mock()
+    mock_commit.sha = 'abc123def456'
+    mock_commit.repository_full_name = 'test-org/test-repo'
+    mock_commit.author_name = 'John Doe'
+    mock_commit.author_email = 'john.doe@example.com'
+    mock_commit.committer_name = 'John Doe'
+    mock_commit.committer_email = 'john.doe@example.com'
+    mock_commit.message = 'feat: add new feature'
+    mock_commit.additions = 100
+    mock_commit.deletions = 50
+    mock_commit.total_changes = 150
+    mock_commit.created_at = datetime(2023, 1, 1, tzinfo=timezone.utc)
+    mock_commit.save.return_value = None
+    return mock_commit
+
+
+@pytest.fixture
 def mock_github_token_service():
     """Mock GitHub token service"""
     with patch('analytics.github_token_service.GitHubTokenService') as mock_service:

@@ -19,6 +19,7 @@ class TestIntelligentIndexingService(BaseTestCase):
         self.repository_full_name = 'test-org/test-repo'
         self.entity_type = 'commits'
         self.github_token = 'ghp_test_token_12345'
+        self.now = datetime.now(timezone.utc)
         
         # Create a mock repository for testing
         self.repository = self.create_mock_repository(
@@ -31,6 +32,21 @@ class TestIntelligentIndexingService(BaseTestCase):
             entity_type=self.entity_type,
             github_token=self.github_token
         )
+    
+    def create_mock_repository(self, full_name='test-org/test-repo'):
+        """Create a mock repository for testing"""
+        mock_repo = Mock()
+        mock_repo.id = 1
+        mock_repo.full_name = full_name
+        mock_repo.name = full_name.split('/')[-1]
+        mock_repo.owner = full_name.split('/')[0]
+        mock_repo.description = 'A test repository'
+        mock_repo.private = False
+        mock_repo.fork = False
+        mock_repo.created_at = datetime(2023, 1, 1, tzinfo=timezone.utc)
+        mock_repo.updated_at = datetime(2023, 1, 15, tzinfo=timezone.utc)
+        mock_repo.save.return_value = None
+        return mock_repo
     
     def test_initialization(self):
         """Test service initialization"""

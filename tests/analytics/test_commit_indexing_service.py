@@ -20,6 +20,25 @@ class TestCommitIndexingService(BaseTestCase):
         self.repository_full_name = 'test-org/test-repo'
         self.github_token = 'ghp_test_token_12345'
     
+    def create_mock_commit(self, sha='abc123def456', repository_full_name='test-org/test-repo', 
+                          author_name='John Doe', author_email='john.doe@example.com',
+                          message='feat: add new feature', additions=100, deletions=50):
+        """Create a mock commit for testing"""
+        mock_commit = Mock()
+        mock_commit.sha = sha
+        mock_commit.repository_full_name = repository_full_name
+        mock_commit.author_name = author_name
+        mock_commit.author_email = author_email
+        mock_commit.committer_name = author_name
+        mock_commit.committer_email = author_email
+        mock_commit.message = message
+        mock_commit.additions = additions
+        mock_commit.deletions = deletions
+        mock_commit.total_changes = additions + deletions
+        mock_commit.created_at = datetime(2023, 1, 15, tzinfo=timezone.utc)
+        mock_commit.save.return_value = None
+        return mock_commit
+    
     @patch('analytics.commit_indexing_service.requests.get')
     def test_fetch_commits_from_github_success(self, mock_get):
         """Test successful commit fetching from GitHub API"""
@@ -71,8 +90,12 @@ class TestCommitIndexingService(BaseTestCase):
         since_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
         until_date = datetime(2023, 1, 31, tzinfo=timezone.utc)
         
+        # Extract owner and repo from full name
+        owner, repo = self.repository_full_name.split('/')
+        
         commits = self.service.fetch_commits_from_github(
-            self.repository_full_name,
+            owner,
+            repo,
             self.github_token,
             since_date,
             until_date
@@ -105,8 +128,12 @@ class TestCommitIndexingService(BaseTestCase):
         until_date = datetime(2023, 1, 31, tzinfo=timezone.utc)
         
         # Test the method
+        # Extract owner and repo from full name
+        owner, repo = self.repository_full_name.split('/')
+        
         commits = self.service.fetch_commits_from_github(
-            self.repository_full_name,
+            owner,
+            repo,
             self.github_token,
             since_date,
             until_date
@@ -129,8 +156,12 @@ class TestCommitIndexingService(BaseTestCase):
         until_date = datetime(2023, 1, 31, tzinfo=timezone.utc)
         
         # Test the method
+        # Extract owner and repo from full name
+        owner, repo = self.repository_full_name.split('/')
+        
         commits = self.service.fetch_commits_from_github(
-            self.repository_full_name,
+            owner,
+            repo,
             self.github_token,
             since_date,
             until_date

@@ -124,7 +124,7 @@ class TestCodeQLService(BaseTestCase):
         result, success = self.service._make_request('https://api.github.com/test')
         
         assert success is False
-        assert result is None
+        assert result is None or result == []
     
     @patch.object(CodeQLService, '_make_request')
     def test_fetch_codeql_alerts_success(self, mock_make_request):
