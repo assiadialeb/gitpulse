@@ -210,4 +210,5 @@ models/*
 node_modules/*
 
 .vscode/*
+.cursor/*
 .sonarlint/*
