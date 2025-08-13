@@ -37,11 +37,8 @@ class SBOMService:
             raise ValueError(f"Invalid repository_full_name: {self.repository_full_name}")
 
         # Prefer org-specific integration token based on repository owner
-        token = GitHubTokenService.get_token_for_repository_or_org(self.repository_full_name)
-        if not token:
-            token = GitHubTokenService.get_token_for_operation('private_repos', user_id)
-            if not token:
-                token = GitHubTokenService._get_user_token(user_id)
+        token = GitHubTokenService.get_token_for_repository_access(user_id, self.repository_full_name) or \
+                GitHubTokenService._get_oauth_app_token()
         if not token:
             raise RuntimeError("GitHub token not found for SBOM fetch")
 

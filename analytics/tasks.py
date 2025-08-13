@@ -1236,8 +1236,7 @@ def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
         # Prefer org integration based on repository owner
         github_token = GitHubTokenService.get_token_for_repository_or_org(repository.full_name)
         if not github_token:
-            github_token = GitHubTokenService.get_token_for_repository_or_org(repository.full_name) or \
-                           GitHubTokenService.get_token_for_repository_access(user_id, repository.full_name) or \
+            github_token = GitHubTokenService.get_token_for_repository_access(user_id, repository.full_name) or \
                            GitHubTokenService._get_oauth_app_token()
         if not github_token:
             logger.warning(f"No GitHub token available for repository {repository.full_name}, skipping")
