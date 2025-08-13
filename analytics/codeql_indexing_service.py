@@ -41,10 +41,44 @@ class CodeQLIndexingService:
             Dictionary with indexing results
         """
         logger.info("Starting CodeQL indexing for repository %s", repository_full_name)
-        # Validate repository_full_name to prevent NoSQL injection
         self._assert_safe_repository_full_name(repository_full_name)
         
-        results = {
+        results = self._initialize_results(repository_id, repository_full_name)
+        
+        try:
+            state = self._get_or_create_indexing_state(repository_id, repository_full_name)
+            
+            if not force_reindex and self._should_skip_indexing(state):
+                return self._handle_skip_indexing(results, repository_full_name)
+            
+            state = self._start_indexing(state)
+            
+            codeql_service = self._get_codeql_service(repository_full_name)
+            if not codeql_service:
+                return self._handle_no_token(results, state, repository_full_name)
+            
+            alerts, fetch_success = self._fetch_alerts(codeql_service, repository_full_name)
+            
+            if not fetch_success:
+                return self._handle_fetch_failure(results, state, alerts, repository_full_name)
+            
+            logger.info("Fetched %d CodeQL alerts for %s", len(alerts), repository_full_name)
+            
+            self._process_alerts(alerts, codeql_service, repository_full_name, results)
+            
+            self._cleanup_obsolete_vulnerabilities(repository_full_name, results)
+            
+            self._complete_indexing(state, results, repository_full_name)
+            
+        except Exception as e:
+            self._handle_indexing_error(e, results, state, repository_full_name)
+        
+        results['completed_at'] = datetime.now(dt_timezone.utc).isoformat()
+        return results
+
+    def _initialize_results(self, repository_id: int, repository_full_name: str) -> Dict:
+        """Initialize results dictionary"""
+        return {
             'repository_id': repository_id,
             'repository_full_name': repository_full_name,
             'vulnerabilities_processed': 0,
@@ -56,158 +90,157 @@ class CodeQLIndexingService:
             'indexing_service': 'codeql',
             'started_at': datetime.now(dt_timezone.utc).isoformat()
         }
+
+    def _handle_skip_indexing(self, results: Dict, repository_full_name: str) -> Dict:
+        """Handle case where indexing should be skipped"""
+        logger.info("Skipping CodeQL indexing for %s - recently indexed", repository_full_name)
+        results['status'] = 'skipped'
+        results['reason'] = 'Recently indexed'
+        return results
+
+    def _start_indexing(self, state: IndexingState) -> IndexingState:
+        """Start indexing process"""
+        state.status = 'running'
+        state.last_run_at = datetime.now(dt_timezone.utc)
+        state.save()
+        return state
+
+    def _get_codeql_service(self, repository_full_name: str):
+        """Get CodeQL service for user"""
+        return get_codeql_service_for_user(self.user_id, repository_full_name)
+
+    def _handle_no_token(self, results: Dict, state: IndexingState, repository_full_name: str) -> Dict:
+        """Handle case where no GitHub token is available"""
+        error_msg = f"No GitHub token available for CodeQL analysis (repository: {repository_full_name})"
+        logger.error(error_msg)
+        results['status'] = 'error'
+        results['errors'].append(error_msg)
+        state.status = 'error'
+        state.error_message = error_msg
+        state.save()
+        return results
+
+    def _fetch_alerts(self, codeql_service, repository_full_name: str):
+        """Fetch alerts from GitHub"""
+        assert_safe_repository_full_name(repository_full_name)
+        return codeql_service.fetch_all_codeql_alerts(repository_full_name)
+
+    def _handle_fetch_failure(self, results: Dict, state: IndexingState, alerts: List, repository_full_name: str) -> Dict:
+        """Handle fetch failure scenarios"""
+        if len(alerts) == 0:
+            if any('Unauthorized' in error for error in results.get('errors', [])):
+                return self._handle_permission_denied(results, state, repository_full_name)
+            else:
+                return self._handle_not_available(results, state, repository_full_name)
+        else:
+            return self._handle_fetch_error(results, state, repository_full_name)
+
+    def _handle_permission_denied(self, results: Dict, state: IndexingState, repository_full_name: str) -> Dict:
+        """Handle permission denied case"""
+        logger.error("Token permission issue for %s - CodeQL access denied", repository_full_name)
+        results['status'] = 'permission_denied'
+        results['reason'] = 'GitHub token does not have required permissions for CodeQL access'
+        state.status = 'error'
+        state.error_message = 'Token permission denied'
+        state.save()
+        return results
+
+    def _handle_not_available(self, results: Dict, state: IndexingState, repository_full_name: str) -> Dict:
+        """Handle CodeQL not available case"""
+        logger.info("CodeQL not available/enabled for %s - marking as completed", repository_full_name)
+        results['status'] = 'not_available'
+        results['reason'] = 'CodeQL analysis not available or not enabled for this repository'
+        state.status = 'completed'
+        state.last_indexed_at = datetime.now(dt_timezone.utc)
+        state.error_message = 'CodeQL not available'
+        state.save()
+        return results
+
+    def _handle_fetch_error(self, results: Dict, state: IndexingState, repository_full_name: str) -> Dict:
+        """Handle fetch error case"""
+        error_msg = f"Failed to fetch CodeQL alerts from GitHub for {repository_full_name}"
+        logger.error("Failed to fetch CodeQL alerts from GitHub for %s", repository_full_name)
+        results['status'] = 'error'
+        results['errors'].append(error_msg)
+        state.status = 'error'
+        state.error_message = error_msg
+        state.retry_count += 1
+        state.save()
+        return results
+
+    def _process_alerts(self, alerts: List, codeql_service, repository_full_name: str, results: Dict):
+        """Process all alerts"""
+        processed_alert_ids = []
+        open_alert_ids = []
+        
+        for alert_data in alerts:
+            try:
+                vulnerability = codeql_service.process_codeql_alert(alert_data, repository_full_name)
+                if not vulnerability:
+                    continue
+                
+                assert_safe_repository_full_name(repository_full_name)
+                existing = CodeQLVulnerability.objects(
+                    repository_full_name=repository_full_name,
+                    vulnerability_id=vulnerability.vulnerability_id
+                ).first()
+                
+                if vulnerability.state == 'open':
+                    open_alert_ids.append(vulnerability.vulnerability_id)
+
+                if existing:
+                    self._update_vulnerability(existing, vulnerability)
+                    results['vulnerabilities_updated'] += 1
+                else:
+                    vulnerability.save()
+                    results['vulnerabilities_new'] += 1
+                
+                processed_alert_ids.append(vulnerability.vulnerability_id)
+                results['vulnerabilities_processed'] += 1
+                
+            except Exception as e:
+                error_msg = f"Error processing alert {alert_data.get('id')}: {e}"
+                logger.error(error_msg)
+                results['errors'].append(error_msg)
+
+    def _cleanup_obsolete_vulnerabilities(self, repository_full_name: str, results: Dict):
+        """Remove obsolete vulnerabilities"""
+        removed_count = self._remove_obsolete_vulnerabilities(repository_full_name, [])
+        results['vulnerabilities_removed'] = removed_count
+
+    def _complete_indexing(self, state: IndexingState, results: Dict, repository_full_name: str):
+        """Complete indexing process"""
+        state.status = 'completed'
+        state.last_indexed_at = datetime.now(dt_timezone.utc)
+        state.total_indexed = results['vulnerabilities_processed']
+        state.error_message = None
+        state.retry_count = 0
+        state.save()
+        
+        logger.info(
+            "CodeQL indexing completed for %s: %d new, %d updated, %d removed",
+            repository_full_name,
+            results['vulnerabilities_new'],
+            results['vulnerabilities_updated'],
+            results['vulnerabilities_removed'],
+        )
+
+    def _handle_indexing_error(self, e: Exception, results: Dict, state: IndexingState, repository_full_name: str):
+        """Handle indexing error"""
+        error_msg = f"CodeQL indexing failed for {repository_full_name}: {e}"
+        logger.error(error_msg)
+        results['status'] = 'error'
+        results['errors'].append(error_msg)
         
         try:
-            # Get or create indexing state
-            state = self._get_or_create_indexing_state(repository_id, repository_full_name)
-            
-            # Check if we should skip indexing
-            if not force_reindex and self._should_skip_indexing(state):
-                logger.info("Skipping CodeQL indexing for %s - recently indexed", repository_full_name)
-                results['status'] = 'skipped'
-                results['reason'] = 'Recently indexed'
-                return results
-            
-            # Update state to running
-            state.status = 'running'
-            state.last_run_at = datetime.now(dt_timezone.utc)
+            state.status = 'error'
+            state.error_message = error_msg
+            state.retry_count += 1
             state.save()
-            
-            # Get CodeQL service
-            codeql_service = get_codeql_service_for_user(self.user_id, repository_full_name)
-            if not codeql_service:
-                error_msg = f"No GitHub token available for CodeQL analysis (repository: {repository_full_name})"
-                logger.error(error_msg)
-                results['status'] = 'error'
-                results['errors'].append(error_msg)
-                state.status = 'error'
-                state.error_message = error_msg
-                state.save()
-                return results
-            
-            # Validate repository name before any Mongo queries
-            assert_safe_repository_full_name(repository_full_name)
-            # Fetch all alerts from GitHub
-            alerts, fetch_success = codeql_service.fetch_all_codeql_alerts(repository_full_name)
-            
-            if not fetch_success:
-                # Check if it's a "not available" case vs a real error
-                if len(alerts) == 0:
-                    # Check if it's a token permission issue or truly not available
-                    if any('Unauthorized' in error for error in results.get('errors', [])):
-                        logger.error("Token permission issue for %s - CodeQL access denied", repository_full_name)
-                        results['status'] = 'permission_denied'
-                        results['reason'] = 'GitHub token does not have required permissions for CodeQL access'
-                        state.status = 'error'
-                        state.error_message = 'Token permission denied'
-                        state.save()
-                        return results
-                    else:
-                        # CodeQL likely not enabled on this repository
-                        logger.info("CodeQL not available/enabled for %s - marking as completed", repository_full_name)
-                        results['status'] = 'not_available'
-                        results['reason'] = 'CodeQL analysis not available or not enabled for this repository'
-                        state.status = 'completed'  # Mark as completed so we don't keep retrying
-                        state.last_indexed_at = datetime.now(dt_timezone.utc)
-                        state.error_message = 'CodeQL not available'
-                        state.save()
-                        return results
-                else:
-                    error_msg = f"Failed to fetch CodeQL alerts from GitHub for {repository_full_name}"
-                    logger.error("Failed to fetch CodeQL alerts from GitHub for %s", repository_full_name)
-                    results['status'] = 'error'
-                    results['errors'].append(error_msg)
-                    state.status = 'error'
-                    state.error_message = error_msg
-                    state.retry_count += 1
-                    state.save()
-                    return results
-            
-            logger.info("Fetched %d CodeQL alerts for %s", len(alerts), repository_full_name)
-            
-            # Process alerts
-            processed_alert_ids = []
-            open_alert_ids = []  # track IDs of alerts that are currently open on GitHub
-            
-            for alert_data in alerts:
-                try:
-                    vulnerability = codeql_service.process_codeql_alert(alert_data, repository_full_name)
-                    if not vulnerability:
-                        continue
-                    
-                    # Check if vulnerability already exists
-                    assert_safe_repository_full_name(repository_full_name)
-                    existing = CodeQLVulnerability.objects(
-                        repository_full_name=repository_full_name,
-                        vulnerability_id=vulnerability.vulnerability_id
-                    ).first()
-                    
-                    # Track current open alerts regardless of DB state
-                    if vulnerability.state == 'open':
-                        open_alert_ids.append(vulnerability.vulnerability_id)
-
-                    if existing:
-                        # Update existing vulnerability
-                        self._update_vulnerability(existing, vulnerability)
-                        results['vulnerabilities_updated'] += 1
-                    else:
-                        # Save new vulnerability
-                        vulnerability.save()
-                        results['vulnerabilities_new'] += 1
-                    
-                    processed_alert_ids.append(vulnerability.vulnerability_id)
-                    results['vulnerabilities_processed'] += 1
-                    
-                except Exception as e:
-                    error_msg = f"Error processing alert {alert_data.get('id')}: {e}"
-                    logger.error(error_msg)
-                    results['errors'].append(error_msg)
-            
-            # Remove open vulnerabilities that are no longer open on GitHub
-            # Use only IDs that are still open to avoid deleting fixed/dismissed entries
-            if open_alert_ids:
-                removed_count = self._remove_obsolete_vulnerabilities(
-                    repository_full_name, open_alert_ids
-                )
-                results['vulnerabilities_removed'] = removed_count
-            
-            # Update indexing state
-            state.status = 'completed'
-            state.last_indexed_at = datetime.now(dt_timezone.utc)
-            state.total_indexed = results['vulnerabilities_processed']
-            state.error_message = None
-            state.retry_count = 0
-            state.save()
-            
-            logger.info(
-                "CodeQL indexing completed for %s: %d new, %d updated, %d removed",
-                repository_full_name,
-                results['vulnerabilities_new'],
-                results['vulnerabilities_updated'],
-                results['vulnerabilities_removed'],
-            )
-            
-        except Exception as e:
-            error_msg = f"CodeQL indexing failed for {repository_full_name}: {e}"
-            logger.error(error_msg)
-            results['status'] = 'error'
-            results['errors'].append(error_msg)
-            
-            # Update state
-            try:
-                state.status = 'error'
-                state.error_message = error_msg
-                state.retry_count += 1
-                state.save()
-            except (SystemExit, KeyboardInterrupt):
-                # Do not swallow termination signals
-                raise
-            except Exception:
-                # Don't fail if we can't update state
-                pass
-        
-        results['completed_at'] = datetime.now(dt_timezone.utc).isoformat()
-        return results
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
+            pass
     
     def _get_or_create_indexing_state(self, repository_id: int, repository_full_name: str) -> IndexingState:
         """Get or create indexing state for repository"""
