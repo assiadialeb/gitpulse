@@ -329,7 +329,22 @@ class TestCommitIndexingService(BaseTestCase):
         """Test successful indexing of commits for a repository"""
         # Patch Repository and Token service to avoid DB and auth
         with patch('repositories.models.Repository.objects') as mock_repo_objects, \
-             patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token:
+             patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token, \
+             patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects:
+            # Provide a valid state object so index_batch can run
+            mock_state = Mock()
+            mock_state.repository_id = mock_repo.id
+            mock_state.entity_type = 'commits'
+            mock_state.status = 'pending'
+            mock_state.total_indexed = 0
+            mock_state.retry_count = 0
+            mock_state.max_retries = 3
+            mock_state.last_indexed_at = None
+            mock_state.save.return_value = None
+            mock_state_objects.get.return_value = mock_state
+            mock_state_objects.filter.return_value = Mock()
+            mock_state_objects.filter.return_value.order_by.return_value = Mock()
+            mock_state_objects.filter.return_value.order_by.return_value.first.return_value = mock_state
             mock_repo = Mock()
             mock_repo.id = 1
             mock_repo.full_name = 'test-org/test-repo'
@@ -380,7 +395,21 @@ class TestCommitIndexingService(BaseTestCase):
     def test_index_commits_for_repository_api_error(self, mock_get):
         """Test handling of API errors during indexing"""
         with patch('repositories.models.Repository.objects') as mock_repo_objects, \
-             patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token:
+             patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token, \
+             patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects:
+            mock_state = Mock()
+            mock_state.repository_id = mock_repo.id
+            mock_state.entity_type = 'commits'
+            mock_state.status = 'pending'
+            mock_state.total_indexed = 0
+            mock_state.retry_count = 0
+            mock_state.max_retries = 3
+            mock_state.last_indexed_at = None
+            mock_state.save.return_value = None
+            mock_state_objects.get.return_value = mock_state
+            mock_state_objects.filter.return_value = Mock()
+            mock_state_objects.filter.return_value.order_by.return_value = Mock()
+            mock_state_objects.filter.return_value.order_by.return_value.first.return_value = mock_state
             mock_repo = Mock()
             mock_repo.id = 1
             mock_repo.full_name = 'test-org/test-repo'
