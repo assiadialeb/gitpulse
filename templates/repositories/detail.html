@@ -117,7 +117,7 @@
         <!-- Overall Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <!-- Total Commits -->
-            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" onclick="openCommitsList()">
+            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" role="button" tabindex="0" onclick="openCommitsList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openCommitsList(); }">
                 <div class="flex items-center">
                     <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl mr-4">
                         <svg class="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
@@ -145,7 +145,7 @@
                 </div>
             </div>
             <!-- Total Releases -->
-            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" onclick="openReleasesList()">
+            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" role="button" tabindex="0" onclick="openReleasesList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openReleasesList(); }">
                 <div class="flex items-center">
                     <div class="p-3 bg-yellow-500 bg-opacity-10 rounded-xl mr-4">
                         <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -276,7 +276,7 @@
             
             <!-- Licensing -->
             <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
-                 onclick="openLicensingAnalysis()">
+                 role="button" tabindex="0" onclick="openLicensingAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openLicensingAnalysis(); }">
                 <div class="flex items-start">
                     <div class="p-3 bg-green-500 bg-opacity-10 rounded-xl mr-4">
                         <svg class="w-8 h-8 text-green-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -334,7 +334,7 @@
             
             <!-- Code Quality Metrics (SonarCloud) -->
             <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
-                 onclick="openSonarCloudAnalysis()">
+                 role="button" tabindex="0" onclick="openSonarCloudAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openSonarCloudAnalysis(); }">
                 <div class="flex items-start">
                     <div class="p-3 bg-orange-500 bg-opacity-10 rounded-xl mr-4">
                         <svg class="w-8 h-8 text-orange-500" fill="currentColor" viewBox="0 0 24 24" role="img" xmlns="http://www.w3.org/2000/svg">
@@ -373,7 +373,7 @@
 
             <!-- Security Analysis (CodeQL) -->
             <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
-                 onclick="openCodeQLAnalysis()">
+                 role="button" tabindex="0" onclick="openCodeQLAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openCodeQLAnalysis(); }">
                 <div class="flex items-start">
                                    <div class="p-3 bg-red-500 bg-opacity-10 rounded-xl mr-4">
                    <svg class="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
@@ -692,7 +692,7 @@
                 <table class="table table-zebra w-full" id="top-contributors-table">
                     <thead>
                         <tr>
-                            <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(0)">
+                            <th class="text-center cursor-pointer hover:bg-gray-100" role="button" tabindex="0" onclick="sortTable(0)" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); sortTable(0); }">
                                 <div class="flex items-center justify-center">
                                     Rank
                                     <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -700,7 +700,7 @@
                                     </svg>
                                 </div>
                             </th>
-                            <th class="text-left cursor-pointer hover:bg-gray-100" onclick="sortTable(1)">
+                            <th class="text-left cursor-pointer hover:bg-gray-100" role="button" tabindex="0" onclick="sortTable(1)" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); sortTable(1); }">
                                 <div class="flex items-center">
                                     Developer
                                     <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -708,7 +708,7 @@
                                     </svg>
                                 </div>
                             </th>
-                            <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(2)">
+                            <th class="text-center cursor-pointer hover:bg-gray-100" role="button" tabindex="0" onclick="sortTable(2)" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); sortTable(2); }">
                                 <div class="flex items-center justify-center">
                                     Commits
                                     <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -716,7 +716,7 @@
                                     </svg>
                                 </div>
                             </th>
-                            <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(3)">
+                            <th class="text-center cursor-pointer hover:bg-gray-100" role="button" tabindex="0" onclick="sortTable(3)" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); sortTable(3); }">
                                 <div class="flex items-center justify-center">
                                     Additions
                                     <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -724,7 +724,7 @@
                                     </svg>
                                 </div>
                             </th>
-                            <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(4)">
+                            <th class="text-center cursor-pointer hover:bg-gray-100" role="button" tabindex="0" onclick="sortTable(4)" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); sortTable(4); }">
                                 <div class="flex items-center justify-center">
                                     Deletions
                                     <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -732,7 +732,7 @@
                                     </svg>
                                 </div>
                             </th>
-                            <th class="text-center cursor-pointer hover:bg-gray-100" onclick="sortTable(5)">
+                            <th class="text-center cursor-pointer hover:bg-gray-100" role="button" tabindex="0" onclick="sortTable(5)" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); sortTable(5); }">
                                 <div class="flex items-center justify-center">
                                     Net Lines
                                     <svg class="w-4 h-4 ml-1 sort-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3008,7 +3008,7 @@ function displayDeploymentsList(data) {
 <!-- Licensing Slide-over Panel -->
 <div id="licensing-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
     <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeLicensingAnalysis()"></div>
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" role="button" tabindex="0" onclick="closeLicensingAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); closeLicensingAnalysis(); }"></div>
         
         <div class="fixed inset-y-0 right-0 flex justify-end">
             <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="licensing-slide-panel">
@@ -3041,7 +3041,7 @@ function displayDeploymentsList(data) {
 <!-- Commits Slide-over Panel -->
 <div id="commits-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
     <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeCommitsList()"></div>
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" role="button" tabindex="0" onclick="closeCommitsList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); closeCommitsList(); }"></div>
         
         <div class="fixed inset-y-0 right-0 flex justify-end">
             <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="commits-slide-panel">
@@ -3071,7 +3071,7 @@ function displayDeploymentsList(data) {
 <!-- Releases Slide-over Panel -->
 <div id="releases-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
     <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeReleasesList()"></div>
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" role="button" tabindex="0" onclick="closeReleasesList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); closeReleasesList(); }"></div>
         
         <div class="fixed inset-y-0 right-0 flex justify-end">
             <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="releases-slide-panel">
@@ -3101,7 +3101,7 @@ function displayDeploymentsList(data) {
 <!-- Deployments Slide-over Panel -->
 <div id="deployments-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
     <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeDeploymentsList()"></div>
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" role="button" tabindex="0" onclick="closeDeploymentsList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); closeDeploymentsList(); }"></div>
         
         <div class="fixed inset-y-0 right-0 flex justify-end">
             <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="deployments-slide-panel">
@@ -3131,7 +3131,7 @@ function displayDeploymentsList(data) {
 <!-- SonarCloud Slide-over Panel -->
 <div id="sonarcloud-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
     <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeSonarCloudAnalysis()"></div>
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" role="button" tabindex="0" onclick="closeSonarCloudAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); closeSonarCloudAnalysis(); }"></div>
         
         <div class="fixed inset-y-0 right-0 flex justify-end">
             <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="sonarcloud-slide-panel">
@@ -3161,7 +3161,7 @@ function displayDeploymentsList(data) {
 <!-- CodeQL Slide-over Panel -->
 <div id="codeql-slide-over" class="fixed inset-0 overflow-hidden hidden z-50">
     <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeCodeQLAnalysis()"></div>
+        <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" role="button" tabindex="0" onclick="closeCodeQLAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); closeCodeQLAnalysis(); }"></div>
         
         <div class="fixed inset-y-0 right-0 flex justify-end">
             <div class="w-4/5 h-full transform translate-x-full transition-transform duration-300 ease-in-out" style="width: 80vw;" id="codeql-slide-panel">
