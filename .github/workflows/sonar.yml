@@ -73,10 +73,10 @@ jobs:
           fetch-depth: 0  # conseillé par Sonar
 
       # Récupère un des coverage.xml du matrix (tu peux aussi agréger)
-      - name: Download coverage artifact (3.12)
+      - name: Download coverage artifact (3.11)
         uses: actions/download-artifact@v4
         with:
-          name: test-reports-3.12
+          name: test-reports-3.11
           path: reports
 
       - name: SonarQube Scan
