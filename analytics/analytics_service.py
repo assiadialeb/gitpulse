@@ -605,9 +605,15 @@ class AnalyticsService:
         # Get the developer (global grouping, no application_id filter)
         try:
             developer = Developer.objects.get(id=developer_id)
-        except:
+        except Developer.DoesNotExist:
             return {
                 'error': 'Developer not found',
+                'success': False
+            }
+        except Exception:
+            # Invalid id or backend error
+            return {
+                'error': 'Unable to retrieve developer',
                 'success': False
             }
         

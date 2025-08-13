@@ -256,7 +256,7 @@ class CodeQLService:
                         if fixed_instances:
                             # Instances do not always include timestamps; fall back to last in list
                             fixed_commit_sha = (fixed_instances[-1] or {}).get('commit_sha')
-            except Exception as e:
+            except (ValueError, KeyError, TypeError) as e:
                 logger.warning(f"Could not determine fixed commit sha for alert {alert_number} in {repo_full_name}: {e}")
 
             vulnerability = CodeQLVulnerability(
@@ -295,7 +295,7 @@ class CodeQLService:
             
             return vulnerability
             
-        except Exception as e:
+        except (ValueError, KeyError, TypeError) as e:
             logger.error(f"Failed to process CodeQL alert {alert_data.get('id')}: {e}")
             return None
 

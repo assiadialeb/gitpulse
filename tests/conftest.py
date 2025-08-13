@@ -28,12 +28,9 @@ def django_db_setup(django_db_setup, django_db_blocker):
 
 @pytest.fixture(autouse=True)
 def mock_mongodb():
-    """Mock MongoDB for all tests"""
-    if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
-        # Mock mongoengine connection
-        with patch('mongoengine.connect'), patch('mongoengine.disconnect'):
-            yield
-    else:
+    """Mock MongoDB for all tests (CI-safe: no real Mongo connection)."""
+    # Always prevent real connections in tests
+    with patch('mongoengine.connect'), patch('mongoengine.disconnect'):
         yield
 
 
@@ -98,44 +95,41 @@ def setup_django_db(django_db_setup, django_db_blocker):
 
 @pytest.fixture(autouse=True)
 def mock_mongodb_objects():
-    """Mock MongoDB objects for testing"""
-    if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
-        # Create a simple mock queryset
-        mock_qs = Mock()
-        mock_qs.first.return_value = None
-        mock_qs.count.return_value = 0
-        mock_qs.order_by.return_value = mock_qs
-        mock_qs.all.return_value = []
-        mock_qs.filter.return_value = mock_qs
-        mock_qs.get.return_value = None
-        # Make the mock iterable
-        mock_qs.__iter__ = lambda self: iter([])
-        mock_qs.__len__ = lambda self: 0
-        
-        # Mock all MongoDB objects with the same mock queryset
-        with patch('analytics.models.Commit.objects') as mock_commit_objects, \
-             patch('analytics.models.PullRequest.objects') as mock_pr_objects, \
-             patch('analytics.models.Release.objects') as mock_release_objects, \
-             patch('analytics.models.SBOM.objects') as mock_sbom_objects, \
-             patch('analytics.models.CodeQLVulnerability.objects') as mock_codeql_objects, \
-             patch('analytics.models.IndexingState.objects') as mock_indexing_objects:
-            
-                        # Apply the same mock queryset to all objects
-            for mock_objects in [mock_commit_objects, mock_pr_objects, mock_release_objects, 
-                               mock_sbom_objects, mock_codeql_objects, mock_indexing_objects]:
-                mock_objects.filter.return_value = mock_qs
-                mock_objects.first.return_value = None
-                mock_objects.count.return_value = 0
-                mock_objects.all.return_value = []
-                mock_objects.get.return_value = None
-                # Add model attribute with __name__ for UnifiedMetricsService
-                mock_objects.model = Mock()
-                mock_objects.model.__name__ = 'MockModel'
-                # Also configure the filter return value to have the same model
-                mock_objects.filter.return_value.model = mock_objects.model
-            
-            yield
-    else:
+    """Mock MongoDB objects for testing (prevent any real Mongo access)."""
+    # Create a simple mock queryset
+    mock_qs = Mock()
+    mock_qs.first.return_value = None
+    mock_qs.count.return_value = 0
+    mock_qs.order_by.return_value = mock_qs
+    mock_qs.all.return_value = []
+    mock_qs.filter.return_value = mock_qs
+    mock_qs.get.return_value = None
+    # Make the mock iterable
+    mock_qs.__iter__ = lambda self: iter([])
+    mock_qs.__len__ = lambda self: 0
+
+    # Mock all MongoDB objects with the same mock queryset
+    with patch('analytics.models.Commit.objects') as mock_commit_objects, \
+         patch('analytics.models.PullRequest.objects') as mock_pr_objects, \
+         patch('analytics.models.Release.objects') as mock_release_objects, \
+         patch('analytics.models.SBOM.objects') as mock_sbom_objects, \
+         patch('analytics.models.CodeQLVulnerability.objects') as mock_codeql_objects, \
+         patch('analytics.models.IndexingState.objects') as mock_indexing_objects:
+
+        # Apply the same mock queryset to all objects
+        for mock_objects in [mock_commit_objects, mock_pr_objects, mock_release_objects, 
+                             mock_sbom_objects, mock_codeql_objects, mock_indexing_objects]:
+            mock_objects.filter.return_value = mock_qs
+            mock_objects.first.return_value = None
+            mock_objects.count.return_value = 0
+            mock_objects.all.return_value = []
+            mock_objects.get.return_value = None
+            # Add model attribute with __name__ for UnifiedMetricsService
+            mock_objects.model = Mock()
+            mock_objects.model.__name__ = 'MockModel'
+            # Also configure the filter return value to have the same model
+            mock_objects.filter.return_value.model = mock_objects.model
+
         yield
 
 
