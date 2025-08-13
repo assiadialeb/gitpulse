@@ -2,10 +2,10 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | ✅ Security fixes  |
-| <0.1    | ❌ No longer supported |
+| Version  | Supported              |
+| -------- | ---------------------- |
+| Latest release  | ✅ Security fixes      |
+| < Latest release| ❌ No longer supported |
 
 ## Reporting a Vulnerability
 
@@ -16,6 +16,7 @@ Instead, report it privately via GitHub's security advisory form:
 🔒 **[Report a vulnerability here](https://github.com/assiadialeb/gitpulse/security/advisories/new)**
 
 ### What to include in your report:
+
 - A clear description of the vulnerability.
 - Steps to reproduce the issue.
 - The potential impact of the vulnerability.
