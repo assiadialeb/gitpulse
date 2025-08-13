@@ -40,6 +40,12 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
+      - name: Run Django migrations
+        env:
+          USE_SQLITE_FOR_TESTS: "1"
+        run: |
+          python manage.py migrate
+
       - name: Pytest (JUnit + Coverage)
         env:
           USE_SQLITE_FOR_TESTS: "1"
