@@ -328,8 +328,8 @@ class TestCommitIndexingService(BaseTestCase):
     def test_index_commits_for_repository_success(self, mock_get):
         """Test successful indexing of commits for a repository"""
         # Patch Repository and Token service to avoid DB and auth
-        with patch('analytics.commit_indexing_service.Repository.objects') as mock_repo_objects, \
-             patch('analytics.commit_indexing_service.GitHubTokenService.get_token_for_repository_access') as mock_token:
+        with patch('repositories.models.Repository.objects') as mock_repo_objects, \
+             patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token:
             mock_repo = Mock()
             mock_repo.id = 1
             mock_repo.full_name = 'test-org/test-repo'
@@ -379,8 +379,8 @@ class TestCommitIndexingService(BaseTestCase):
     @patch('analytics.commit_indexing_service.requests.get')
     def test_index_commits_for_repository_api_error(self, mock_get):
         """Test handling of API errors during indexing"""
-        with patch('analytics.commit_indexing_service.Repository.objects') as mock_repo_objects, \
-             patch('analytics.commit_indexing_service.GitHubTokenService.get_token_for_repository_access') as mock_token:
+        with patch('repositories.models.Repository.objects') as mock_repo_objects, \
+             patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token:
             mock_repo = Mock()
             mock_repo.id = 1
             mock_repo.full_name = 'test-org/test-repo'
@@ -437,6 +437,22 @@ class TestCommitIndexingServiceIntegration(BaseTestCase):
         super().setUp()
         self.service = CommitIndexingService()
         self.repository_full_name = 'test-org/test-repo'
+    
+    def create_mock_commit(self, sha='abc123def456', repository_full_name='test-org/test-repo', 
+                           author_name='John Doe', author_email='john.doe@example.com',
+                           message='feat: add new feature', additions=100, deletions=50):
+        mock_commit = Mock()
+        mock_commit.sha = sha
+        mock_commit.repository_full_name = repository_full_name
+        mock_commit.author_name = author_name
+        mock_commit.author_email = author_email
+        mock_commit.committer_name = author_name
+        mock_commit.committer_email = author_email
+        mock_commit.message = message
+        mock_commit.additions = additions
+        mock_commit.deletions = deletions
+        mock_commit.total_changes = additions + deletions
+        return mock_commit
     
     def test_end_to_end_commit_processing(self):
         """Test end-to-end commit processing workflow"""
