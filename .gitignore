@@ -208,3 +208,6 @@ __marimo__/
 .DS_Store
 models/*
 node_modules/*
+
+.vscode/*
+.sonarlint/*
