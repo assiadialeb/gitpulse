@@ -331,6 +331,14 @@ class TestCommitIndexingService(BaseTestCase):
         with patch('repositories.models.Repository.objects') as mock_repo_objects, \
              patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token, \
              patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects:
+            # Create repository mock first
+            mock_repo = Mock()
+            mock_repo.id = 1
+            mock_repo.full_name = 'test-org/test-repo'
+            mock_repo.owner_name = 'test-org'
+            mock_repo.repo_name = 'test-repo'
+            mock_repo_objects.get.return_value = mock_repo
+            mock_token.return_value = self.github_token
             # Provide a valid state object so index_batch can run
             mock_state = Mock()
             mock_state.repository_id = mock_repo.id
@@ -345,13 +353,6 @@ class TestCommitIndexingService(BaseTestCase):
             mock_state_objects.filter.return_value = Mock()
             mock_state_objects.filter.return_value.order_by.return_value = Mock()
             mock_state_objects.filter.return_value.order_by.return_value.first.return_value = mock_state
-            mock_repo = Mock()
-            mock_repo.id = 1
-            mock_repo.full_name = 'test-org/test-repo'
-            mock_repo.owner_name = 'test-org'
-            mock_repo.repo_name = 'test-repo'
-            mock_repo_objects.get.return_value = mock_repo
-            mock_token.return_value = self.github_token
 
         # Mock successful API response
             mock_response = Mock()
@@ -397,6 +398,15 @@ class TestCommitIndexingService(BaseTestCase):
         with patch('repositories.models.Repository.objects') as mock_repo_objects, \
              patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token, \
              patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects:
+            # Create repository mock first
+            mock_repo = Mock()
+            mock_repo.id = 1
+            mock_repo.full_name = 'test-org/test-repo'
+            mock_repo.owner_name = 'test-org'
+            mock_repo.repo_name = 'test-repo'
+            mock_repo_objects.get.return_value = mock_repo
+            mock_token.return_value = self.github_token
+            # Provide a valid state object so index_batch can run
             mock_state = Mock()
             mock_state.repository_id = mock_repo.id
             mock_state.entity_type = 'commits'
@@ -410,13 +420,6 @@ class TestCommitIndexingService(BaseTestCase):
             mock_state_objects.filter.return_value = Mock()
             mock_state_objects.filter.return_value.order_by.return_value = Mock()
             mock_state_objects.filter.return_value.order_by.return_value.first.return_value = mock_state
-            mock_repo = Mock()
-            mock_repo.id = 1
-            mock_repo.full_name = 'test-org/test-repo'
-            mock_repo.owner_name = 'test-org'
-            mock_repo.repo_name = 'test-repo'
-            mock_repo_objects.get.return_value = mock_repo
-            mock_token.return_value = self.github_token
             # Mock API error
             mock_response = Mock()
             mock_response.status_code = 404
