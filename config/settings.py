@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 import mongoengine
 from decouple import config, Csv
-
+from datetime import datetime
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -269,8 +269,7 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 # Logging Configuration
-import os
-from datetime import datetime
+
 
 # Create logs directory if it doesn't exist
 LOGS_DIR = BASE_DIR / 'logs'
