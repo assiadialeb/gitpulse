@@ -452,8 +452,8 @@ class SonarCloudService:
                 # Get current metrics for Technical Debt
                 latest_metrics = self.get_latest_metrics(repository_id)
                 
-                # Recalculate trends including issues
-                trends = self._calculate_trends(base_result.get('metrics_timeline', []), issues_timeline, latest_metrics)
+                # Recalculate trends
+                trends = self._calculate_trends(base_result.get('metrics_timeline', []), latest_metrics)
 
                 return {
                     'metrics_timeline': base_result.get('metrics_timeline', []),
@@ -509,7 +509,7 @@ class SonarCloudService:
             latest_metrics = self.get_latest_metrics(repository_id)
             
             # Calculate trends
-            trends = self._calculate_trends(metrics_timeline, issues_timeline, latest_metrics)
+            trends = self._calculate_trends(metrics_timeline, latest_metrics)
             
             return {
                 'metrics_timeline': metrics_timeline,
@@ -610,7 +610,7 @@ class SonarCloudService:
                     })
             
             # Calculate trends from backfilled data
-            trends = self._calculate_trends(metrics_timeline, [])
+            trends = self._calculate_trends(metrics_timeline)
             
             return {
                 'metrics_timeline': metrics_timeline,
@@ -643,72 +643,98 @@ class SonarCloudService:
                 'error': str(e)
             }
     
-    def _calculate_trends(self, metrics_timeline: List[Dict], issues_timeline: List[Dict], latest_metrics=None) -> Dict:
+    def _calculate_trends(self, metrics_timeline: List[Dict], latest_metrics=None) -> Dict:
         """Calculate trends from timeline data"""
-        trends = {
+        trends = self._initialize_trends()
+        self._add_technical_debt_metrics(trends, latest_metrics)
+        self._calculate_metric_trends(trends, metrics_timeline)
+        return trends
+    
+    def _initialize_trends(self) -> Dict:
+        """Initialize default trends dictionary"""
+        return {
             'quality_gate_trend': 'stable',
             'maintainability_trend': 'stable',
             'reliability_trend': 'stable',
             'security_trend': 'stable',
-            'issues_trend': 'stable',
             'coverage_trend': 'stable',
             'sqale_debt_ratio': 0.0,
             'new_technical_debt': 0.0
         }
-        
-        # Get current metrics for Technical Debt values
+    
+    def _add_technical_debt_metrics(self, trends: Dict, latest_metrics) -> None:
+        """Add current Technical Debt metrics to trends"""
         if latest_metrics:
             trends['sqale_debt_ratio'] = getattr(latest_metrics, 'sqale_debt_ratio', 0.0)
             trends['new_technical_debt'] = getattr(latest_metrics, 'new_technical_debt', 0.0)
+    
+    def _calculate_metric_trends(self, trends: Dict, metrics_timeline: List[Dict]) -> None:
+        """Calculate trends for all metrics in timeline"""
+        if not metrics_timeline:
+            return
         
-        # Simple trend calculation (can be enhanced)
-        if metrics_timeline:
-            # Group by metric and calculate trend
-            metrics_by_type = {}
-            for point in metrics_timeline:
-                metric = point['metric']
-                if metric not in metrics_by_type:
-                    metrics_by_type[metric] = []
-                metrics_by_type[metric].append(point)
+        metrics_by_type = self._group_metrics_by_type(metrics_timeline)
+        self._process_metric_trends(trends, metrics_by_type)
+    
+    def _group_metrics_by_type(self, metrics_timeline: List[Dict]) -> Dict:
+        """Group metrics by their type"""
+        metrics_by_type = {}
+        for point in metrics_timeline:
+            metric = point['metric']
+            if metric not in metrics_by_type:
+                metrics_by_type[metric] = []
+            metrics_by_type[metric].append(point)
+        return metrics_by_type
+    
+    def _process_metric_trends(self, trends: Dict, metrics_by_type: Dict) -> None:
+        """Process trends for each metric type"""
+        for metric, points in metrics_by_type.items():
+            if len(points) >= 2:
+                trend = self._calculate_single_metric_trend(metric, points)
+                trends[f'{metric}_trend'] = trend
+    
+    def _calculate_single_metric_trend(self, metric: str, points: List[Dict]) -> str:
+        """Calculate trend for a single metric"""
+        sorted_points = sorted(points, key=lambda x: x['date'])
+        first_value = sorted_points[0]['value']
+        last_value = sorted_points[-1]['value']
+        
+        if self._is_rating_metric(metric):
+            return self._calculate_rating_trend(first_value, last_value)
+        else:
+            return self._calculate_numeric_trend(first_value, last_value)
+    
+    def _is_rating_metric(self, metric: str) -> bool:
+        """Check if metric is a rating type"""
+        return metric in ['maintainability_rating', 'reliability_rating', 'security_rating']
+    
+    def _calculate_rating_trend(self, first_value: str, last_value: str) -> str:
+        """Calculate trend for rating metrics (A=1, B=2, C=3, D=4, E=5)"""
+        rating_to_num = {'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5}
+        first_num = rating_to_num.get(first_value, 3)
+        last_num = rating_to_num.get(last_value, 3)
+        
+        if last_num < first_num:  # Lower number = better rating
+            return 'improving'
+        elif last_num > first_num:
+            return 'degrading'
+        else:
+            return 'stable'
+    
+    def _calculate_numeric_trend(self, first_value: str, last_value: str) -> str:
+        """Calculate trend for numeric metrics"""
+        try:
+            first_num = float(first_value) if first_value else 0
+            last_num = float(last_value) if last_value else 0
             
-            # Calculate trends for each metric type
-            for metric, points in metrics_by_type.items():
-                if len(points) >= 2:
-                    # Sort by date
-                    sorted_points = sorted(points, key=lambda x: x['date'])
-                    first_value = sorted_points[0]['value']
-                    last_value = sorted_points[-1]['value']
-                    
-                    # Handle different metric types
-                    if metric in ['maintainability_rating', 'reliability_rating', 'security_rating']:
-                        # For ratings (A=1, B=2, C=3, D=4, E=5)
-                        rating_to_num = {'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5}
-                        first_num = rating_to_num.get(first_value, 3)
-                        last_num = rating_to_num.get(last_value, 3)
-                        
-                        if last_num < first_num:  # Lower number = better rating
-                            trends[f'{metric}_trend'] = 'improving'
-                        elif last_num > first_num:
-                            trends[f'{metric}_trend'] = 'degrading'
-                        else:
-                            trends[f'{metric}_trend'] = 'stable'
-                    else:
-                        # For numeric metrics
-                        try:
-                            first_num = float(first_value) if first_value else 0
-                            last_num = float(last_value) if last_value else 0
-                            
-                            # Determine trend
-                            if last_num > first_num * 1.1:  # 10% improvement
-                                trends[f'{metric}_trend'] = 'improving'
-                            elif last_num < first_num * 0.9:  # 10% degradation
-                                trends[f'{metric}_trend'] = 'degrading'
-                            else:
-                                trends[f'{metric}_trend'] = 'stable'
-                        except (ValueError, TypeError):
-                            trends[f'{metric}_trend'] = 'stable'
-        
-        return trends 
+            if last_num > first_num * 1.1:  # 10% improvement
+                return 'improving'
+            elif last_num < first_num * 0.9:  # 10% degradation
+                return 'degrading'
+            else:
+                return 'stable'
+        except (ValueError, TypeError):
+            return 'stable' 
 
     def _fetch_project_analyses(self, project_key: str, repository_full_name: str = None, 
                                from_date: datetime = None, to_date: datetime = None) -> List[Dict]:
