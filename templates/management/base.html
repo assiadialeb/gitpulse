@@ -2,6 +2,12 @@
 
 {% block title %}{% block management_title %}GitPulse Management{% endblock %} - GitPulse{% endblock %}
 
+{% block extra_head %}
+<!-- Include Toast System -->
+{% include 'partials/_toast.html' %}
+{% block management_extra_head %}{% endblock %}
+{% endblock %}
+
 {% block content %}
 <div class="min-h-screen bg-gray-50">
     <!-- Management Header -->

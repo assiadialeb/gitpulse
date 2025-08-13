@@ -293,7 +293,7 @@ function selectDeveloper(developer) {
     
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
     if (!csrfToken) {
-        alert('CSRF token not found. Please refresh the page and try again.');
+        window.toast.error('CSRF token not found. Please refresh the page and try again.');
         return;
     }
     
@@ -307,16 +307,19 @@ function selectDeveloper(developer) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
+            window.toast.success(data.message);
             closeLinkDeveloperModal();
-            location.reload(); // Refresh to show updated status
+            // Update the UI without reloading
+            setTimeout(() => {
+                location.reload();
+            }, 1500); // Reload after 1.5 seconds to show the toast
         } else {
-            alert('Error: ' + data.error);
+            window.toast.error('Error: ' + data.error);
         }
     })
     .catch(error => {
         console.error('Error linking user to developer:', error);
-        alert('An error occurred while linking user to developer');
+        window.toast.error('An error occurred while linking user to developer');
     });
 }
 
@@ -335,15 +338,18 @@ function toggleUserStatus(userId, username) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            window.toast.success(data.message || 'User status updated successfully');
             // Reload the page to show updated status
-            location.reload();
+            setTimeout(() => {
+                location.reload();
+            }, 1500); // Reload after 1.5 seconds to show the toast
         } else {
-            alert('Error: ' + data.error);
+            window.toast.error('Error: ' + data.error);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while updating user status');
+        window.toast.error('An error occurred while updating user status');
     });
 }
 

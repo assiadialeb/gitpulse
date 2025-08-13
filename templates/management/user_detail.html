@@ -264,7 +264,7 @@ function selectDeveloper(developer) {
     
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
     if (!csrfToken) {
-        alert('CSRF token not found. Please refresh the page and try again.');
+        window.toast.error('CSRF token not found. Please refresh the page and try again.');
         return;
     }
     
@@ -278,16 +278,19 @@ function selectDeveloper(developer) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
+            window.toast.success(data.message);
             closeLinkDeveloperModal();
-            location.reload(); // Refresh to show updated status
+            // Update the UI without reloading
+            setTimeout(() => {
+                location.reload();
+            }, 1500); // Reload after 1.5 seconds to show the toast
         } else {
-            alert('Error: ' + data.error);
+            window.toast.error('Error: ' + data.error);
         }
     })
     .catch(error => {
         console.error('Error linking user to developer:', error);
-        alert('An error occurred while linking user to developer');
+        window.toast.error('An error occurred while linking user to developer');
     });
 }
 
@@ -347,7 +350,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.edit-user-btn').forEach(button => {
         button.addEventListener('click', function() {
             const userId = this.dataset.userId;
-            alert('Edit user functionality will be implemented here');
+            window.toast.info('Edit user functionality will be implemented here');
         });
     });
 
@@ -359,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
                 return;
             }
-            alert('Delete user functionality will be implemented here');
+            window.toast.info('Delete user functionality will be implemented here');
         });
     });
 
@@ -374,7 +377,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
             if (!csrfToken) {
-                alert('CSRF token not found. Please refresh the page and try again.');
+                window.toast.error('CSRF token not found. Please refresh the page and try again.');
                 return;
             }
             
@@ -386,17 +389,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            })
+                .then(data => {
+        if (data.success) {
+            window.toast.success(data.message);
+            setTimeout(() => {
+                location.reload();
+            }, 1500); // Reload after 1.5 seconds to show the toast
+        } else {
+            window.toast.error('Error: ' + data.error);
+        }
+    })
             .catch(error => {
                 console.error('Error unlinking developer:', error);
-                alert('An error occurred while unlinking developer');
+                window.toast.error('An error occurred while unlinking developer');
             });
         });
     });

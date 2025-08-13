@@ -839,8 +839,8 @@ def link_user_to_developer(request, user_id):
                 'error': f'User is already linked to developer {existing_link.developer_id}'
             }, status=400)
         
-        # Check if developer is already linked
-        existing_dev_link = UserDeveloperLink.objects.filter(developer_id=developer_id).first()
+        # Check if developer is already linked to another user
+        existing_dev_link = UserDeveloperLink.objects.filter(developer_id=developer_id).exclude(user=user).first()
         if existing_dev_link:
             return JsonResponse({
                 'success': False,
@@ -855,7 +855,7 @@ def link_user_to_developer(request, user_id):
         
         return JsonResponse({
             'success': True,
-            'message': f'User {user.username} successfully linked to developer {developer.name}',
+            'message': f'User {user.username} successfully linked to developer {developer.primary_name}',
             'link_id': link.id
         })
         
