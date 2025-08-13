@@ -14,3 +14,4 @@ asgiref==3.8.1
 MarkupSafe==2.1.5
 ollama==0.5.1
 PyJWT==2.8.0
+pytest==8.3.4
