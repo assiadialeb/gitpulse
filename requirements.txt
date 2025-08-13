@@ -1,6 +1,5 @@
 Django==5.2.4
 django-allauth==65.10.0
-django-debug-toolbar==6.0.0
 django-picklefield==3.3
 django-q2==1.8.0
 mongoengine==0.29.1

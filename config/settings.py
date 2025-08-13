@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_q',
-    #"debug_toolbar",
     'users',
     'github.apps.GithubConfig',
     'projects',
@@ -66,7 +65,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    #"debug_toolbar.middleware.DebugToolbarMiddleware",
+
 ]
 INTERNAL_IPS = [
     # ...
@@ -98,19 +97,20 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 
 
+# Environment flags (uniform)
+# Single source of truth for test mode
+IS_TEST = os.getenv('PYTEST') == '1'
+DISABLE_MONGO = IS_TEST
+
 # MongoDB Configuration
 MONGODB_HOST = config('MONGODB_HOST', default='localhost')
 MONGODB_PORT = int(config('MONGODB_PORT', default=27017))
 MONGODB_NAME = config('MONGODB_NAME', default='gitpulse')
 
-# Connect to MongoDB
-mongoengine.connect(
-    db=MONGODB_NAME,
-    host=MONGODB_HOST,
-    port=MONGODB_PORT,
-)
+if not DISABLE_MONGO:
+    mongoengine.connect(db=MONGODB_NAME, host=MONGODB_HOST, port=MONGODB_PORT)
 
-if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
+if IS_TEST:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -202,7 +202,7 @@ Q_CLUSTER = {
 
 # GitPulse Configuration
 # Choose indexing service: 'git_local' or 'github_api'
-INDEXING_SERVICE = config('INDEXING_SERVICE', default='git_local')
+INDEXING_SERVICE = config('INDEXING_SERVICE', default='github_api')
 
 # GitHub API Configuration (only used if INDEXING_SERVICE = 'github_api')
 GITHUB_API_RATE_LIMIT_WARNING = int(config('GITHUB_API_RATE_LIMIT_WARNING', default=10))
