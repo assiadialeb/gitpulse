@@ -100,3 +100,4 @@ nav:
       - Production: deployment/production.md
       - GitHub Pages: deployment/github-pages.md
   - Releases : https://github.com/assiadialeb/gitpulse/releases
+  - Security : SECURITY.md
