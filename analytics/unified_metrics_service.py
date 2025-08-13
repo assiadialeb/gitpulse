@@ -1,5 +1,5 @@
 """
-Unified metrics service for calculating analytics across repositories, applications, and developers
+Unified metrics service for calculating analytics across repositories, projects, and developers
 """
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Dict, List, Optional, Union
@@ -18,7 +18,7 @@ class UnifiedMetricsService:
     """
     Unified service for calculating metrics across different entities:
     - Repository (R): single repo metrics
-    - Application (A): aggregated repos metrics  
+    - Project (P): aggregated repos metrics  
     - Developer (D): single developer metrics
     """
     
@@ -34,8 +34,8 @@ class UnifiedMetricsService:
         Initialize the service for a specific entity
         
         Args:
-            entity_type: 'repository', 'application', or 'developer'
-            entity_id: Repository ID, Application ID, or Developer ID
+            entity_type: 'repository', 'application' (for projects), or 'developer'
+            entity_id: Repository ID, Project ID, or Developer ID
         """
         self.entity_type = entity_type.lower()
         self.entity_id = entity_id
@@ -57,11 +57,14 @@ class UnifiedMetricsService:
             
         elif self.entity_type == 'application':
             
-            self.application = Application.objects.get(id=self.entity_id)
-            self.commits = Commit.objects.filter(application_id=self.entity_id)
-            self.prs = PullRequest.objects.filter(application_id=self.entity_id)
-            self.releases = Release.objects.filter(application_id=self.entity_id)
-            self.deployments = Deployment.objects.filter(application_id=self.entity_id)
+            from projects.models import Project
+            self.project = Project.objects.get(id=self.entity_id)
+            # Get all repository full names for this project
+            project_repo_names = [repo.full_name for repo in self.project.repositories.all()]
+            self.commits = Commit.objects.filter(repository_full_name__in=project_repo_names)
+            self.prs = PullRequest.objects.filter(repository_full_name__in=project_repo_names)
+            self.releases = Release.objects.filter(repository_full_name__in=project_repo_names)
+            self.deployments = Deployment.objects.filter(repository_full_name__in=project_repo_names)
             
         elif self.entity_type == 'developer':
             self.developer = Developer.objects.get(id=self.entity_id)
@@ -115,7 +118,7 @@ class UnifiedMetricsService:
                 return qs
         return qs
     
-    # Basic Stats (DAR - Developers, Applications, Repositories)
+    # Basic Stats (DPR - Developers, Projects, Repositories)
     def get_total_commits(self) -> int:
         """Total Commits (DAR)"""
         return self.commits.count()
@@ -132,9 +135,10 @@ class UnifiedMetricsService:
             return 1  # Single developer
         
         if self.entity_type == 'application':
-            # Use grouped developers from existing service
-            grouping_service = DeveloperGroupingService(self.entity_id)
-            return len(grouping_service.get_all_developers_for_application(self.entity_id))
+            # For projects, use the commits we already have to count developers
+            from .developer_grouping_service import DeveloperGroupingService
+            grouping_service = DeveloperGroupingService()
+            return grouping_service.get_all_developers_for_commits(self.commits)
         else:
             # Repository: use grouped developers instead of simple email counting
             from .developer_grouping_service import DeveloperGroupingService
@@ -289,35 +293,27 @@ class UnifiedMetricsService:
         # recent_commits is already filtered by date range or days
         
         if self.entity_type == 'application':
-            # Use grouped developers for applications
-            grouping_service = DeveloperGroupingService(self.entity_id)
-            grouped_developers = grouping_service.get_grouped_developers_for_application(self.entity_id)
-            
-            # Create mapping from email to group
-            email_to_group = {}
-            for group in grouped_developers:
-                for alias in group['aliases']:
-                    email_to_group[alias['email']] = group
+            # For projects, use the same logic as repositories but with project commits
+            # Create mapping from email to Developer
+            email_to_developer = {}
+            for alias in DeveloperAlias.objects():
+                if alias.developer:
+                    email_to_developer[alias.email.lower()] = alias.developer
             
             # Aggregate by developer groups
             developer_stats = {}
             for commit in recent_commits:
-                group = email_to_group.get(commit.author_email)
-                if group:
-                    key = group['primary_name']
-                    if key not in developer_stats:
-                        developer_stats[key] = {'commits': 0, 'additions': 0, 'deletions': 0}
-                    developer_stats[key]['commits'] += 1
-                    developer_stats[key]['additions'] += commit.additions
-                    developer_stats[key]['deletions'] += commit.deletions
+                email = commit.author_email.lower()
+                developer = email_to_developer.get(email)
+                if developer:
+                    key = developer.primary_name
                 else:
-                    # Fallback for ungrouped developers
                     key = commit.author_name
-                    if key not in developer_stats:
-                        developer_stats[key] = {'commits': 0, 'additions': 0, 'deletions': 0}
-                    developer_stats[key]['commits'] += 1
-                    developer_stats[key]['additions'] += commit.additions
-                    developer_stats[key]['deletions'] += commit.deletions
+                if key not in developer_stats:
+                    developer_stats[key] = {'commits': 0, 'additions': 0, 'deletions': 0}
+                developer_stats[key]['commits'] += 1
+                developer_stats[key]['additions'] += commit.additions
+                developer_stats[key]['deletions'] += commit.deletions
         else:
             # Repository: For repositories, we want to show ALL developers who contributed
             # but calculate their stats for the recent period only
@@ -515,34 +511,25 @@ class UnifiedMetricsService:
             }]
         
         if self.entity_type == 'application':
-            # Use grouped developers for applications
-            grouping_service = DeveloperGroupingService(self.entity_id)
-            grouped_developers = grouping_service.get_grouped_developers_for_application(self.entity_id)
-            
-            # Create mapping from email to group
-            email_to_group = {}
-            for group in grouped_developers:
-                for alias in group['aliases']:
-                    email_to_group[alias['email']] = group
-            
-            # Aggregate by developer groups
+            # For projects, use the same logic as repositories but with project commits
             contributor_stats = {}
+            # Prépare un mapping email -> Developer (si existe)
+            email_to_developer = {}
+            for alias in DeveloperAlias.objects():
+                if alias.developer:
+                    email_to_developer[alias.email.lower()] = alias.developer
             for commit in self.commits:
-                group = email_to_group.get(commit.author_email)
-                if group:
-                    key = group['primary_name']
-                    if key not in contributor_stats:
-                        contributor_stats[key] = {'additions': 0, 'deletions': 0, 'commits': 0}
-                    contributor_stats[key]['additions'] += commit.additions
-                    contributor_stats[key]['deletions'] += commit.deletions
-                    contributor_stats[key]['commits'] += 1
+                email = commit.author_email.lower()
+                developer = email_to_developer.get(email)
+                if developer:
+                    key = developer.primary_name
                 else:
                     key = commit.author_name
-                    if key not in contributor_stats:
-                        contributor_stats[key] = {'additions': 0, 'deletions': 0, 'commits': 0}
-                    contributor_stats[key]['additions'] += commit.additions
-                    contributor_stats[key]['deletions'] += commit.deletions
-                    contributor_stats[key]['commits'] += 1
+                if key not in contributor_stats:
+                    contributor_stats[key] = {'additions': 0, 'deletions': 0, 'commits': 0}
+                contributor_stats[key]['additions'] += commit.additions
+                contributor_stats[key]['deletions'] += commit.deletions
+                contributor_stats[key]['commits'] += 1
         else:
             # Repository: group by author (corrigé pour alias/group)
             contributor_stats = {}

@@ -609,7 +609,11 @@ class SonarCloudMetrics(Document):
     code_smells = fields.IntField(default=0)
     duplicated_lines_density = fields.FloatField(default=0.0)  # %
     coverage = fields.FloatField()  # %
-    technical_debt = fields.FloatField()  # hours
+    technical_debt = fields.FloatField()  # hours (deprecated)
+    
+    # Technical Debt metrics (new)
+    sqale_debt_ratio = fields.FloatField(default=0.0)  # Technical debt ratio (%)
+    new_technical_debt = fields.FloatField(default=0.0)  # New technical debt (hours)
     
     # Issues by severity
     issues_blocker = fields.IntField(default=0)

@@ -22,15 +22,20 @@
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
                             <div class="w-8 h-8 rounded-full flex items-center justify-center 
-                                {% if temporal_data.trends.quality_gate_trend == 'improving' %}bg-green-100
-                                {% elif temporal_data.trends.quality_gate_trend == 'degrading' %}bg-red-100
+                                {% if current_metrics.quality_gate == 'PASS' %}bg-green-100
+                                {% elif current_metrics.quality_gate == 'FAIL' %}bg-red-100
                                 {% else %}bg-gray-100{% endif %}">
                                 <span class="text-sm font-medium">QG</span>
                             </div>
                         </div>
                         <div class="ml-3">
                             <p class="text-sm font-medium text-gray-900">Quality Gate</p>
-                            <p class="text-sm text-gray-500">{{ temporal_data.trends.quality_gate_trend|default:"stable" }}</p>
+                            <p class="text-sm font-bold 
+                                {% if current_metrics.quality_gate == 'PASS' %}text-green-600
+                                {% elif current_metrics.quality_gate == 'FAIL' %}text-red-600
+                                {% else %}text-gray-600{% endif %}">
+                                {{ current_metrics.quality_gate|default:"N/A" }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -155,8 +160,39 @@
                 <div class="bg-white border border-gray-200 rounded-lg p-4">
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-medium text-gray-900">Coverage</span>
-                        <span class="text-2xl font-bold text-green-600" data-coverage="{{ current_metrics.coverage|default:0 }}">
+                        <span class="text-2xl font-bold 
+                            {% if current_metrics.coverage >= 80 %}text-green-600
+                            {% elif current_metrics.coverage >= 60 %}text-yellow-600
+                            {% elif current_metrics.coverage >= 40 %}text-orange-600
+                            {% else %}text-red-600{% endif %}" 
+                            data-coverage="{{ current_metrics.coverage|default:0 }}">
                             {{ current_metrics.coverage|floatformat:1|default:"0" }}%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-900">Technical Debt Ratio</span>
+                        <span class="text-2xl font-bold 
+                            {% if current_metrics.sqale_debt_ratio < 1 %}text-green-600
+                            {% elif current_metrics.sqale_debt_ratio < 3 %}text-yellow-600
+                            {% else %}text-red-600{% endif %}" 
+                            data-debt-ratio="{{ current_metrics.sqale_debt_ratio|default:0 }}">
+                            {{ current_metrics.sqale_debt_ratio|floatformat:1|default:"0" }}%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-900">New Technical Debt</span>
+                        <span class="text-2xl font-bold 
+                            {% if current_metrics.new_technical_debt == 0 %}text-green-600
+                            {% elif current_metrics.new_technical_debt < 2 %}text-yellow-600
+                            {% else %}text-red-600{% endif %}" 
+                            data-new-debt="{{ current_metrics.new_technical_debt|default:0 }}">
+                            {{ current_metrics.new_technical_debt|floatformat:1|default:"0" }}h
                         </span>
                     </div>
                 </div>

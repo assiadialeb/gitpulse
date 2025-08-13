@@ -123,7 +123,7 @@ class SonarCloudService:
             params = {
                 'organization': org,
                 'component': project_key,
-                'metricKeys': 'bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density,technical_debt,sqale_rating,reliability_rating,security_rating'
+                'metricKeys': 'bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density,technical_debt,sqale_rating,reliability_rating,security_rating,sqale_debt_ratio,new_technical_debt'
             }
             
             response = requests.get(url, headers=self.headers, params=params, timeout=10)
@@ -287,6 +287,10 @@ class SonarCloudService:
                 coverage=float(metrics.get('coverage', 0.0)) if metrics.get('coverage') else None,
                 technical_debt=float(metrics.get('technical_debt', 0.0)) if metrics.get('technical_debt') else None,
                 
+                # Technical Debt metrics (new)
+                sqale_debt_ratio=float(metrics.get('sqale_debt_ratio', 0.0)),
+                new_technical_debt=float(metrics.get('new_technical_debt', 0.0)),
+                
                 # Issues by severity
                 issues_blocker=issues.get('by_severity', {}).get('BLOCKER', 0),
                 issues_critical=issues.get('by_severity', {}).get('CRITICAL', 0),
@@ -336,7 +340,7 @@ class SonarCloudService:
             params = {
                 'component': project_key,
                 'organization': org,
-                'metrics': 'bugs,vulnerabilities,code_smells,duplicated_lines_density,coverage,sqale_rating,reliability_rating,security_rating',
+                'metrics': 'bugs,vulnerabilities,code_smells,duplicated_lines_density,coverage,sqale_rating,reliability_rating,security_rating,sqale_debt_ratio,new_technical_debt',
                 'ps': 100  # Page size
             }
             
@@ -445,8 +449,11 @@ class SonarCloudService:
                         'url': f"https://sonarcloud.io/project/issues?organization={org}&id={project_key}&open={issue_key}" if issue_key and org else None,
                     })
 
+                # Get current metrics for Technical Debt
+                latest_metrics = self.get_latest_metrics(repository_id)
+                
                 # Recalculate trends including issues
-                trends = self._calculate_trends(base_result.get('metrics_timeline', []), issues_timeline)
+                trends = self._calculate_trends(base_result.get('metrics_timeline', []), issues_timeline, latest_metrics)
 
                 return {
                     'metrics_timeline': base_result.get('metrics_timeline', []),
@@ -498,8 +505,11 @@ class SonarCloudService:
                     'url': f"https://sonarcloud.io/project/issues?organization={org}&id={project_key}&open={issue_key}" if issue_key and org else None,
                 })
             
+            # Get current metrics for Technical Debt
+            latest_metrics = self.get_latest_metrics(repository_id)
+            
             # Calculate trends
-            trends = self._calculate_trends(metrics_timeline, issues_timeline)
+            trends = self._calculate_trends(metrics_timeline, issues_timeline, latest_metrics)
             
             return {
                 'metrics_timeline': metrics_timeline,
@@ -633,7 +643,7 @@ class SonarCloudService:
                 'error': str(e)
             }
     
-    def _calculate_trends(self, metrics_timeline: List[Dict], issues_timeline: List[Dict]) -> Dict:
+    def _calculate_trends(self, metrics_timeline: List[Dict], issues_timeline: List[Dict], latest_metrics=None) -> Dict:
         """Calculate trends from timeline data"""
         trends = {
             'quality_gate_trend': 'stable',
@@ -641,8 +651,15 @@ class SonarCloudService:
             'reliability_trend': 'stable',
             'security_trend': 'stable',
             'issues_trend': 'stable',
-            'coverage_trend': 'stable'
+            'coverage_trend': 'stable',
+            'sqale_debt_ratio': 0.0,
+            'new_technical_debt': 0.0
         }
+        
+        # Get current metrics for Technical Debt values
+        if latest_metrics:
+            trends['sqale_debt_ratio'] = getattr(latest_metrics, 'sqale_debt_ratio', 0.0)
+            trends['new_technical_debt'] = getattr(latest_metrics, 'new_technical_debt', 0.0)
         
         # Simple trend calculation (can be enhanced)
         if metrics_timeline:
@@ -789,7 +806,7 @@ class SonarCloudService:
                 'component': project_key,
                 'organization': org,
                 'analysis': analysis_key,
-                'metricKeys': 'bugs,vulnerabilities,code_smells,duplicated_lines_density,coverage,sqale_rating,reliability_rating,security_rating,maintainability_rating'
+                'metricKeys': 'bugs,vulnerabilities,code_smells,duplicated_lines_density,coverage,sqale_rating,reliability_rating,security_rating,maintainability_rating,sqale_debt_ratio,new_technical_debt'
             }
             
             response = requests.get(url, headers=self.headers, params=params, timeout=10)
@@ -841,6 +858,10 @@ class SonarCloudService:
                     duplicated_lines_density=float(metrics_dict.get('duplicated_lines_density', 0.0)),
                     coverage=float(metrics_dict.get('coverage', 0.0)) if metrics_dict.get('coverage') else None,
                     technical_debt=float(metrics_dict.get('technical_debt', 0.0)) if metrics_dict.get('technical_debt') else None,
+                    
+                    # Technical Debt metrics (new)
+                    sqale_debt_ratio=float(metrics_dict.get('sqale_debt_ratio', 0.0)),
+                    new_technical_debt=float(metrics_dict.get('new_technical_debt', 0.0)),
                     
                     # Quality gate (we don't have historical quality gate data)
                     quality_gate='UNKNOWN'

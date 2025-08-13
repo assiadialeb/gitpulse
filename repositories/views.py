@@ -1419,7 +1419,9 @@ def repository_sonarcloud_analysis(request, repo_id):
             'maintainability_rating': getattr(latest_metrics, 'maintainability_rating', 'N/A'),
             'reliability_rating': getattr(latest_metrics, 'reliability_rating', 'N/A'),
             'security_rating': getattr(latest_metrics, 'security_rating', 'N/A'),
-            'quality_gate': getattr(latest_metrics, 'quality_gate', 'N/A')
+            'quality_gate': getattr(latest_metrics, 'quality_gate', 'N/A'),
+            'sqale_debt_ratio': getattr(latest_metrics, 'sqale_debt_ratio', 0.0),
+            'new_technical_debt': getattr(latest_metrics, 'new_technical_debt', 0.0)
         }
         
         return render(request, 'repositories/sonarcloud_analysis.html', {
