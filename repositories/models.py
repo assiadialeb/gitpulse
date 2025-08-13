@@ -77,6 +77,7 @@ class Repository(models.Model):
             repo.cascade_delete(confirm_repository_name=repo.full_name)
         
         Collections that need to be cleaned up:
+        - Commit (repository_full_name)
         - PullRequest (repository_full_name)
         - Deployment (repository_full_name) 
         - Release (repository_full_name)
@@ -86,6 +87,9 @@ class Repository(models.Model):
         - IndexingState (repository_full_name)
         - RepositoryStats (repository_full_name)
         - SyncLog (repository_full_name)
+        - CodeQLVulnerability (repository_full_name)
+        - RepositoryKLOCHistory (repository_full_name)
+        - SecurityHealthHistory (repository_full_name)
         
         TODO: Update this list when adding new collections
         """
@@ -101,6 +105,7 @@ class Repository(models.Model):
         try:
             # Collections with direct repository_full_name field (excluding SBOM which needs special handling)
             direct_collections = [
+                ('analytics.models.Commit', 'repository_full_name'),
                 ('analytics.models.PullRequest', 'repository_full_name'),
                 ('analytics.models.Deployment', 'repository_full_name'),
                 ('analytics.models.Release', 'repository_full_name'),
@@ -108,6 +113,9 @@ class Repository(models.Model):
                 ('analytics.models.IndexingState', 'repository_full_name'),
                 ('analytics.models.RepositoryStats', 'repository_full_name'),
                 ('analytics.models.SyncLog', 'repository_full_name'),
+                ('analytics.models.CodeQLVulnerability', 'repository_full_name'),
+                ('analytics.models.RepositoryKLOCHistory', 'repository_full_name'),
+                ('analytics.models.SecurityHealthHistory', 'repository_full_name'),
             ]
             
             # Clean up direct collections

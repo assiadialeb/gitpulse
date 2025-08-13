@@ -586,37 +586,7 @@ def index_repository(request):
         return _error_response('Error indexing repository', exc=e)
 
 
-@login_required
-@staff_required
-@require_http_methods(["POST"])
-def start_indexing(request, repo_id):
-    """Start indexing for a specific repository"""
-    try:
-        repository = Repository.objects.get(id=repo_id)
-    except Repository.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Repository not found'})
-    
-    try:
-        from analytics.tasks import background_indexing_task
-        from django_q.tasks import async_task
-        
-        # Schedule background indexing task
-        task_id = async_task(
-            'analytics.tasks.background_indexing_task',
-            repository.id,
-            request.user.id,
-            group=f'indexing_{repository.id}',
-            timeout=3600  # 1 hour timeout
-        )
-        
-        return JsonResponse({
-            'success': True,
-            'task_id': task_id,
-            'message': f'Indexing started for repository {repository.full_name}'
-        })
-        
-    except Exception as e:
-        return _error_response('Error starting indexing', exc=e)
+
 
 
 @login_required
@@ -630,61 +600,14 @@ def delete_repository(request, repo_id):
         return JsonResponse({'success': False, 'error': 'Repository not found'})
     
     try:
-        from analytics.models import Commit, PullRequest, Release, Deployment, RepositoryStats, SyncLog
-        
-        # Delete all associated data from MongoDB
-        deleted_counts = {
-            'commits': 0,
-            'pull_requests': 0,
-            'releases': 0,
-            'deployments': 0,
-            'repository_stats': 0,
-            'sync_logs': 0
-        }
-        
-        # Delete commits
-        assert_safe_repository_full_name(repository.full_name)
-        commits = Commit.objects(repository_full_name=repository.full_name)
-        deleted_counts['commits'] = commits.count()
-        commits.delete()
-        
-        # Delete pull requests
-        assert_safe_repository_full_name(repository.full_name)
-        pull_requests = PullRequest.objects(repository_full_name=repository.full_name)
-        deleted_counts['pull_requests'] = pull_requests.count()
-        pull_requests.delete()
-        
-        # Delete releases
-        assert_safe_repository_full_name(repository.full_name)
-        releases = Release.objects(repository_full_name=repository.full_name)
-        deleted_counts['releases'] = releases.count()
-        releases.delete()
-        
-        # Delete deployments
-        assert_safe_repository_full_name(repository.full_name)
-        deployments = Deployment.objects(repository_full_name=repository.full_name)
-        deleted_counts['deployments'] = deployments.count()
-        deployments.delete()
-        
-        # Delete repository stats
-        assert_safe_repository_full_name(repository.full_name)
-        repo_stats = RepositoryStats.objects(repository_full_name=repository.full_name)
-        deleted_counts['repository_stats'] = repo_stats.count()
-        repo_stats.delete()
-        
-        # Delete sync logs
-        assert_safe_repository_full_name(repository.full_name)
-        sync_logs = SyncLog.objects(repository_full_name=repository.full_name)
-        deleted_counts['sync_logs'] = sync_logs.count()
-        sync_logs.delete()
-        
-        # Delete the repository from Django DB
-        repository.delete()
+        # Use the safe cascade_delete method from the model
+        # This ensures ALL related data is properly cleaned up
+        repository.cascade_delete(confirm_repository_name=repository.full_name)
         
         return JsonResponse({
             'success': True,
-            'message': f'Repository {repository.full_name} deleted successfully',
-            'deleted_counts': deleted_counts
+            'message': f'Repository {repository.full_name} deleted successfully with all associated data',
+            'method': 'cascade_delete'
         })
         
     except Exception as e:
