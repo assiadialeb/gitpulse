@@ -27,12 +27,47 @@ def django_db_setup(django_db_setup, django_db_blocker):
 
 
 @pytest.fixture(autouse=True)
-def disable_mongodb():
-    """Disable MongoDB connection for tests"""
+def mock_mongodb():
+    """Mock MongoDB for all tests"""
     if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
-        with patch('mongoengine.connect'):
-            with patch('mongoengine.disconnect'):
-                yield
+        # Mock mongoengine connection
+        with patch('mongoengine.connect'), patch('mongoengine.disconnect'):
+            yield
+    else:
+        yield
+
+
+@pytest.fixture(autouse=True)
+def mock_mongodb_objects():
+    """Mock MongoDB objects for testing"""
+    if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
+        # Create a simple mock queryset
+        mock_qs = Mock()
+        mock_qs.first.return_value = None
+        mock_qs.count.return_value = 0
+        mock_qs.order_by.return_value = mock_qs
+        mock_qs.all.return_value = []
+        mock_qs.filter.return_value = mock_qs
+        mock_qs.get.return_value = None
+        
+        # Mock all MongoDB objects with the same mock queryset
+        with patch('analytics.models.Commit.objects') as mock_commit_objects, \
+             patch('analytics.models.PullRequest.objects') as mock_pr_objects, \
+             patch('analytics.models.Release.objects') as mock_release_objects, \
+             patch('analytics.models.SBOM.objects') as mock_sbom_objects, \
+             patch('analytics.models.CodeQLVulnerability.objects') as mock_codeql_objects, \
+             patch('analytics.models.IndexingState.objects') as mock_indexing_objects:
+            
+            # Apply the same mock queryset to all objects
+            for mock_objects in [mock_commit_objects, mock_pr_objects, mock_release_objects, 
+                               mock_sbom_objects, mock_codeql_objects, mock_indexing_objects]:
+                mock_objects.filter.return_value = mock_qs
+                mock_objects.first.return_value = None
+                mock_objects.count.return_value = 0
+                mock_objects.all.return_value = []
+                mock_objects.get.return_value = None
+            
+            yield
     else:
         yield
 
@@ -188,20 +223,86 @@ def mock_llm_service():
         yield mock_service
 
 
+@pytest.fixture
+def mock_commit_objects():
+    """Mock Commit.objects for testing"""
+    with patch('analytics.models.Commit.objects') as mock_objects:
+        mock_queryset = Mock()
+        mock_objects.filter.return_value = mock_queryset
+        mock_objects.filter.return_value.first.return_value = None
+        mock_objects.filter.return_value.count.return_value = 0
+        mock_objects.filter.return_value.order_by.return_value = []
+        mock_objects.filter.return_value.all.return_value = []
+        yield mock_objects
+
+
+@pytest.fixture
+def mock_pullrequest_objects():
+    """Mock PullRequest.objects for testing"""
+    with patch('analytics.models.PullRequest.objects') as mock_objects:
+        mock_queryset = Mock()
+        mock_objects.filter.return_value = mock_queryset
+        mock_objects.filter.return_value.first.return_value = None
+        mock_objects.filter.return_value.count.return_value = 0
+        mock_objects.filter.return_value.all.return_value = []
+        yield mock_objects
+
+
+@pytest.fixture
+def mock_release_objects():
+    """Mock Release.objects for testing"""
+    with patch('analytics.models.Release.objects') as mock_objects:
+        mock_queryset = Mock()
+        mock_objects.filter.return_value = mock_queryset
+        mock_objects.filter.return_value.first.return_value = None
+        mock_objects.filter.return_value.count.return_value = 0
+        mock_objects.filter.return_value.all.return_value = []
+        yield mock_objects
+
+
+@pytest.fixture
+def mock_sbom_objects():
+    """Mock SBOM.objects for testing"""
+    with patch('analytics.models.SBOM.objects') as mock_objects:
+        mock_queryset = Mock()
+        mock_objects.filter.return_value = mock_queryset
+        mock_objects.filter.return_value.first.return_value = None
+        mock_objects.filter.return_value.count.return_value = 0
+        mock_objects.filter.return_value.all.return_value = []
+        yield mock_objects
+
+
+@pytest.fixture
+def mock_codeql_objects():
+    """Mock CodeQLVulnerability.objects for testing"""
+    with patch('analytics.models.CodeQLVulnerability.objects') as mock_objects:
+        mock_queryset = Mock()
+        mock_objects.filter.return_value = mock_queryset
+        mock_objects.filter.return_value.first.return_value = None
+        mock_objects.filter.return_value.count.return_value = 0
+        mock_objects.filter.return_value.order_by.return_value = []
+        mock_objects.filter.return_value.all.return_value = []
+        yield mock_objects
+
+
+@pytest.fixture
+def mock_indexing_state_objects():
+    """Mock IndexingState.objects for testing"""
+    with patch('analytics.models.IndexingState.objects') as mock_objects:
+        mock_queryset = Mock()
+        mock_objects.filter.return_value = mock_queryset
+        mock_objects.filter.return_value.first.return_value = None
+        mock_objects.filter.return_value.count.return_value = 0
+        mock_objects.filter.return_value.all.return_value = []
+        yield mock_objects
+
+
 class BaseTestCase(TestCase):
     """Base test case with common setup"""
     
     def setUp(self):
         super().setUp()
-        # Disable MongoDB for tests if using SQLite
-        if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
-            self.patcher = patch('mongoengine.connect')
-            self.mock_connect = self.patcher.start()
-            self.patcher_disconnect = patch('mongoengine.disconnect')
-            self.mock_disconnect = self.patcher_disconnect.start()
+        # MongoDB is already mocked by fixtures
     
     def tearDown(self):
-        if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
-            self.patcher.stop()
-            self.patcher_disconnect.stop()
         super().tearDown()
