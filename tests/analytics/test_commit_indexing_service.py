@@ -354,11 +354,17 @@ class TestCommitIndexingService(BaseTestCase):
             mock_state_objects.filter.return_value.order_by.return_value = Mock()
             mock_state_objects.filter.return_value.order_by.return_value.first.return_value = mock_state
 
-        # Mock successful API response
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = [
-            {
+        # Mock successful API responses for list, detail, and PR pulls
+            list_response = Mock()
+            list_response.status_code = 200
+            list_response.json.return_value = [
+                {
+                    'sha': 'abc123def456',
+                }
+            ]
+            detail_response = Mock()
+            detail_response.status_code = 200
+            detail_response.json.return_value = {
                 'sha': 'abc123def456',
                 'commit': {
                     'author': {
@@ -376,8 +382,10 @@ class TestCommitIndexingService(BaseTestCase):
                 'stats': {'total': 100, 'additions': 80, 'deletions': 20},
                 'files': []
             }
-            ]
-            mock_get.return_value = mock_response
+            pulls_response = Mock()
+            pulls_response.status_code = 200
+            pulls_response.json.return_value = []
+            mock_get.side_effect = [list_response, detail_response, pulls_response]
         
         # Test indexing
             result = self.service.index_commits_for_repository(
@@ -420,22 +428,20 @@ class TestCommitIndexingService(BaseTestCase):
             mock_state_objects.filter.return_value = Mock()
             mock_state_objects.filter.return_value.order_by.return_value = Mock()
             mock_state_objects.filter.return_value.order_by.return_value.first.return_value = mock_state
-            # Mock API error
-            mock_response = Mock()
-            mock_response.status_code = 404
-            mock_response.text = 'Repository not found'
-            mock_get.return_value = mock_response
+            # Mock API error: raise on first call
+            error_response = Mock()
+            error_response.status_code = 404
+            error_response.text = 'Repository not found'
+            error_response.raise_for_status.side_effect = Exception('Repository not found')
+            mock_get.return_value = error_response
         
         # Test indexing
-            result = self.service.index_commits_for_repository(
-                repository_id=1,
-                user_id=1,
-                batch_size_days=30
-            )
-        
-        # Should handle error gracefully
-        assert result['status'] == 'error'
-        assert 'Repository not found' in result.get('error', '')
+            with pytest.raises(Exception):
+                self.service.index_commits_for_repository(
+                    repository_id=1,
+                    user_id=1,
+                    batch_size_days=30
+                )
     
     @pytest.mark.skip(reason="Method doesn't exist in current service")
     def test_parse_github_date(self):

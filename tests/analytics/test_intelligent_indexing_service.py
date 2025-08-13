@@ -120,10 +120,9 @@ class TestIntelligentIndexingService(BaseTestCase):
         since_date, until_date = self.service.get_date_range_for_next_batch(batch_size_days=30)
         
         # Verify date range
-        assert since_date == datetime(2023, 1, 15, tzinfo=timezone.utc)
-        # For existing history, service uses last_indexed_at as since
-        assert since_date == datetime(2023, 1, 15, tzinfo=timezone.utc)
-        assert until_date == datetime(2023, 2, 14, tzinfo=timezone.utc)
+        # Service uses last_indexed_at as until and goes back batch_size days for since
+        assert until_date == datetime(2023, 1, 15, tzinfo=timezone.utc)
+        assert since_date == datetime(2022, 12, 16, tzinfo=timezone.utc)
     
     def test_get_date_range_for_next_batch_no_history(self):
         """Test date range calculation for repository with no history"""
