@@ -536,7 +536,7 @@ class TestIntelligentIndexingServiceIntegration(BaseTestCase):
         assert result2['processed'] == 0
         assert result2['total_processed'] == 0
         
-        # Verify total state
+        # Verify total state - with mocked objects, check in-memory state
         assert service.state.total_indexed == 3
     
     def test_state_persistence_across_instances(self):

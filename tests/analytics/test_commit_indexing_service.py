@@ -335,7 +335,7 @@ class TestCommitIndexingService(BaseTestCase):
             # Ensure Commit.objects(sha=...).first() returns None (new commit)
             commit_qs = Mock()
             commit_qs.first.return_value = None
-            mock_commit_objects.__call__.return_value = commit_qs
+            mock_commit_objects.return_value = commit_qs
             # Create repository mock first
             mock_repo = Mock()
             mock_repo.id = 1
@@ -414,7 +414,7 @@ class TestCommitIndexingService(BaseTestCase):
              patch('analytics.models.Commit.objects') as mock_commit_objects:
             commit_qs = Mock()
             commit_qs.first.return_value = None
-            mock_commit_objects.__call__.return_value = commit_qs
+            mock_commit_objects.return_value = commit_qs
             # Create repository mock first
             mock_repo = Mock()
             mock_repo.id = 1
