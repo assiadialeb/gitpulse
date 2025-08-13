@@ -330,7 +330,12 @@ class TestCommitIndexingService(BaseTestCase):
         # Patch Repository and Token service to avoid DB and auth
         with patch('repositories.models.Repository.objects') as mock_repo_objects, \
              patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token, \
-             patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects:
+             patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects, \
+             patch('analytics.models.Commit.objects') as mock_commit_objects:
+            # Ensure Commit.objects(sha=...).first() returns None (new commit)
+            commit_qs = Mock()
+            commit_qs.first.return_value = None
+            mock_commit_objects.__call__.return_value = commit_qs
             # Create repository mock first
             mock_repo = Mock()
             mock_repo.id = 1
@@ -405,7 +410,11 @@ class TestCommitIndexingService(BaseTestCase):
         """Test handling of API errors during indexing"""
         with patch('repositories.models.Repository.objects') as mock_repo_objects, \
              patch('analytics.github_token_service.GitHubTokenService.get_token_for_repository_access') as mock_token, \
-             patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects:
+             patch('analytics.intelligent_indexing_service.IndexingState.objects') as mock_state_objects, \
+             patch('analytics.models.Commit.objects') as mock_commit_objects:
+            commit_qs = Mock()
+            commit_qs.first.return_value = None
+            mock_commit_objects.__call__.return_value = commit_qs
             # Create repository mock first
             mock_repo = Mock()
             mock_repo.id = 1
