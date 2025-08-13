@@ -183,6 +183,40 @@ class IntelligentIndexingService:
         
         return since_date, until_date
     
+    def get_progress_percentage(self, estimated_total: int) -> int:
+        """Compute progress percentage based on estimated total items."""
+        if not estimated_total or estimated_total <= 0:
+            return 0
+        percentage = int(round((self.state.total_indexed / float(estimated_total)) * 100))
+        return max(0, min(100, percentage))
+
+    def get_state_summary(self) -> Dict[str, Any]:
+        """Return a concise summary of the current indexing state."""
+        return {
+            'repository_full_name': self.repository.full_name,
+            'entity_type': self.entity_type,
+            'total_indexed': self.state.total_indexed,
+            'last_indexed_at': self.state.last_indexed_at,
+            'status': self.state.status,
+            'retry_count': self.state.retry_count,
+        }
+
+    def save_state(self) -> None:
+        """Persist current state to storage."""
+        self.state.updated_at = timezone.now()
+        self.state.save()
+
+    def update_state(self, processed_count: int) -> None:
+        """Update state counters after a processing run and persist."""
+        self.state.total_indexed += max(0, int(processed_count))
+        # When updating, we consider last_indexed_at to move towards now
+        self.state.last_indexed_at = timezone.now()
+        self.save_state()
+
+    def reset_state(self) -> None:
+        """Reset state to initial values and persist (compat wrapper)."""
+        self.reset_indexing_state()
+
     def has_more_to_index(self, since_date: datetime) -> bool:
         """
         Check if there's more data to index after this batch

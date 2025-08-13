@@ -106,8 +106,8 @@ class TestCommitIndexingService(BaseTestCase):
         if commits:
             assert commits[0] is not None
         
-        # Verify API call
-        mock_get.assert_called_once()
+        # Verify API call (initial list + detail + PR lookup)
+        assert mock_get.call_count >= 1
         call_args = mock_get.call_args
         assert 'api.github.com' in call_args[0][0]
         assert self.repository_full_name in call_args[0][0]
@@ -327,10 +327,21 @@ class TestCommitIndexingService(BaseTestCase):
     @patch('analytics.commit_indexing_service.requests.get')
     def test_index_commits_for_repository_success(self, mock_get):
         """Test successful indexing of commits for a repository"""
+        # Patch Repository and Token service to avoid DB and auth
+        with patch('analytics.commit_indexing_service.Repository.objects') as mock_repo_objects, \
+             patch('analytics.commit_indexing_service.GitHubTokenService.get_token_for_repository_access') as mock_token:
+            mock_repo = Mock()
+            mock_repo.id = 1
+            mock_repo.full_name = 'test-org/test-repo'
+            mock_repo.owner_name = 'test-org'
+            mock_repo.repo_name = 'test-repo'
+            mock_repo_objects.get.return_value = mock_repo
+            mock_token.return_value = self.github_token
+
         # Mock successful API response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = [
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = [
             {
                 'sha': 'abc123def456',
                 'commit': {
@@ -349,15 +360,15 @@ class TestCommitIndexingService(BaseTestCase):
                 'stats': {'total': 100, 'additions': 80, 'deletions': 20},
                 'files': []
             }
-        ]
-        mock_get.return_value = mock_response
+            ]
+            mock_get.return_value = mock_response
         
         # Test indexing
-        result = self.service.index_commits_for_repository(
-            repository_id=1,
-            user_id=1,
-            batch_size_days=30
-        )
+            result = self.service.index_commits_for_repository(
+                repository_id=1,
+                user_id=1,
+                batch_size_days=30
+            )
         
         # Assertions
         assert result['status'] == 'success'
@@ -368,18 +379,27 @@ class TestCommitIndexingService(BaseTestCase):
     @patch('analytics.commit_indexing_service.requests.get')
     def test_index_commits_for_repository_api_error(self, mock_get):
         """Test handling of API errors during indexing"""
-        # Mock API error
-        mock_response = Mock()
-        mock_response.status_code = 404
-        mock_response.text = 'Repository not found'
-        mock_get.return_value = mock_response
+        with patch('analytics.commit_indexing_service.Repository.objects') as mock_repo_objects, \
+             patch('analytics.commit_indexing_service.GitHubTokenService.get_token_for_repository_access') as mock_token:
+            mock_repo = Mock()
+            mock_repo.id = 1
+            mock_repo.full_name = 'test-org/test-repo'
+            mock_repo.owner_name = 'test-org'
+            mock_repo.repo_name = 'test-repo'
+            mock_repo_objects.get.return_value = mock_repo
+            mock_token.return_value = self.github_token
+            # Mock API error
+            mock_response = Mock()
+            mock_response.status_code = 404
+            mock_response.text = 'Repository not found'
+            mock_get.return_value = mock_response
         
         # Test indexing
-        result = self.service.index_commits_for_repository(
-            repository_id=1,
-            user_id=1,
-            batch_size_days=30
-        )
+            result = self.service.index_commits_for_repository(
+                repository_id=1,
+                user_id=1,
+                batch_size_days=30
+            )
         
         # Should handle error gracefully
         assert result['status'] == 'error'
