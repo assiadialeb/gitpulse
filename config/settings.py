@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+import os
 from pathlib import Path
 import mongoengine
 from decouple import config, Csv
@@ -96,7 +96,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-import os
+
 
 # MongoDB Configuration
 MONGODB_HOST = config('MONGODB_HOST', default='localhost')
@@ -110,17 +110,25 @@ mongoengine.connect(
     port=MONGODB_PORT,
 )
 
-# PostgreSQL Configuration
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('POSTGRES_DB', default='gitpulse_new'),
-        'USER': config('POSTGRES_USER', default='gitpulse_user'),
-        'PASSWORD': config('POSTGRES_PASSWORD', default='gitpulse_password'),
-        'HOST': config('POSTGRES_HOST', default='localhost'),
-        'PORT': config('POSTGRES_PORT', default='5432'),
+if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",  # ou os.path.join(BASE_DIR, "test.sqlite3")
+        }
     }
-}
+else:
+    # PostgreSQL Configuration
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('POSTGRES_DB', default='gitpulse_new'),
+            'USER': config('POSTGRES_USER', default='gitpulse_user'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default='gitpulse_password'),
+            'HOST': config('POSTGRES_HOST', default='localhost'),
+            'PORT': config('POSTGRES_PORT', default='5432'),
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

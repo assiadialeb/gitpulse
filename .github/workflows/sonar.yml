@@ -41,6 +41,8 @@ jobs:
           pip install pytest pytest-cov
 
       - name: Pytest (JUnit + Coverage)
+        env:
+          USE_SQLITE_FOR_TESTS: "1"
         run: |
           mkdir -p reports
           pytest \
