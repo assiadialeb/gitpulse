@@ -4,7 +4,7 @@ Fetches and processes GitHub commits using the Intelligent Indexing Service
 """
 import logging
 import requests
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime, timezone as dt_timezone, timedelta
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
 
@@ -49,12 +49,24 @@ class CommitIndexingService:
             params = {
                 "per_page": 100,
                 "page": page,
-                "since": since.isoformat(),
-                "until": until.isoformat()
+                "since": since.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                "until": until.strftime('%Y-%m-%dT%H:%M:%SZ')
             }
             
             try:
                 response = requests.get(url, headers=headers, params=params)
+                
+                # Handle 409 Conflict error specifically
+                if response.status_code == 409:
+                    logger.warning(f"409 Conflict for {owner}/{repo} - possible date range issue. Retrying with adjusted dates.")
+                    # Try with a smaller date range
+                    adjusted_since = since + timedelta(days=1)
+                    adjusted_until = until - timedelta(days=1)
+                    if adjusted_since < adjusted_until:
+                        params["since"] = adjusted_since.strftime('%Y-%m-%dT%H:%M:%SZ')
+                        params["until"] = adjusted_until.strftime('%Y-%m-%dT%H:%M:%SZ')
+                        response = requests.get(url, headers=headers, params=params)
+                
                 response.raise_for_status()
                 
                 batch = response.json()
