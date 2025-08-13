@@ -18,7 +18,7 @@ Projects in GitPulse represent logical groupings of related repositories. They h
 1. **Navigate to Projects**: Go to the Projects section in GitPulse
 2. **Create New Project**: Click "Create Project"
 3. **Define Scope**: Select repositories that belong to the project
-4. **Set Configuration**: Configure analysis settings and integrations
+4. **Enjoy**
 
 ### Project Types
 
@@ -139,23 +139,8 @@ Choose repositories that logically belong together:
 - **Technology Stack**: Repositories using similar technologies
 - **Business Domain**: Repositories serving the same business area
 
-### Analysis Settings
 
-Configure how the project is analyzed:
 
-- **Update Frequency**: How often project data is refreshed
-- **Integration Settings**: CodeQL and SonarCloud configuration
-- **Access Control**: Who can view project analytics
-- **Alert Thresholds**: When to notify about issues
-
-### Custom Metrics
-
-Define project-specific metrics:
-
-- **Business KPIs**: Revenue, user engagement, performance
-- **Technical SLAs**: Response times, availability, error rates
-- **Quality Gates**: Minimum quality standards
-- **Security Requirements**: Security compliance standards
 
 ## Best Practices
 
