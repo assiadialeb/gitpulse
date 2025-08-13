@@ -238,6 +238,31 @@ python manage.py backfill_sonarcloud --dry-run
 
 ## 🧠 Intelligent Analysis Commands
 
+#### `calculate_kloc`
+Calculate KLOC (Kilo Lines of Code) for repositories.
+
+```bash
+# Specific repository
+python manage.py calculate_kloc --repo-id 123
+
+# All repositories
+python manage.py calculate_kloc --all
+
+# Force recalculation
+python manage.py calculate_kloc --repo-id 123 --force
+
+# Dry-run mode
+python manage.py calculate_kloc --repo-id 123 --dry-run
+```
+
+**Options:**
+- `--repo-id N` : Repository ID to calculate KLOC for
+- `--all` : Calculate KLOC for all repositories
+- `--force` : Force recalculation even if recently calculated
+- `--dry-run` : Show what would be calculated without changes
+
+**Note:** This command clones repositories locally to calculate KLOC, which can take time for large repositories.
+
 #### `classify_existing_commits`
 Reclassify commits marked as "other" using Ollama LLM.
 
@@ -419,16 +444,3 @@ python manage.py shell
    ```bash
    python manage.py calculate_shs_all_repos
    ```
-
-2. **Generate SBOMs:**
-   ```bash
-   python manage.py generate_sbom --all
-   ```
-
-## 📝 Important Notes
-
-- **Django-Q required** : Cluster must be active for scheduled tasks
-- **UTC times** : All scheduling uses UTC timezone
-- **Rate limits** : Automatically handled by the system
-- **Automatic indexing** : Works without manual intervention
-- **Dry-run mode** : Always available for testing commands 
