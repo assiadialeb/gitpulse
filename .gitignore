@@ -212,3 +212,4 @@ node_modules/*
 .vscode/*
 .cursor/*
 .sonarlint/*
+templates/repositories/Design-ideas/*
