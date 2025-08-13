@@ -51,6 +51,41 @@ def setup_test_database():
                     )
                 """)
                 
+                # Create repositories table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS repositories_repository (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name VARCHAR(255) NOT NULL,
+                        full_name VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        private BOOLEAN NOT NULL,
+                        fork BOOLEAN NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        updated_at DATETIME NOT NULL,
+                        pushed_at DATETIME,
+                        size INTEGER NOT NULL,
+                        stargazers_count INTEGER NOT NULL,
+                        watchers_count INTEGER NOT NULL,
+                        language VARCHAR(50),
+                        has_issues BOOLEAN NOT NULL,
+                        has_projects BOOLEAN NOT NULL,
+                        has_downloads BOOLEAN NOT NULL,
+                        has_wiki BOOLEAN NOT NULL,
+                        has_pages BOOLEAN NOT NULL,
+                        has_discussions BOOLEAN NOT NULL,
+                        forks_count INTEGER NOT NULL,
+                        archived BOOLEAN NOT NULL,
+                        disabled BOOLEAN NOT NULL,
+                        license_key VARCHAR(100),
+                        license_name VARCHAR(255),
+                        license_url VARCHAR(500),
+                        default_branch VARCHAR(100),
+                        topics TEXT,
+                        kloc INTEGER,
+                        kloc_calculated_at DATETIME
+                    )
+                """)
+                
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS repositories_repository (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,

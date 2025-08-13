@@ -118,8 +118,9 @@ class TestCodeQLService(BaseTestCase):
     @patch('analytics.codeql_service.requests.Session.get')
     def test_make_request_network_error(self, mock_get):
         """Test handling of network errors"""
-        # Mock network error
-        mock_get.side_effect = Exception("Network error")
+        # Mock network error with proper exception type
+        from requests.exceptions import RequestException
+        mock_get.side_effect = RequestException("Network error")
         
         result, success = self.service._make_request('https://api.github.com/test')
         
