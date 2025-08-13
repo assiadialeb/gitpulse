@@ -4,9 +4,9 @@ CodeQL Indexing Service with intelligent state management
 import logging
 import re
 from datetime import datetime, timezone as dt_timezone, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-from .codeql_service import CodeQLService, get_codeql_service_for_user
+from .codeql_service import get_codeql_service_for_user
 from .sanitization import assert_safe_repository_full_name
 from .models import CodeQLVulnerability, IndexingState, SecurityHealthHistory
 from .security_health_score_service import SecurityHealthScoreService
@@ -40,7 +40,7 @@ class CodeQLIndexingService:
         Returns:
             Dictionary with indexing results
         """
-        logger.info(f"Starting CodeQL indexing for repository {repository_full_name}")
+        logger.info("Starting CodeQL indexing for repository %s", repository_full_name)
         # Validate repository_full_name to prevent NoSQL injection
         self._assert_safe_repository_full_name(repository_full_name)
         
@@ -63,7 +63,7 @@ class CodeQLIndexingService:
             
             # Check if we should skip indexing
             if not force_reindex and self._should_skip_indexing(state):
-                logger.info(f"Skipping CodeQL indexing for {repository_full_name} - recently indexed")
+                logger.info("Skipping CodeQL indexing for %s - recently indexed", repository_full_name)
                 results['status'] = 'skipped'
                 results['reason'] = 'Recently indexed'
                 return results
@@ -95,7 +95,7 @@ class CodeQLIndexingService:
                 if len(alerts) == 0:
                     # Check if it's a token permission issue or truly not available
                     if any('Unauthorized' in error for error in results.get('errors', [])):
-                        logger.error(f"Token permission issue for {repository_full_name} - CodeQL access denied")
+                        logger.error("Token permission issue for %s - CodeQL access denied", repository_full_name)
                         results['status'] = 'permission_denied'
                         results['reason'] = 'GitHub token does not have required permissions for CodeQL access'
                         state.status = 'error'
@@ -104,7 +104,7 @@ class CodeQLIndexingService:
                         return results
                     else:
                         # CodeQL likely not enabled on this repository
-                        logger.info(f"CodeQL not available/enabled for {repository_full_name} - marking as completed")
+                        logger.info("CodeQL not available/enabled for %s - marking as completed", repository_full_name)
                         results['status'] = 'not_available'
                         results['reason'] = 'CodeQL analysis not available or not enabled for this repository'
                         state.status = 'completed'  # Mark as completed so we don't keep retrying
@@ -114,7 +114,7 @@ class CodeQLIndexingService:
                         return results
                 else:
                     error_msg = f"Failed to fetch CodeQL alerts from GitHub for {repository_full_name}"
-                    logger.error(error_msg)
+                    logger.error("Failed to fetch CodeQL alerts from GitHub for %s", repository_full_name)
                     results['status'] = 'error'
                     results['errors'].append(error_msg)
                     state.status = 'error'
@@ -123,7 +123,7 @@ class CodeQLIndexingService:
                     state.save()
                     return results
             
-            logger.info(f"Fetched {len(alerts)} CodeQL alerts for {repository_full_name}")
+            logger.info("Fetched %d CodeQL alerts for %s", len(alerts), repository_full_name)
             
             # Process alerts
             processed_alert_ids = []
@@ -179,10 +179,13 @@ class CodeQLIndexingService:
             state.retry_count = 0
             state.save()
             
-            logger.info(f"CodeQL indexing completed for {repository_full_name}: "
-                       f"{results['vulnerabilities_new']} new, "
-                       f"{results['vulnerabilities_updated']} updated, "
-                       f"{results['vulnerabilities_removed']} removed")
+            logger.info(
+                "CodeQL indexing completed for %s: %d new, %d updated, %d removed",
+                repository_full_name,
+                results['vulnerabilities_new'],
+                results['vulnerabilities_updated'],
+                results['vulnerabilities_removed'],
+            )
             
         except Exception as e:
             error_msg = f"CodeQL indexing failed for {repository_full_name}: {e}"
@@ -196,8 +199,12 @@ class CodeQLIndexingService:
                 state.error_message = error_msg
                 state.retry_count += 1
                 state.save()
-            except:
-                pass  # Don't fail if we can't update state
+            except (SystemExit, KeyboardInterrupt):
+                # Do not swallow termination signals
+                raise
+            except Exception:
+                # Don't fail if we can't update state
+                pass
         
         results['completed_at'] = datetime.now(dt_timezone.utc).isoformat()
         return results
@@ -218,7 +225,7 @@ class CodeQLIndexingService:
                 batch_size_days=365  # CodeQL doesn't need daily batching
             )
             state.save()
-            logger.info(f"Created new CodeQL indexing state for {repository_full_name}")
+            logger.info("Created new CodeQL indexing state for %s", repository_full_name)
         
         return state
     
@@ -240,7 +247,7 @@ class CodeQLIndexingService:
         time_since_last = datetime.now(dt_timezone.utc) - state.last_indexed_at
         
         if time_since_last < min_interval:
-            logger.info(f"Skipping CodeQL indexing - last indexed {time_since_last} ago")
+            logger.info("Skipping CodeQL indexing - last indexed %s ago", time_since_last)
             return True
         
         return False
@@ -325,7 +332,7 @@ class CodeQLIndexingService:
         
         count = obsolete_vulns.count()
         if count > 0:
-            logger.info(f"Removing {count} obsolete vulnerabilities for {repository_full_name}")
+            logger.info("Removing %d obsolete vulnerabilities for %s", count, repository_full_name)
             obsolete_vulns.delete()
         
         return count
@@ -423,7 +430,7 @@ class CodeQLIndexingService:
             }
             
         except Exception as e:
-            logger.error(f"Error getting security metrics for {repository_full_name}: {e}")
+            logger.error("Error getting security metrics for %s: %s", repository_full_name, e)
             return {
                 'shs_score': None,
                 'shs_display': 'Error',
