@@ -68,16 +68,16 @@ class SonarCloudService:
             return None
         
         try:
-            rating_num = float(rating_value)
-            if rating_num == 1.0:
+            rating_num = int(float(rating_value))
+            if rating_num == 1:
                 return 'A'
-            elif rating_num == 2.0:
+            elif rating_num == 2:
                 return 'B'
-            elif rating_num == 3.0:
+            elif rating_num == 3:
                 return 'C'
-            elif rating_num == 4.0:
+            elif rating_num == 4:
                 return 'D'
-            elif rating_num == 5.0:
+            elif rating_num == 5:
                 return 'E'
             else:
                 return None
