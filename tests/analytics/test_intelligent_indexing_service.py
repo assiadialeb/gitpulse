@@ -257,7 +257,7 @@ class TestIntelligentIndexingService(BaseTestCase):
         progress = self.service.get_progress_percentage(estimated_total)
         
         # Verify progress calculation
-        assert progress == 75.0  # 75/100 * 100
+        assert progress == 75 # 75/100 * 100
     
     def test_get_progress_percentage_zero_total(self):
         """Test progress percentage with zero estimated total"""
@@ -266,7 +266,7 @@ class TestIntelligentIndexingService(BaseTestCase):
         progress = self.service.get_progress_percentage(0)
         
         # Should handle division by zero
-        assert progress == 0.0
+        assert progress == 0
     
     def test_get_progress_percentage_no_progress(self):
         """Test progress percentage with no progress"""
@@ -275,7 +275,7 @@ class TestIntelligentIndexingService(BaseTestCase):
         progress = self.service.get_progress_percentage(100)
         
         # Should return 0 for no progress
-        assert progress == 0.0
+        assert progress == 0
 
 
 class TestIntelligentIndexingServiceIntegration(BaseTestCase):
