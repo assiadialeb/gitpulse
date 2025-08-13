@@ -534,7 +534,7 @@ class TestIntelligentIndexingServiceIntegration(BaseTestCase):
         
         assert result2['status'] == 'success'
         assert result2['processed'] == 0
-        assert result2['total_processed'] == 0
+        assert result2['total_processed'] == 3  # Should remain 3, not reset to 0
         
         # Verify total state - with mocked objects, check in-memory state
         assert service.state.total_indexed == 3

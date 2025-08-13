@@ -401,8 +401,8 @@ class TestCommitIndexingService(BaseTestCase):
         
         # Assertions
         assert result['status'] == 'success'
-        assert result['processed'] == 1
-        assert result['total_processed'] == 1
+        assert result['processed'] == 1  # One commit processed
+        assert result['total_processed'] == 1  # Total processed
         assert result['has_more'] is False  # Only one commit in mock
     
     @patch('analytics.commit_indexing_service.requests.get')
