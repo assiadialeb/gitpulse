@@ -1430,7 +1430,8 @@ def index_commits_intelligent_task(repository_id):
         else:
             # Use GitHub API service for commits
             logger.info(f"Using GitHub API indexing service for commits in repository {repository.full_name}")
-            batch_size_days = 7
+            # Use adaptive batch sizing (None triggers adaptive mode)
+            batch_size_days = None
             
             # Run intelligent indexing via API
             result = CommitIndexingService.index_commits_for_repository(
@@ -1471,63 +1472,82 @@ def index_commits_intelligent_task(repository_id):
                 logger.info(f"Created new commit indexing schedule for repository {repository_id}")
         else:
             # No more batches -> perform KLOC calculation by cloning the repo locally
-            try:
-                logger.info(f"----------Starting KLOC calculation (API flow) for {repository.full_name}")
-                # Resolve a token suitable for cloning (GitHub App if configured, else user/public)
-                from .github_token_service import GitHubTokenService
-                token = GitHubTokenService.get_token_for_repository_access(user_id, repository.full_name)
-
-                # Clone repository
-                from .git_service import GitService
-                git_service = GitService()
-                repo_path = git_service.clone_repository(repository.clone_url, repository.full_name, token)
-                logger.info(f"----------Cloned repository for KLOC: {repository.full_name} at {repo_path}")
-
-                # Validate safe repo path before KLOC
-                from .sanitization import assert_safe_repo_path
+            # OR if KLOC is missing or older than 30 days
+            should_calculate_kloc = True
+            kloc_reason = "backfill_complete"
+            
+            # Check if KLOC needs recalculation (missing or older than 30 days)
+            if repository.kloc_calculated_at:
+                days_since_kloc = (timezone.now() - repository.kloc_calculated_at).days
+                if days_since_kloc < 30:
+                    should_calculate_kloc = False
+                    logger.info(f"KLOC for {repository.full_name} was calculated {days_since_kloc} days ago, skipping recalculation")
+                else:
+                    kloc_reason = f"kloc_old_{days_since_kloc}_days"
+            else:
+                kloc_reason = "kloc_missing"
+            
+            if should_calculate_kloc:
                 try:
-                    safe_repo_path = str(assert_safe_repo_path(repo_path))
-                except Exception as safe_err:
-                    logger.warning(f"Skipping KLOC, repo path not safe: {repo_path} - {safe_err}")
-                    safe_repo_path = None
+                    logger.info(f"----------Starting KLOC calculation ({kloc_reason}) for {repository.full_name}")
+                    # Resolve a token suitable for cloning (GitHub App if configured, else user/public)
+                    from .github_token_service import GitHubTokenService
+                    token = GitHubTokenService.get_token_for_repository_access(user_id, repository.full_name)
 
-                # Calculate KLOC
-                from .kloc_service import KLOCService
-                kloc_data = KLOCService.calculate_kloc(safe_repo_path or repo_path)
+                    # Clone repository
+                    from .git_service import GitService
+                    git_service = GitService()
+                    repo_path = git_service.clone_repository(repository.clone_url, repository.full_name, token)
+                    logger.info(f"----------Cloned repository for KLOC: {repository.full_name} at {repo_path}")
 
-                # Persist KLOC on relational model
-                repository.kloc = kloc_data.get('kloc', 0.0)
-                repository.kloc_calculated_at = timezone.now()
-                repository.save()
+                    # Validate safe repo path before KLOC
+                    from .sanitization import assert_safe_repo_path
+                    try:
+                        safe_repo_path = str(assert_safe_repo_path(repo_path))
+                    except Exception as safe_err:
+                        logger.warning(f"Skipping KLOC, repo path not safe: {repo_path} - {safe_err}")
+                        safe_repo_path = None
 
-                # Save KLOC history in Mongo
-                try:
-                    from .models import RepositoryKLOCHistory
-                    kloc_history = RepositoryKLOCHistory(
-                        repository_full_name=repository.full_name,
-                        repository_id=repository_id,
-                        kloc=kloc_data.get('kloc', 0.0),
-                        total_lines=kloc_data.get('total_lines', 0),
-                        language_breakdown=kloc_data.get('language_breakdown', {}),
-                        calculated_at=kloc_data.get('calculated_at'),
-                        total_files=len(kloc_data.get('language_breakdown', {})),
-                        code_files=sum(1 for ext_lines in kloc_data.get('language_breakdown', {}).values() if ext_lines > 0)
-                    )
-                    kloc_history.save()
-                except Exception as mongo_err:
-                    logger.warning(f"Failed to save KLOC history for {repository.full_name}: {mongo_err}")
+                    # Calculate KLOC
+                    from .kloc_service import KLOCService
+                    kloc_data = KLOCService.calculate_kloc(safe_repo_path or repo_path)
 
-                # Enrich result payload
-                result['kloc'] = {
-                    'value': kloc_data.get('kloc', 0.0),
-                    'total_lines': kloc_data.get('total_lines', 0),
-                    'languages': len(kloc_data.get('language_breakdown', {})),
-                    'calculated_at': (kloc_data.get('calculated_at') or datetime.now(dt_timezone.utc)).isoformat()
-                }
+                    # Persist KLOC on relational model
+                    repository.kloc = kloc_data.get('kloc', 0.0)
+                    repository.kloc_calculated_at = timezone.now()
+                    repository.save()
 
-                logger.info(f"KLOC calculation completed (API flow) for {repository.full_name}: {kloc_data.get('kloc', 0.0):.2f} KLOC")
-            except Exception as kloc_err:
-                logger.warning(f"KLOC calculation skipped/failed for {repository.full_name}: {kloc_err}")
+                    # Save KLOC history in Mongo
+                    try:
+                        from .models import RepositoryKLOCHistory
+                        kloc_history = RepositoryKLOCHistory(
+                            repository_full_name=repository.full_name,
+                            repository_id=repository_id,
+                            kloc=kloc_data.get('kloc', 0.0),
+                            total_lines=kloc_data.get('total_lines', 0),
+                            language_breakdown=kloc_data.get('language_breakdown', {}),
+                            calculated_at=kloc_data.get('calculated_at'),
+                            total_files=len(kloc_data.get('language_breakdown', {})),
+                            code_files=sum(1 for ext_lines in kloc_data.get('language_breakdown', {}).values() if ext_lines > 0)
+                        )
+                        kloc_history.save()
+                    except Exception as mongo_err:
+                        logger.warning(f"Failed to save KLOC history for {repository.full_name}: {mongo_err}")
+
+                    # Enrich result payload
+                    result['kloc'] = {
+                        'value': kloc_data.get('kloc', 0.0),
+                        'total_lines': kloc_data.get('total_lines', 0),
+                        'languages': len(kloc_data.get('language_breakdown', {})),
+                        'calculated_at': (kloc_data.get('calculated_at') or datetime.now(dt_timezone.utc)).isoformat(),
+                        'reason': kloc_reason
+                    }
+
+                    logger.info(f"KLOC calculation completed ({kloc_reason}) for {repository.full_name}: {kloc_data.get('kloc', 0.0):.2f} KLOC")
+                except Exception as kloc_err:
+                    logger.warning(f"KLOC calculation skipped/failed for {repository.full_name}: {kloc_err}")
+            else:
+                logger.info(f"Skipping KLOC calculation for {repository.full_name} - not needed")
         
         # Always mark repository as indexed after processing
         print(f"DEBUG: Marking repository {repository.full_name} as indexed (intelligent task)")
@@ -1647,6 +1667,78 @@ def index_commits_git_local_task(repository_id):
             'backfill_complete': True,  # Full backfill completed
             'errors': result.get('errors', [])
         }
+        
+        # Calculate KLOC for git_local mode (since we have the repository cloned)
+        # OR if KLOC is missing or older than 30 days
+        should_calculate_kloc = True
+        kloc_reason = "git_local_backfill"
+        
+        # Check if KLOC needs recalculation (missing or older than 30 days)
+        if repository.kloc_calculated_at:
+            days_since_kloc = (timezone.now() - repository.kloc_calculated_at).days
+            if days_since_kloc < 30:
+                should_calculate_kloc = False
+                logger.info(f"KLOC for {repository.full_name} was calculated {days_since_kloc} days ago, skipping recalculation")
+            else:
+                kloc_reason = f"kloc_old_{days_since_kloc}_days"
+        else:
+            kloc_reason = "kloc_missing"
+        
+        if should_calculate_kloc:
+            try:
+                logger.info(f"----------Starting KLOC calculation ({kloc_reason}) for {repository.full_name}")
+                
+                # Get the cloned repository path
+                repo_path = sync_service.get_repo_path(repository.full_name)
+                
+                # Validate safe repo path before KLOC
+                from .sanitization import assert_safe_repo_path
+                try:
+                    safe_repo_path = str(assert_safe_repo_path(repo_path))
+                except Exception as safe_err:
+                    logger.warning(f"Skipping KLOC, repo path not safe: {repo_path} - {safe_err}")
+                    safe_repo_path = None
+
+                # Calculate KLOC
+                from .kloc_service import KLOCService
+                kloc_data = KLOCService.calculate_kloc(safe_repo_path or repo_path)
+
+                # Persist KLOC on relational model
+                repository.kloc = kloc_data.get('kloc', 0.0)
+                repository.kloc_calculated_at = timezone.now()
+                repository.save()
+
+                # Save KLOC history in Mongo
+                try:
+                    from .models import RepositoryKLOCHistory
+                    kloc_history = RepositoryKLOCHistory(
+                        repository_full_name=repository.full_name,
+                        repository_id=repository_id,
+                        kloc=kloc_data.get('kloc', 0.0),
+                        total_lines=kloc_data.get('total_lines', 0),
+                        language_breakdown=kloc_data.get('language_breakdown', {}),
+                        calculated_at=kloc_data.get('calculated_at'),
+                        total_files=len(kloc_data.get('language_breakdown', {})),
+                        code_files=sum(1 for ext_lines in kloc_data.get('language_breakdown', {}).values() if ext_lines > 0)
+                    )
+                    kloc_history.save()
+                except Exception as mongo_err:
+                    logger.warning(f"Failed to save KLOC history for {repository.full_name}: {mongo_err}")
+
+                # Add KLOC info to results
+                final_result['kloc'] = {
+                    'value': kloc_data.get('kloc', 0.0),
+                    'total_lines': kloc_data.get('total_lines', 0),
+                    'languages': len(kloc_data.get('language_breakdown', {})),
+                    'calculated_at': (kloc_data.get('calculated_at') or datetime.now(dt_timezone.utc)).isoformat(),
+                    'reason': kloc_reason
+                }
+
+                logger.info(f"KLOC calculation completed ({kloc_reason}) for {repository.full_name}: {kloc_data.get('kloc', 0.0):.2f} KLOC")
+            except Exception as kloc_err:
+                logger.warning(f"KLOC calculation skipped/failed for {repository.full_name}: {kloc_err}")
+        else:
+            logger.info(f"Skipping KLOC calculation for {repository.full_name} - not needed")
         
         # Always mark repository as indexed after processing (success or not)
         print(f"DEBUG: Marking repository {repository.full_name} as indexed")

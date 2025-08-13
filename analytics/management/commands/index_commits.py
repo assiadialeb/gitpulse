@@ -31,8 +31,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--batch-size',
             type=int,
-            default=7,
-            help='Number of days per batch (default: 7)'
+            default=None,
+            help='Number of days per batch (None = adaptive sizing: 30+ days for backfill, 7 days for maintenance)'
         )
         parser.add_argument(
             '--sync',

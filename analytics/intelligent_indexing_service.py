@@ -123,6 +123,28 @@ class IntelligentIndexingService:
         
         return True
     
+    def get_adaptive_batch_size(self, default_batch_size: int = 7) -> int:
+        """
+        Determine adaptive batch size based on backfill state
+        
+        Args:
+            default_batch_size: Default batch size for maintenance phase
+            
+        Returns:
+            Adaptive batch size (larger for backfill, smaller for maintenance)
+        """
+        # If this is the first run or we have very few items indexed, use larger batches for backfill
+        if (self.state.last_indexed_at is None or 
+            self.state.total_indexed < 100):  # Less than 100 items = still in backfill phase
+            return max(30, default_batch_size * 4)  # At least 30 days, or 4x the default
+        
+        # If we have a lot of items indexed, we're likely in maintenance phase
+        if self.state.total_indexed > 1000:
+            return default_batch_size
+        
+        # For medium amounts, use intermediate batch size
+        return max(15, default_batch_size * 2)  # At least 15 days, or 2x the default
+
     def get_date_range_for_next_batch(self, batch_size_days: int = None) -> Tuple[datetime, datetime]:
         """
         Get the date range for the next batch to index
@@ -171,8 +193,16 @@ class IntelligentIndexingService:
         Returns:
             True if there's potentially more data to index
         """
-        # No time limit - continue indexing until GitHub API returns no more data
-        # We'll rely on the fetch function returning empty results to stop indexing
+        # If we've gone back more than 10 years, assume we've reached the beginning
+        # This prevents infinite backfilling for very old repositories
+        ten_years_ago = timezone.now() - timedelta(days=3650)
+        
+        if since_date < ten_years_ago:
+            logger.info(f"Reached 10-year limit for {self.repository.full_name} - {self.entity_type}, stopping backfill")
+            return False
+        
+        # For now, continue indexing until we hit the time limit
+        # In the future, we could check if the fetch function returned empty results
         return True
     
     def index_batch(self, 
@@ -187,7 +217,7 @@ class IntelligentIndexingService:
                            Signature: (owner, repo, token, since_date, until_date) -> List[Dict]
             process_function: Function to process and save the fetched data
                              Signature: (items: List[Dict]) -> int (number processed)
-            batch_size_days: Number of days per batch
+            batch_size_days: Number of days per batch (if None, uses adaptive sizing)
             
         Returns:
             Dictionary with indexing results
@@ -206,6 +236,11 @@ class IntelligentIndexingService:
         self.state.save()
         
         try:
+            # Use adaptive batch size if not specified
+            if batch_size_days is None:
+                batch_size_days = self.get_adaptive_batch_size()
+                logger.info(f"Using adaptive batch size: {batch_size_days} days for {self.repository.full_name} - {self.entity_type}")
+            
             # Get date range for this batch
             since_date, until_date = self.get_date_range_for_next_batch(batch_size_days)
             

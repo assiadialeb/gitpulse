@@ -93,6 +93,7 @@ class GitService:
                 env = os.environ.copy()
                 env['GIT_LFS_SKIP_SMUDGE'] = '1'  # Skip LFS file download
                 env['GIT_LFS_SKIP_PUSH'] = '1'    # Skip LFS push
+                env['GIT_TERMINAL_PROMPT'] = '0'  # Disable interactive prompts
                 
                 # Prepare clone URL with authentication if token provided
                 clone_url = self._build_authenticated_url(repo_url, github_token)
@@ -314,7 +315,8 @@ class GitService:
             netloc_host = host
             if parsed.port:
                 netloc_host = f"{host}:{parsed.port}"
-            netloc = f"{github_token}@{netloc_host}"
+            # Use GitHub-recommended basic auth format: username 'x-access-token' and token as password
+            netloc = f"x-access-token:{github_token}@{netloc_host}"
             return urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
         return repo_url
     

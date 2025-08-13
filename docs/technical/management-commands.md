@@ -263,6 +263,14 @@ python manage.py calculate_kloc --repo-id 123 --dry-run
 
 **Note:** This command clones repositories locally to calculate KLOC, which can take time for large repositories.
 
+**Automatic KLOC Calculation:**
+KLOC is automatically calculated during indexing in the following cases:
+- **Backfill complete**: When all commits have been indexed
+- **KLOC missing**: When no KLOC has been calculated yet
+- **KLOC outdated**: When KLOC was calculated more than 30 days ago
+
+This ensures KLOC stays fresh without unnecessary recalculations.
+
 #### `classify_existing_commits`
 Reclassify commits marked as "other" using Ollama LLM.
 

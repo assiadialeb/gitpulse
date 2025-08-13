@@ -340,14 +340,14 @@ class CommitIndexingService:
     
     @staticmethod
     def index_commits_for_repository(repository_id: int, user_id: int, 
-                                   batch_size_days: int = 7) -> Dict:
+                                   batch_size_days: int = None) -> Dict:
         """
         Index commits for a specific repository using intelligent indexing
         
         Args:
             repository_id: Repository ID
             user_id: User ID (owner of the repository)
-            batch_size_days: Number of days per batch (default: 7 for commits)
+            batch_size_days: Number of days per batch (None = adaptive sizing)
             
         Returns:
             Dictionary with indexing results
@@ -375,11 +375,11 @@ class CommitIndexingService:
                 github_token=github_token
             )
             
-            # Run indexing batch
+            # Run indexing batch with adaptive sizing (batch_size_days=None triggers adaptive mode)
             result = indexing_service.index_batch(
                 fetch_function=CommitIndexingService.fetch_commits_from_github,
                 process_function=CommitIndexingService.process_commits,
-                batch_size_days=batch_size_days
+                batch_size_days=batch_size_days  # None = adaptive, or specific value if provided
             )
             
 
