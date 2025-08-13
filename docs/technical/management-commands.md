@@ -4,13 +4,13 @@ This document provides a complete reference for all management commands availabl
 
 ## 🔄 Automatic Indexing Commands
 
-### Setup Commands
+### Indexing Setup
 
 #### `setup_auto_indexing`
-Set up automatic daily indexing for all applications.
+Set up automatic daily indexing for all applications (deprecated - use `setup_repository_indexing`).
 
 ```bash
-# Basic setup (2 AM UTC default)
+# Basic setup (02:00 UTC default)
 python manage.py setup_auto_indexing
 
 # Custom time
@@ -21,72 +21,306 @@ python manage.py setup_auto_indexing --time 02:00 --force
 ```
 
 **Options:**
-- `--time HH:MM`: Set custom time (24-hour format)
-- `--force`: Recreate existing schedules
+- `--time HH:MM` : Set custom time (24-hour format)
+- `--force` : Recreate existing schedules
 
-**Examples:**
-```bash
-# Set up indexing at 2 AM UTC
-python manage.py setup_auto_indexing
-
-# Set up indexing at 3:30 PM UTC
-python manage.py setup_auto_indexing --time 15:30
-
-# Update all schedules to run at 1 AM UTC
-python manage.py setup_auto_indexing --time 01:00 --force
-```
-
-### Management Commands
-
-#### `list_scheduled_tasks`
-View and manage scheduled tasks.
+#### `setup_repository_indexing`
+Set up automatic daily indexing for repositories (recommended).
 
 ```bash
-# List all scheduled tasks
-python manage.py list_scheduled_tasks
+# Global task (recommended)
+python manage.py setup_repository_indexing --global-task --time 02:00
 
-# List tasks for specific application
-python manage.py list_scheduled_tasks --application-id 1
+# Individual tasks per repository
+python manage.py setup_repository_indexing --time 02:00
 
-# Delete all scheduled tasks
-python manage.py list_scheduled_tasks --delete
-
-# Delete tasks for specific application
-python manage.py list_scheduled_tasks --delete --application-id 1
+# Force recreate
+python manage.py setup_repository_indexing --time 02:00 --force
 ```
 
 **Options:**
-- `--delete`: Remove scheduled tasks
-- `--application-id ID`: Filter by application ID
+- `--time HH:MM` : Execution time (default: 02:00)
+- `--force` : Recreate existing schedules
+- `--global-task` : Create a single global task instead of individual tasks
 
 #### `setup_complete_indexing`
-Set up comprehensive indexing for all repositories.
+Set up a complete indexing system with all tasks.
 
 ```bash
-# Set up complete indexing
+# Complete setup
 python manage.py setup_complete_indexing
 
-# Custom configuration
-python manage.py setup_complete_indexing --workers 4 --timeout 3600
+# Setup with task spreading
+python manage.py setup_complete_indexing --spread
+
+# Custom time
+python manage.py setup_complete_indexing --time 02:00 --force
 ```
 
-#### `start_intelligent_indexing`
-Start intelligent indexing with AI-powered commit classification.
+**Options:**
+- `--time HH:MM` : Base time for tasks
+- `--force` : Recreate all schedules
+- `--spread` : Spread tasks across different hours
+
+#### `setup_rate_limit_monitoring`
+Set up automatic GitHub rate limit monitoring.
 
 ```bash
-# Start intelligent indexing
-python manage.py start_intelligent_indexing
-
-# Custom model
-python manage.py start_intelligent_indexing --model llama3.2:3b
+python manage.py setup_rate_limit_monitoring
 ```
 
-## 🛠️ System Commands
+**Features:**
+- Process pending restarts every 5 minutes
+- Clean up old rate limit resets (daily)
 
-### Django-Q Commands
+## 🚀 Manual Indexing Commands
+
+### Intelligent Indexing
+
+#### `start_intelligent_indexing`
+Start intelligent indexing for repositories.
+
+```bash
+# Complete indexing for all repositories
+python manage.py start_intelligent_indexing
+
+# Specific repository
+python manage.py start_intelligent_indexing --repository-id 123
+
+# Specific entity types
+python manage.py start_intelligent_indexing --entity-types commits pullrequests
+
+# Dry-run mode
+python manage.py start_intelligent_indexing --dry-run
+```
+
+**Options:**
+- `--repository-id ID` : Specific repository
+- `--entity-types` : Entity types (commits, pullrequests, releases, deployments)
+- `--dry-run` : Simulation without starting tasks
+
+### Entity-Specific Indexing
+
+#### `index_commits`
+Index GitHub commits with PR links.
+
+```bash
+# All repositories
+python manage.py index_commits --all
+
+# Specific repository
+python manage.py index_commits --repo-id 123
+
+# Synchronous mode
+python manage.py index_commits --repo-id 123 --sync
+
+# Reset indexing state
+python manage.py index_commits --repo-id 123 --reset
+
+# Show status
+python manage.py index_commits --status
+```
+
+**Options:**
+- `--repo-id ID` : Specific repository
+- `--all` : All indexed repositories
+- `--batch-size N` : Batch size in days (default: 7)
+- `--sync` : Synchronous execution
+- `--reset` : Reset indexing state
+- `--status` : Show indexing status
+
+#### `index_pullrequests`
+Index GitHub pull requests.
+
+```bash
+# All repositories
+python manage.py index_pullrequests --all
+
+# Specific repository
+python manage.py index_pullrequests --repo-id 123
+
+# Synchronous mode
+python manage.py index_pullrequests --repo-id 123 --sync
+```
+
+#### `index_releases`
+Index GitHub releases.
+
+```bash
+# All repositories
+python manage.py index_releases --all
+
+# Specific repository
+python manage.py index_releases --repo-id 123
+
+# Synchronous mode
+python manage.py index_releases --repo-id 123 --sync
+```
+
+#### `index_deployments`
+Index GitHub deployments.
+
+```bash
+# All repositories
+python manage.py index_deployments --all
+
+# Specific repository
+python manage.py index_deployments --repo-id 123
+
+# Synchronous mode
+python manage.py index_deployments --repo-id 123 --sync
+```
+
+#### `index_repositories`
+Index repository metadata.
+
+```bash
+# All repositories
+python manage.py index_repositories --all
+
+# Specific repository
+python manage.py index_repositories --repo-id 123
+
+# Synchronous mode
+python manage.py index_repositories --repo-id 123 --sync
+```
+
+### Specialized Indexing
+
+#### `index_codeql_repository`
+Index CodeQL vulnerabilities for repositories.
+
+```bash
+# Specific repository
+python manage.py index_codeql_repository --repo-id 123
+
+# All repositories
+python manage.py index_codeql_repository --all
+
+# Synchronous mode
+python manage.py index_codeql_repository --repo-id 123 --sync
+```
+
+## 🔄 Backfill Commands
+
+#### `backfill_commits_git_local`
+Complete commit backfill using Git local (no rate limits).
+
+```bash
+# All repositories
+python manage.py backfill_commits_git_local
+
+# Specific repository
+python manage.py backfill_commits_git_local --repository-id 123
+
+# Dry-run mode
+python manage.py backfill_commits_git_local --dry-run
+```
+
+**Advantages:**
+- No GitHub rate limits
+- No pagination
+- Complete history
+
+#### `backfill_sonarcloud`
+Backfill SonarCloud metrics.
+
+```bash
+# All repositories
+python manage.py backfill_sonarcloud
+
+# Specific repository
+python manage.py backfill_sonarcloud --repo-id 123
+
+# Dry-run mode
+python manage.py backfill_sonarcloud --dry-run
+```
+
+## 🧠 Intelligent Analysis Commands
+
+#### `classify_existing_commits`
+Reclassify commits marked as "other" using Ollama LLM.
+
+```bash
+# Complete reclassification
+python manage.py classify_existing_commits
+
+# Dry-run mode
+python manage.py classify_existing_commits --dry-run
+
+# Limit for testing
+python manage.py classify_existing_commits --limit 50
+
+# Custom batch size
+python manage.py classify_existing_commits --batch-size 200
+```
+
+**Options:**
+- `--dry-run` : Simulation without changes
+- `--batch-size N` : Batch size (default: 100)
+- `--limit N` : Limit for testing
+
+#### `calculate_shs_all_repos`
+Calculate Security Health Score (SHS) for repositories.
+
+```bash
+# All repositories
+python manage.py calculate_shs_all_repos
+
+# Specific repository
+python manage.py calculate_shs_all_repos --repository-id 123
+
+# Force recalculation
+python manage.py calculate_shs_all_repos --force
+```
+
+**Options:**
+- `--repository-id ID` : Specific repository
+- `--force` : Force recalculation even if SHS exists
+
+#### `generate_sbom`
+Generate SBOM (Software Bill of Materials) for repositories.
+
+```bash
+# All repositories
+python manage.py generate_sbom --all
+
+# Specific repository
+python manage.py generate_sbom --repo-id 123
+
+# Synchronous mode
+python manage.py generate_sbom --repo-id 123 --sync
+
+# Force generation
+python manage.py generate_sbom --repo-id 123 --force
+```
+
+**Options:**
+- `--repo-id ID` : Specific repository
+- `--all` : All indexed repositories
+- `--sync` : Synchronous execution
+- `--force` : Force generation
+
+## 🔧 Maintenance Commands
+
+#### `reset_developer_groups`
+Reset developer groups.
+
+```bash
+python manage.py reset_developer_groups
+```
+
+#### `compare_indexing_methods`
+Compare indexing methods (empty file - to be implemented).
+
+```bash
+python manage.py compare_indexing_methods
+```
+
+## 🛠️ Django-Q Commands
 
 #### `qcluster`
-Start the Django-Q cluster (required for scheduled tasks).
+Start Django-Q cluster (required for scheduled tasks).
 
 ```bash
 python manage.py qcluster
@@ -106,7 +340,14 @@ View task history and statistics.
 python manage.py qinfo
 ```
 
-### Database Commands
+#### `qmemory`
+View cluster memory usage.
+
+```bash
+python manage.py qmemory
+```
+
+## 📊 Base Django Commands
 
 #### `makemigrations`
 Create database migrations.
@@ -122,355 +363,72 @@ Apply database migrations.
 python manage.py migrate
 ```
 
-#### `dbshell`
-Open database shell.
+#### `check`
+Check project configuration.
 
 ```bash
-python manage.py dbshell
+python manage.py check
 ```
 
-## 📊 Analytics Commands
-
-### Indexing Commands
-
-#### `index_commits`
-Index commits from repositories.
+#### `shell`
+Open Django interactive shell.
 
 ```bash
-# Index all commits
-python manage.py index_commits
-
-# Index specific repository
-python manage.py index_commits --repository-id 1
-
-# Index with custom date range
-python manage.py index_commits --start-date 2024-01-01 --end-date 2024-12-31
+python manage.py shell
 ```
 
-#### `index_repositories`
-Index repository information.
-
-```bash
-# Index all repositories
-python manage.py index_repositories
-
-# Index specific repository
-python manage.py index_repositories --repository-id 1
-```
-
-#### `index_pullrequests`
-Index pull requests.
-
-```bash
-# Index all pull requests
-python manage.py index_pullrequests
-
-# Index specific repository
-python manage.py index_pullrequests --repository-id 1
-```
-
-#### `index_releases`
-Index releases.
-
-```bash
-# Index all releases
-python manage.py index_releases
-
-# Index specific repository
-python manage.py index_releases --repository-id 1
-```
-
-#### `index_deployments`
-Index deployments.
-
-```bash
-# Index all deployments
-python manage.py index_deployments
-
-# Index specific repository
-python manage.py index_deployments --repository-id 1
-```
-
-### Classification Commands
-
-#### `classify_existing_commits`
-Classify existing commits using AI.
-
-```bash
-# Classify all commits
-python manage.py classify_existing_commits
-
-# Classify specific repository
-python manage.py classify_existing_commits --repository-id 1
-
-# Use custom model
-python manage.py classify_existing_commits --model llama3.2:3b
-```
-
-## 🔧 Configuration Commands
-
-### GitHub Commands
-
-#### `check_github_permissions`
-Check GitHub API permissions and rate limits.
-
-```bash
-# Check all permissions
-python manage.py check_github_permissions
-
-# Check specific user
-python manage.py check_github_permissions --user-id 1
-```
-
-#### `check_rate_limit`
-Check GitHub API rate limit status.
-
-```bash
-# Check rate limits
-python manage.py check_rate_limit
-
-# Check specific token
-python manage.py check_rate_limit --token your-token
-```
-
-#### `setup_repository_indexing`
-Set up repository indexing configuration.
-
-```bash
-# Set up indexing
-python manage.py setup_repository_indexing
-
-# Custom configuration
-python manage.py setup_repository_indexing --workers 4 --timeout 3600
-```
-
-### Database Commands
-
-#### `cleanup_duplicates`
-Clean up duplicate records.
-
-```bash
-# Clean up all duplicates
-python manage.py cleanup_duplicates
-
-# Clean up specific table
-python manage.py cleanup_duplicates --table commits
-```
-
-#### `merge_duplicate_developers`
-Merge duplicate developer records.
-
-```bash
-# Merge all duplicates
-python manage.py merge_duplicate_developers
-
-# Merge specific developer
-python manage.py merge_duplicate_developers --developer-id 1
-```
-
-## 🔍 Debug Commands
-
-### Task Commands
-
-#### `debug_task_creation`
-Debug task creation issues.
-
-```bash
-# Debug task creation
-python manage.py debug_task_creation
-
-# Debug specific task
-python manage.py debug_task_creation --task-id 1
-```
-
-#### `debug_task_storage`
-Debug task storage issues.
-
-```bash
-# Debug task storage
-python manage.py debug_task_storage
-```
-
-#### `verify_task_execution`
-Verify task execution.
-
-```bash
-# Verify task execution
-python manage.py verify_task_execution
-
-# Verify specific task
-python manage.py verify_task_execution --task-id 1
-```
-
-### System Commands
-
-#### `inspect_django_q`
-Inspect Django-Q configuration and status.
-
-```bash
-# Inspect Django-Q
-python manage.py inspect_django_q
-```
-
-#### `test_github_tokens`
-Test GitHub token validity.
-
-```bash
-# Test all tokens
-python manage.py test_github_tokens
-
-# Test specific token
-python manage.py test_github_tokens --token your-token
-```
-
-## 🧹 Maintenance Commands
-
-### Cleanup Commands
-
-#### `cleanup_duplicate_tasks`
-Clean up duplicate scheduled tasks.
-
-```bash
-# Clean up duplicate tasks
-python manage.py cleanup_duplicate_tasks
-```
-
-#### `manage_orphan_aliases`
-Manage orphaned developer aliases.
-
-```bash
-# Manage orphan aliases
-python manage.py manage_orphan_aliases
-
-# Clean up orphans
-python manage.py manage_orphan_aliases --cleanup
-```
-
-#### `reset_developer_groups`
-Reset developer groups.
-
-```bash
-# Reset all groups
-python manage.py reset_developer_groups
-
-# Reset specific group
-python manage.py reset_developer_groups --group-id 1
-```
-
-### Verification Commands
-
-#### `verify_deduplication`
-Verify deduplication process.
-
-```bash
-# Verify deduplication
-python manage.py verify_deduplication
-```
-
-#### `check_orphan_aliases`
-Check for orphaned aliases.
-
-```bash
-# Check orphan aliases
-python manage.py check_orphan_aliases
-```
-
-## 📈 Monitoring Commands
-
-### Performance Commands
-
-#### `compare_indexing_methods`
-Compare different indexing methods.
-
-```bash
-# Compare methods
-python manage.py compare_indexing_methods
-
-# Custom comparison
-python manage.py compare_indexing_methods --method1 git_local --method2 github_api
-```
-
-#### `test_corrected_indexing`
-Test corrected indexing process.
-
-```bash
-# Test corrected indexing
-python manage.py test_corrected_indexing
-```
-
-### Analysis Commands
-
-#### `generate_sbom`
-Generate Software Bill of Materials.
-
-```bash
-# Generate SBOM
-python manage.py generate_sbom
-
-# Custom output
-python manage.py generate_sbom --output sbom.json
-```
-
-## 🚀 Utility Commands
-
-### Development Commands
-
-#### `restart_worker`
-Restart background workers.
-
-```bash
-# Restart all workers
-python manage.py restart_worker
-
-# Restart specific worker
-python manage.py restart_worker --worker-id 1
-```
-
-#### `schedule_daily_indexing`
-Schedule daily indexing tasks.
-
-```bash
-# Schedule daily indexing
-python manage.py schedule_daily_indexing
-
-# Custom schedule
-python manage.py schedule_daily_indexing --time 02:00
-```
-
-## 📚 Command Categories
-
-### Indexing Commands
-- `setup_auto_indexing` - Set up automatic indexing
-- `index_commits` - Index repository commits
-- `index_repositories` - Index repository information
-- `index_pullrequests` - Index pull requests
-- `index_releases` - Index releases
-- `index_deployments` - Index deployments
-
-### System Commands
-- `qcluster` - Start Django-Q cluster
-- `qmonitor` - Monitor cluster status
-- `qinfo` - View task statistics
-- `makemigrations` - Create migrations
-- `migrate` - Apply migrations
-
-### Debug Commands
-- `debug_task_creation` - Debug task creation
-- `debug_task_storage` - Debug task storage
-- `verify_task_execution` - Verify task execution
-- `inspect_django_q` - Inspect Django-Q
-- `test_github_tokens` - Test GitHub tokens
-
-### Maintenance Commands
-- `cleanup_duplicates` - Clean up duplicates
-- `merge_duplicate_developers` - Merge developers
-- `manage_orphan_aliases` - Manage aliases
-- `reset_developer_groups` - Reset groups
-- `verify_deduplication` - Verify deduplication
-
-## 📚 Related Documentation
-
-- **[Technical Architecture](architecture.md)** - System architecture overview
-- **[API Reference](api.md)** - API documentation
-- **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
-- **[Docker Deployment](../deployment/docker.md)** - Docker deployment guide 
+## 🎯 Recommended Usage
+
+### Initial Setup
+
+1. **Set up automatic indexing:**
+   ```bash
+   python manage.py setup_repository_indexing --global-task --time 02:00
+   ```
+
+2. **Set up rate limit monitoring:**
+   ```bash
+   python manage.py setup_rate_limit_monitoring
+   ```
+
+3. **Start Django-Q cluster:**
+   ```bash
+   python manage.py qcluster
+   ```
+
+### Manual Indexing
+
+1. **Complete repository indexing:**
+   ```bash
+   python manage.py start_intelligent_indexing --repository-id 123
+   ```
+
+2. **Git local backfill (no limits):**
+   ```bash
+   python manage.py backfill_commits_git_local --repository-id 123
+   ```
+
+3. **Commit reclassification:**
+   ```bash
+   python manage.py classify_existing_commits --dry-run
+   ```
+
+### Maintenance
+
+1. **Calculate security scores:**
+   ```bash
+   python manage.py calculate_shs_all_repos
+   ```
+
+2. **Generate SBOMs:**
+   ```bash
+   python manage.py generate_sbom --all
+   ```
+
+## 📝 Important Notes
+
+- **Django-Q required** : Cluster must be active for scheduled tasks
+- **UTC times** : All scheduling uses UTC timezone
+- **Rate limits** : Automatically handled by the system
+- **Automatic indexing** : Works without manual intervention
+- **Dry-run mode** : Always available for testing commands 
