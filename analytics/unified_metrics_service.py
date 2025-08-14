@@ -232,11 +232,43 @@ class UnifiedMetricsService:
             'period_days': days_span
         }
     
-    def get_pr_cycle_time(self) -> Dict:
-        """PR Cycle Time (AR)"""
+    def get_pr_metrics(self) -> Dict:
+        """Unified PR metrics including cycle time and health metrics (AR)"""
         if self.entity_type == 'developer':
-            return {'avg_cycle_time_hours': 0, 'median_cycle_time_hours': 0, 'total_prs': 0}
-        # Toujours utiliser self.prs filtré (déjà filtré sur la plage si fournie)
+            return {
+                # Cycle time metrics
+                'avg_cycle_time_hours': 0, 
+                'median_cycle_time_hours': 0, 
+                'min_cycle_time_hours': 0,
+                'max_cycle_time_hours': 0,
+                'total_prs': 0,
+                # Health metrics
+                'open_prs': 0, 'merged_prs': 0, 'closed_prs': 0,
+                'prs_without_review': 0, 'prs_without_review_rate': 0,
+                'self_merged_prs': 0, 'self_merged_rate': 0,
+                'old_open_prs': 0, 'old_open_prs_rate': 0,
+                'avg_merge_time_hours': 0, 'median_merge_time_hours': 0,
+                'open_prs_percentage': 0, 'merged_prs_percentage': 0
+            }
+        
+        if self.prs.count() == 0:
+            return {
+                # Cycle time metrics
+                'avg_cycle_time_hours': 0, 
+                'median_cycle_time_hours': 0, 
+                'min_cycle_time_hours': 0,
+                'max_cycle_time_hours': 0,
+                'total_prs': 0,
+                # Health metrics
+                'open_prs': 0, 'merged_prs': 0, 'closed_prs': 0,
+                'prs_without_review': 0, 'prs_without_review_rate': 0,
+                'self_merged_prs': 0, 'self_merged_rate': 0,
+                'old_open_prs': 0, 'old_open_prs_rate': 0,
+                'avg_merge_time_hours': 0, 'median_merge_time_hours': 0,
+                'open_prs_percentage': 0, 'merged_prs_percentage': 0
+            }
+        
+        # Calculate cycle times (using closed_at for consistency)
         prs_with_times = self.prs.filter(created_at__ne=None, closed_at__ne=None)
         cycle_times = []
         
@@ -245,16 +277,66 @@ class UnifiedMetricsService:
                 cycle_time_hours = (pr.closed_at - pr.created_at).total_seconds() / 3600
                 cycle_times.append(cycle_time_hours)
         
-        if not cycle_times:
-            return {'avg_cycle_time_hours': 0, 'median_cycle_time_hours': 0, 'total_prs': 0}
+        # Calculate health metrics
+        total_prs = self.prs.count()
+        open_prs = self.prs.filter(state='open').count()
+        merged_prs = self.prs.filter(merged_at__ne=None).count()
+        closed_prs = self.prs.filter(state='closed').count()
         
-        avg_cycle_time = statistics.mean(cycle_times)
-        median_cycle_time = statistics.median(cycle_times)
+        # Calculate old open PRs (open for more than 7 days)
+        cutoff_date = datetime.now(dt_timezone.utc) - timedelta(days=7)
+        old_open_prs = 0
+        for pr in self.prs.filter(state='closed'):
+            if pr.created_at and pr.closed_at:
+                days_open = (pr.closed_at - pr.created_at).days
+                if days_open > 7:
+                    old_open_prs += 1
+        
+        # Calculate self-merged PRs
+        self_merged_prs = 0
+        for pr in self.prs.filter(merged_at__ne=None):
+            if pr.merged_by and pr.author and pr.merged_by == pr.author:
+                self_merged_prs += 1
+        
+        # Estimate PRs without review
+        prs_without_review = 0
+        for pr in self.prs.filter(merged_at__ne=None):
+            if (pr.merged_by and pr.author and pr.merged_by == pr.author) or pr.comments_count <= 1:
+                prs_without_review += 1
+        
+        # Calculate percentages
+        open_prs_percentage = round((open_prs / total_prs * 100) if total_prs > 0 else 0, 1)
+        merged_prs_percentage = round((merged_prs / total_prs * 100) if total_prs > 0 else 0, 1)
+        prs_without_review_rate = round((prs_without_review / total_prs * 100) if total_prs > 0 else 0, 1)
+        self_merged_rate = round((self_merged_prs / total_prs * 100) if total_prs > 0 else 0, 1)
+        old_open_prs_rate = round((old_open_prs / total_prs * 100) if total_prs > 0 else 0, 1)
+        
+        # Calculate cycle time statistics
+        avg_cycle_time = statistics.mean(cycle_times) if cycle_times else 0
+        median_cycle_time = statistics.median(cycle_times) if cycle_times else 0
+        min_cycle_time = min(cycle_times) if cycle_times else 0
+        max_cycle_time = max(cycle_times) if cycle_times else 0
         
         return {
+            # Cycle time metrics (for Release Frequency section)
             'avg_cycle_time_hours': round(avg_cycle_time, 1),
             'median_cycle_time_hours': round(median_cycle_time, 1),
-            'total_prs': len(cycle_times)
+            'min_cycle_time_hours': round(min_cycle_time, 1),
+            'max_cycle_time_hours': round(max_cycle_time, 1),
+            'total_prs': total_prs,
+            'open_prs': open_prs,
+            'open_prs_percentage': open_prs_percentage,
+            'merged_prs': merged_prs,
+            'merged_prs_percentage': merged_prs_percentage,
+            'closed_prs': closed_prs,
+            'prs_without_review': prs_without_review,
+            'prs_without_review_rate': prs_without_review_rate,
+            'self_merged_prs': self_merged_prs,
+            'self_merged_rate': self_merged_rate,
+            'old_open_prs': old_open_prs,
+            'old_open_prs_rate': old_open_prs_rate,
+            'avg_merge_time_hours': round(avg_cycle_time, 1),  # Use same value as cycle time for consistency
+            'median_merge_time_hours': round(median_cycle_time, 1)
         }
     
     # Activity Metrics
@@ -365,78 +447,37 @@ class UnifiedMetricsService:
         """Commit Type Distribution (DAR)"""
         return get_commit_type_stats(self.commits)
     
-    # PR Health Metrics (AR)
-    def get_pr_health_metrics(self) -> Dict:
-        """Pull Request Health (AR)"""
-        if self.entity_type == 'developer':
-            return {
-                'total_prs': 0, 'open_prs': 0, 'merged_prs': 0, 'closed_prs': 0,
-                'prs_without_review': 0, 'prs_without_review_rate': 0,
-                'self_merged_prs': 0, 'self_merged_rate': 0,
-                'old_open_prs': 0, 'old_open_prs_rate': 0,
-                'avg_merge_time_hours': 0, 'median_merge_time_hours': 0
-            }
-        
-        if self.prs.count() == 0:
-            return {
-                'total_prs': 0, 'open_prs': 0, 'merged_prs': 0, 'closed_prs': 0,
-                'prs_without_review': 0, 'prs_without_review_rate': 0,
-                'self_merged_prs': 0, 'self_merged_rate': 0,
-                'old_open_prs': 0, 'old_open_prs_rate': 0,
-                'avg_merge_time_hours': 0, 'median_merge_time_hours': 0
-            }
-        
-        total_prs = self.prs.count()
-        open_prs = self.prs.filter(state='open').count()
-        merged_prs = self.prs.filter(merged_at__ne=None).count()
-        closed_prs = self.prs.filter(state='closed').count()
-        
-        # Calculate old open PRs (open for more than 7 days)
-        cutoff_date = datetime.now(dt_timezone.utc) - timedelta(days=7)
-        old_open_prs = 0
-        for pr in self.prs.filter(state='closed'):
-            if pr.created_at and pr.closed_at:
-                days_open = (pr.closed_at - pr.created_at).days
-                if days_open > 7:
-                    old_open_prs += 1
-        
-        # Calculate merge times
-        merge_times = []
-        for pr in self.prs.filter(merged_at__ne=None):
-            if pr.merged_at and pr.created_at:
-                merge_time_hours = (pr.merged_at - pr.created_at).total_seconds() / 3600
-                merge_times.append(merge_time_hours)
-        
-        avg_merge_time = statistics.mean(merge_times) if merge_times else 0
-        median_merge_time = statistics.median(merge_times) if merge_times else 0
-        
-        # Calculate self-merged PRs
-        self_merged_prs = 0
-        for pr in self.prs.filter(merged_at__ne=None):
-            if pr.merged_by and pr.author and pr.merged_by == pr.author:
-                self_merged_prs += 1
-        
-        # Estimate PRs without review
-        prs_without_review = 0
-        for pr in self.prs.filter(merged_at__ne=None):
-            if (pr.merged_by and pr.author and pr.merged_by == pr.author) or pr.comments_count <= 1:
-                prs_without_review += 1
-        
+    # PR Cycle Time (AR) - Now uses unified method
+    def get_pr_cycle_time(self) -> Dict:
+        """PR Cycle Time (AR) - Returns cycle time metrics from unified PR metrics"""
+        pr_metrics = self.get_pr_metrics()
         return {
-            'total_prs': total_prs,
-            'open_prs': open_prs,
-            'open_prs_percentage': round((open_prs / total_prs * 100) if total_prs > 0 else 0, 1),
-            'merged_prs': merged_prs,
-            'merged_prs_percentage': round((merged_prs / total_prs * 100) if total_prs > 0 else 0, 1),
-            'closed_prs': closed_prs,
-            'prs_without_review': prs_without_review,
-            'prs_without_review_rate': round((prs_without_review / total_prs * 100) if total_prs > 0 else 0, 1),
-            'self_merged_prs': self_merged_prs,
-            'self_merged_rate': round((self_merged_prs / total_prs * 100) if total_prs > 0 else 0, 1),
-            'old_open_prs': old_open_prs,
-            'old_open_prs_rate': round((old_open_prs / total_prs * 100) if total_prs > 0 else 0, 1),
-            'avg_merge_time_hours': round(avg_merge_time, 1),
-            'median_merge_time_hours': round(median_merge_time, 1)
+            'avg_cycle_time_hours': pr_metrics['avg_cycle_time_hours'],
+            'median_cycle_time_hours': pr_metrics['median_cycle_time_hours'],
+            'min_cycle_time_hours': pr_metrics['min_cycle_time_hours'],
+            'max_cycle_time_hours': pr_metrics['max_cycle_time_hours'],
+            'total_prs': pr_metrics['total_prs']
+        }
+    
+    # PR Health Metrics (AR) - Now uses unified method
+    def get_pr_health_metrics(self) -> Dict:
+        """Pull Request Health (AR) - Returns health metrics from unified PR metrics"""
+        pr_metrics = self.get_pr_metrics()
+        return {
+            'total_prs': pr_metrics['total_prs'],
+            'open_prs': pr_metrics['open_prs'],
+            'open_prs_percentage': pr_metrics['open_prs_percentage'],
+            'merged_prs': pr_metrics['merged_prs'],
+            'merged_prs_percentage': pr_metrics['merged_prs_percentage'],
+            'closed_prs': pr_metrics['closed_prs'],
+            'prs_without_review': pr_metrics['prs_without_review'],
+            'prs_without_review_rate': pr_metrics['prs_without_review_rate'],
+            'self_merged_prs': pr_metrics['self_merged_prs'],
+            'self_merged_rate': pr_metrics['self_merged_rate'],
+            'old_open_prs': pr_metrics['old_open_prs'],
+            'old_open_prs_rate': pr_metrics['old_open_prs_rate'],
+            'avg_merge_time_hours': pr_metrics['avg_merge_time_hours'],
+            'median_merge_time_hours': pr_metrics['median_merge_time_hours']
         }
     
     # Top Contributors (AR)

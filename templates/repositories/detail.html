@@ -114,538 +114,164 @@
     {% if repository.is_indexed %}
     <!-- Analytics Dashboard -->
     <div class="space-y-8">
-        <!-- Overall Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <!-- Total Commits -->
-            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" role="button" tabindex="0" onclick="openCommitsList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openCommitsList(); }">
-                <div class="flex items-center">
-                    <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
-                            <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Total Commits</p>
-                        <p class="text-2xl font-bold text-blue-500">{{ overall_stats.total_commits|default:"0" }}</p>
-                    </div>
-                </div>
-            </div>
-            <!-- Lines Added -->
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <div class="flex items-center">
-                    <div class="p-3 bg-green-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Lines Added</p>
-                        <p class="text-2xl font-bold text-dark-gray">{{ overall_stats.total_additions|default:"0" }}</p>
-                    </div>
-                </div>
-            </div>
-            <!-- Total Releases -->
-            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" role="button" tabindex="0" onclick="openReleasesList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openReleasesList(); }">
-                <div class="flex items-center">
-                    <div class="p-3 bg-yellow-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Total Releases</p>
-                        <p class="text-2xl font-bold text-dark-gray">{{ total_releases|default:"0" }}</p>
-                    </div>
-                </div>
-            </div>
-            <!-- Total Developers -->
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <div class="flex items-center">
-                    <div class="p-3 bg-purple-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Total Developers</p>
-                        <p class="text-2xl font-bold text-purple-500">{{ overall_stats.total_authors|default:"0" }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Second Row: Commit Frequency, Release Frequency, PR Cycle Time -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <!-- Commit Frequency -->
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <div class="flex items-start">
-                    <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
-                            <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Commit Frequency</p>
-                        <p class="text-2xl font-bold text-blue-500">
-                            {% if commit_frequency and commit_frequency.avg_commits_per_day is not None %}
-                                {{ commit_frequency.avg_commits_per_day }}/day
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <!-- Commit Change Stats (nouveau bloc) -->
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <div class="flex items-start">
-                    <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
-                            <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm mb-1">Commit Change Stats</p>
-                        <div class="text-medium-gray text-xs mb-1">Avg. Lines Changed: <span class="text-dark-gray font-semibold text-sm">{{ commit_change_stats.avg_total_changes }}</span></div>
-                        <div class="text-medium-gray text-xs">Avg. Files Changed: <span class="text-dark-gray font-semibold text-sm">{{ commit_change_stats.avg_files_changed }}</span></div>
-                    </div>
-                </div>
-            </div>
-            <!-- Release Frequency -->
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <div class="flex items-start">
-                    <div class="p-3 bg-yellow-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Release Frequency</p>
-                        <p class="text-2xl font-bold text-yellow-500">
-                            {% if release_frequency and release_frequency.releases_per_month is not None %}
-                                {{ release_frequency.releases_per_month }}/month
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <!-- PR Cycle Time Block -->
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <div class="flex items-start">
-                    <div class="p-3 bg-purple-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">PR Cycle Time (h)</p>
-                        {% if pr_cycle_time_count > 0 %}
-                            <p class="text-2xl font-bold text-dark-gray">{{ pr_cycle_time_median|floatformat:1 }}</p>
-                            <p class="text-xs text-medium-gray">min: {{ pr_cycle_time_min|floatformat:1 }}h / max: {{ pr_cycle_time_max|floatformat:1 }}h</p>
-                            <p class="text-xs text-medium-gray">{{ pr_cycle_time_count }} PRs</p>
-                        {% else %}
-                            <p class="text-2xl font-bold text-gray-400">N/A</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <!-- Deployment Frequency -->
-            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" onclick="openDeploymentsList()">
-                <div class="flex items-start">
-                    <div class="p-3 bg-pink-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
-                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Deployments</p>
-                        <p class="text-2xl font-bold text-pink-500">{{ total_deployments }}</p>
-                        <p class="text-xs text-medium-gray">
-                            {% if deployment_frequency and deployment_frequency.deployments_per_week is not None %}
-                                {{ deployment_frequency.deployments_per_week }}/week
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Licensing -->
-            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
-                 role="button" tabindex="0" onclick="openLicensingAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openLicensingAnalysis(); }">
-                <div class="flex items-start">
-                    <div class="p-3 bg-green-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-green-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path opacity="0.1" d="M12 17H7C5.89543 17 5 16.1046 5 15V5C5 3.89543 5.89543 3 7 3H16C17.1046 3 18 3.89543 18 5V19C18 20.1046 17.1046 21 16 21C14.8954 21 14 20.1046 14 19C14 17.8954 13.1046 17 12 17Z" fill="currentColor"/>
-                            <path d="M19 3H9V3C7.11438 3 6.17157 3 5.58579 3.58579C5 4.17157 5 5.11438 5 7V10.5V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M14 17V19C14 20.1046 14.8954 21 16 21V21C17.1046 21 18 20.1046 18 19V9V4.5C18 3.67157 18.6716 3 19.5 3V3C20.3284 3 21 3.67157 21 4.5V4.5C21 5.32843 20.3284 6 19.5 6H18.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M16 21H5C3.89543 21 3 20.1046 3 19V19C3 17.8954 3.89543 17 5 17H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M9 7H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M9 11H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-medium-gray text-sm">Licensing</p>
-                        <p class="text-2xl font-bold text-green-500" id="licensing-status">Analyzing...</p>
-                        <p class="text-xs text-medium-gray">Commercial compatibility</p>
-                    </div>
-                </div>
-            </div>
-            <script>
-            (function initLicensingTileImmediately(){
-                try {
-                    const el = document.getElementById('licensing-status');
-                    if (!el) return;
-                    const repoId = {{ repository.id }};
-                    // Baseline (SBOM-based) status only; NO LLM call here
-                    fetch(`/repositories/api/${repoId}/licensing-analysis/`, { credentials: 'same-origin' })
-                        .then(r => r.ok ? r.json() : Promise.reject(r))
-                        .then(d => {
-                            if (!d || !d.success || !d.analysis) return;
-                            const a = d.analysis;
-                            if (!a.has_sbom) {
-                                el.textContent = 'No SBOM';
-                                el.className = 'text-2xl font-bold text-gray-400';
-                                return;
-                            }
-                            const hasWarnings = Array.isArray(a.warnings) && a.warnings.length > 0;
-                            const hasIncompat = Array.isArray(a.incompatible_components) && a.incompatible_components.length > 0;
-                            if (a.compatible === false || hasIncompat) {
-                                el.textContent = '❌ Not Compatible';
-                                el.className = 'text-2xl font-bold text-red-500';
-                            } else if (hasWarnings) {
-                                el.textContent = '⚠️ Caution';
-                                el.className = 'text-2xl font-bold text-yellow-500';
-                            } else {
-                                el.textContent = '✅ Compatible';
-                                el.className = 'text-2xl font-bold text-green-500';
-                            }
-                        })
-                        .catch(() => {/* keep default */});
-                } catch(e) { /* no-op */ }
-            })();
-            </script>
-            
 
-            
-            <!-- Code Quality Metrics (SonarCloud) -->
-            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
-                 role="button" tabindex="0" onclick="openSonarCloudAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openSonarCloudAnalysis(); }">
-                <div class="flex items-start">
-                    <div class="p-3 bg-orange-500 bg-opacity-10 rounded-xl mr-4">
-                        <svg class="w-8 h-8 text-orange-500" fill="currentColor" viewBox="0 0 24 24" role="img" xmlns="http://www.w3.org/2000/svg">
-                            <title>SonarCloud icon</title>
-                            <path d="M22.406 10.9a7.088 7.088 0 00-3.377-2.358v-.085c0-4.035-3.156-7.324-7.047-7.324-3.893 0-7.05 3.282-7.05 7.325v.1C2.081 9.492 0 12.268 0 15.542c0 4.035 3.159 7.325 7.05 7.325a6.907 6.907 0 004.952-2.108 6.885 6.885 0 004.947 2.108c3.884 0 7.051-3.282 7.051-7.325a7.572 7.572 0 00-1.594-4.643zM16.95 21.014c-2.903 0-5.267-2.456-5.267-5.474a.91.91 0 00-.89-.924.906.906 0 00-.892.925c0 1.368.367 2.651.994 3.748a5.156 5.156 0 01-3.845 1.733c-2.904 0-5.27-2.457-5.27-5.474 0-3.016 2.366-5.473 5.27-5.473.63 0 1.241.117 1.827.335.007 0 .013.007.02.007.203.071.489.21.578.287a.858.858 0 001.249-.1.942.942 0 00-.097-1.3c-.39-.342-.995-.575-1.144-.63a6.814 6.814 0 00-2.425-.443c-.113 0-.225 0-.338.007.12-2.916 2.433-5.247 5.27-5.247 2.903 0 5.267 2.456 5.267 5.474a5.569 5.569 0 01-2.215 4.463.948.948 0 00-.21 1.283c.171.25.45.39.727.39a.86.86 0 00.516-.172 7.381 7.381 0 002.709-4.02c2.035.785 3.449 2.829 3.449 5.139-.007 3.01-2.371 5.466-5.283 5.466z"/>
-                        </svg>
-                    </div>
-                    <div class="flex-1">
-                        <p class="text-medium-gray text-sm">Code Quality Metrics</p>
-                        
-                        {% if sonarcloud_metrics %}
-                        <div class="mt-3 space-y-2 text-xs">
-                            <div class="flex justify-between items-center">
-                                <span class="text-medium-gray">Maintainability</span>
-                                <span class="font-medium {% if sonarcloud_metrics.maintainability_rating == 'A' %}text-green-500{% elif sonarcloud_metrics.maintainability_rating == 'B' %}text-blue-500{% elif sonarcloud_metrics.maintainability_rating == 'C' %}text-yellow-500{% elif sonarcloud_metrics.maintainability_rating == 'D' %}text-orange-500{% elif sonarcloud_metrics.maintainability_rating == 'E' %}text-red-500{% else %}text-gray-400{% endif %}">
-                                    {{ sonarcloud_metrics.maintainability_rating|default:"N/A" }}
-                                </span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-medium-gray">Reliability</span>
-                                <span class="font-medium {% if sonarcloud_metrics.reliability_rating == 'A' %}text-green-500{% elif sonarcloud_metrics.reliability_rating == 'B' %}text-blue-500{% elif sonarcloud_metrics.reliability_rating == 'C' %}text-yellow-500{% elif sonarcloud_metrics.reliability_rating == 'D' %}text-orange-500{% elif sonarcloud_metrics.reliability_rating == 'E' %}text-red-500{% else %}text-gray-400{% endif %}">
-                                    {{ sonarcloud_metrics.reliability_rating|default:"N/A" }}
-                                </span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-medium-gray">Security</span>
-                                <span class="font-medium {% if sonarcloud_metrics.security_rating == 'A' %}text-green-500{% elif sonarcloud_metrics.security_rating == 'B' %}text-blue-500{% elif sonarcloud_metrics.security_rating == 'C' %}text-yellow-500{% elif sonarcloud_metrics.security_rating == 'D' %}text-orange-500{% elif sonarcloud_metrics.security_rating == 'E' %}text-red-500{% else %}text-gray-400{% endif %}">
-                                    {{ sonarcloud_metrics.security_rating|default:"N/A" }}
-                                </span>
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
 
-            <!-- Security Analysis (CodeQL) -->
-            <div class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200" 
-                 role="button" tabindex="0" onclick="openCodeQLAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openCodeQLAnalysis(); }">
-                <div class="flex items-start">
-                                   <div class="p-3 bg-red-500 bg-opacity-10 rounded-xl mr-4">
-                   <svg class="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-                       <path d="M435.209,96.685l-19.627-1.077c-53.229-2.957-99.37-23.39-126.611-56.099L255.999,0l-32.98,39.509
-		c-27.24,32.709-73.391,53.142-126.611,56.099l-40.497,2.24v187.094c0,26.61,8.059,51.698,20.878,74.642
-		c44.26,79.84,144.978,134.496,159.311,142.02L255.999,512l19.891-10.396c18.454-9.678,180.198-97.664,180.198-216.662V97.848
-		L435.209,96.685z M98.737,261.106c0-46.326,0-122.674,0-122.674c64.333-3.579,121.509-28.578,157.263-71.5v194.174h157.247v23.836
-		c0,96.501-157.247,178.668-157.247,178.668V261.106H98.737z"/>
-                   </svg>
-               </div>
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-dark-gray">Security Health Score</h3>
-                        <p class="text-sm text-medium-gray mt-1">CodeQL vulnerability analysis</p>
-                        
-                        {% if codeql_metrics %}
-                            {% if codeql_metrics.status == 'not_available' %}
-                                <div class="mt-3 text-xs">
-                                    <div class="flex items-center text-gray-500">
-                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
-                                        </svg>
-                                        <span>Not available</span>
-                                    </div>
-                                    <p class="text-xs text-gray-400 mt-1">CodeQL analysis not enabled for this repository</p>
-                                </div>
-                            {% else %}
-                                <div class="mt-3 space-y-2 text-xs">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-medium-gray">Security Health Score</span>
-                                        <span class="font-medium {% if codeql_metrics.shs_score >= 70 %}text-green-500{% elif codeql_metrics.shs_score >= 50 %}text-orange-500{% else %}text-red-500{% endif %}">
-                                            {{ codeql_metrics.shs_display }}
-                                        </span>
-                                    </div>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-medium-gray">Open Vulnerabilities</span>
-                                        <span class="font-medium {% if codeql_metrics.total_vulnerabilities == 0 %}text-green-500{% elif codeql_metrics.total_vulnerabilities < 5 %}text-yellow-500{% else %}text-red-500{% endif %}">
-                                            {{ codeql_metrics.total_vulnerabilities }}
-                                        </span>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% else %}
-                            <div class="mt-3 text-xs">
-                                <div class="flex items-center text-gray-500">
-                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                                        <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+
+        <!-- Commits Section -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-bold text-dark-gray mb-6">
+                <svg class="w-8 h-8 text-blue-500 inline mr-2" fill="currentColor" viewBox="0 0 512 512">
+                    <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
+                </svg>
+                Commits
+            </h2>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left side: 2x2 grid of tiles -->
+                <div class="lg:col-span-2">
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Total Commits -->
+                        <div class="bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors duration-200" role="button" tabindex="0" onclick="openCommitsList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openCommitsList(); }">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-blue-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
+                                        <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
                                     </svg>
-                                    <span>Loading...</span>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Total Commits</p>
+                                    <p class="text-xl font-bold text-blue-500">{{ overall_stats.total_commits|default:"0" }}</p>
                                 </div>
                             </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Frequency Metrics -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <h3 class="text-xl font-semibold text-dark-gray mb-6">⚡ Commit Frequency</h3>
-                <div class="space-y-4">
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">Recent Activity Score</span>
-                        <span class="font-medium">{{ commit_frequency.recent_activity_score }}/100</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">Consistency Score</span>
-                        <span class="font-medium">{{ commit_frequency.consistency_score }}/100</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">Overall Frequency Score</span>
-                        <span class="font-medium">{{ commit_frequency.overall_frequency_score }}/100</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">Commits Last 30 Days</span>
-                        <span class="font-medium">{{ commit_frequency.commits_last_30_days }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">Active Days</span>
-                        <span class="font-medium">{{ commit_frequency.active_days }}/{{ commit_frequency.total_days }}</span>
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <details class="bg-blue-50 rounded-lg p-4 border border-blue-200 cursor-pointer">
-                        <summary class="font-semibold text-blue-800 text-base">What do these metrics mean?</summary>
-                        <div class="mt-3 space-y-2 text-blue-900 text-sm">
-                            <div>
-                                <span class="font-bold">Recent Activity Score</span>:<br>
-                                <span>Percentage of recent activity. Calculated as <code>Commits Last 30 Days / Commits Last 90 Days × 100</code> (max 100).</span>
-                            </div>
-                            <div>
-                                <span class="font-bold">Consistency Score</span>:<br>
-                                <span>How regularly commits are made. Calculated as <code>Active Days / Total Days × 100</code> (max 100).</span>
-                            </div>
-                            <div>
-                                <span class="font-bold">Overall Frequency Score</span>:<br>
-                                <span>Weighted global score: <code>0.3 × Normalized Avg + 0.4 × Recent Activity Score + 0.3 × Consistency Score</code>.<br>Normalized Avg = <code>min(Average Commits per Day × 20, 100)</code>.</span>
-                            </div>
-                            <div>
-                                <span class="font-bold">Commits Last 30 Days</span>:<br>
-                                <span>Number of commits made in the last 30 days.</span>
-                            </div>
-                            <div>
-                                <span class="font-bold">Active Days</span>:<br>
-                                <span>Number of distinct days with at least one commit, over the repository's period. Displayed as <code>Active Days / Total Days</code>.</span>
+                        </div>
+                        
+                        <!-- Commit Frequency (tuile) -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-blue-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
+                                        <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Commit Frequency</p>
+                                    <p class="text-xl font-bold text-blue-500">
+                                        {% if commit_frequency and commit_frequency.avg_commits_per_day is not None %}
+                                            {{ commit_frequency.avg_commits_per_day }}/day
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </details>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <h3 class="text-xl font-semibold text-dark-gray mb-6">🚀 Release Frequency</h3>
-                <div class="space-y-4">
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">Releases per Month</span>
-                        <span class="font-medium">{{ release_frequency.releases_per_month }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">Releases per Week</span>
-                        <span class="font-medium">{{ release_frequency.releases_per_week }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">PR Cycle Time (median)</span>
-                        <span class="font-medium">{{ pr_cycle_time_median }}h</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">PR Cycle Time (avg)</span>
-                        <span class="font-medium">{{ pr_cycle_time_avg }}h</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-medium-gray">Total PRs Analyzed</span>
-                        <span class="font-medium">{{ pr_cycle_time_count }}</span>
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <details class="bg-blue-50 rounded-lg p-4 border border-blue-200 cursor-pointer">
-                        <summary class="font-semibold text-blue-800 text-base">What do these metrics mean?</summary>
-                        <div class="mt-3 space-y-2 text-blue-900 text-sm">
-                            <div>
-                                <span class="font-bold">Releases per Month</span>:<br>
-                                <span>Average number of releases per month over the selected period (usually 90 days).</span>
-                            </div>
-                            <div>
-                                <span class="font-bold">Releases per Week</span>:<br>
-                                <span>Average number of releases per week over the selected period.</span>
-                            </div>
-                            <div>
-                                <span class="font-bold">Total Releases</span>:<br>
-                                <span>Total number of releases published during the selected period.</span>
-                            </div>
-                            <div>
-                                <span class="font-bold">Period (days)</span>:<br>
-                                <span>The time window (in days) over which the release frequency is calculated (default: 90 days).</span>
-                            </div>
-                            <div>
-                                <span class="font-bold">PR Cycle Time (median)</span>:<br>
-                                <span>The median time (in hours) between the opening and merging/closing of pull requests during the selected period. Half of the PRs were merged/closed in less time, and half took longer.</span>
-                            </div>
-                            <div>
-                                <span class="font-bold">PR Cycle Time (avg)</span>:<br>
-                                <span>The average time (in hours) between the opening and merging/closing of pull requests during the selected period. This is the mean value for all PRs analyzed.</span>
+                        
+                        <!-- Commit Change Stats -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-blue-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 512 512">
+                                        <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Change Stats</p>
+                                    <div class="text-medium-gray text-xs">Lines: <span class="text-dark-gray font-semibold">{{ commit_change_stats.avg_total_changes }}</span></div>
+                                    <div class="text-medium-gray text-xs">Files: <span class="text-dark-gray font-semibold">{{ commit_change_stats.avg_files_changed }}</span></div>
+                                </div>
                             </div>
                         </div>
-                    </details>
-                </div>
-            </div>
-        </div>
-
-        <!-- Commit Type Distribution - Full Width -->
-        <div class="bg-white p-6 rounded-xl shadow-lg relative">
-            <h3 class="text-xl font-semibold text-dark-gray mb-4">🍩 Commit Type Distribution</h3>
-            {% if commit_types.counts %}
-            <div class="flex items-start gap-8">
-                <!-- Left side: Chart and Legend (50%) -->
-                <div class="w-1/2 flex items-start space-x-6">
-                    <div class="relative flex-1" style="min-height: 250px;">
-                        <canvas id="commitTypeDoughnut" class="w-full h-full"></canvas>
-                    </div>
-                    <div class="flex flex-col space-y-3 flex-shrink-0">
-                        {% for item in commit_type_legend %}
-                            <div class="flex items-center space-x-2">
-                                <span class="inline-block w-4 h-4 rounded-full" style="background-color: {{ item.color }};"></span>
-                                <span class="text-sm text-dark-gray font-medium">{{ item.label|title }} ({{ item.count }})</span>
+                        
+                        <!-- Lines Added -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-green-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Lines Added</p>
+                                    <p class="text-xl font-bold text-green-500">{{ overall_stats.total_additions|default:"0" }}</p>
+                                </div>
                             </div>
-                        {% endfor %}
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Right side: Indicators (50%) -->
-                <div class="w-1/2 flex flex-col space-y-4">
-                
-                <!-- Feature-to-Fix Ratio Block -->
-                <div class="p-4 rounded-xl shadow-sm bg-light-gray">
-                    <div class="flex items-center mb-2">
-                        <span class="text-lg font-semibold text-dark-gray mr-2">Feature-to-Fix Ratio</span>
-                        <span class="text-sm text-medium-gray">(Feature / Fix &gt; 1)</span>
+                <!-- Right side: Commit Frequency detailed block -->
+                <div class="lg:col-span-1">
+                    <div class="bg-gray-50 p-4 rounded-lg h-full">
+                        <h3 class="text-lg font-semibold text-dark-gray mb-4">⚡ Commit Frequency</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-medium-gray text-sm">Recent Activity</span>
+                                <span class="font-medium text-sm">{{ commit_frequency.recent_activity_score }}/100</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-medium-gray text-sm">Consistency</span>
+                                <span class="font-medium text-sm">{{ commit_frequency.consistency_score }}/100</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-medium-gray text-sm">Overall Score</span>
+                                <span class="font-medium text-sm">{{ commit_frequency.overall_frequency_score }}/100</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-medium-gray text-sm">Last 30 Days</span>
+                                <span class="font-medium text-sm">{{ commit_frequency.commits_last_30_days }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-medium-gray text-sm">Active Days</span>
+                                <span class="font-medium text-sm">{{ commit_frequency.active_days }}/{{ commit_frequency.total_days }}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex items-center mb-1">
-                        <span class="text-2xl font-bold mr-3 {% if commit_types.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
-                            {{ commit_types.feature_fix_ratio }}
-                        </span>
-                        <span class="ml-2 text-lg font-semibold {% if commit_types.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
-                            {% if commit_types.feature_fix_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
-                        </span>
-                    </div>
-                    <div class="text-sm text-dark-gray mt-1">{{ commit_types.feature_fix_message }}</div>
-                </div>
-                
-                <!-- Test Coverage Ratio Block -->
-                <div class="p-4 rounded-xl shadow-sm bg-light-gray">
-                    <div class="flex items-center mb-2">
-                        <span class="text-lg font-semibold text-dark-gray mr-2">Test Coverage Ratio</span>
-                        <span class="text-sm text-medium-gray">(Test / Feature ≥ 0.3)</span>
-                    </div>
-                    <div class="flex items-center mb-1">
-                        <span class="text-2xl font-bold mr-3 {% if commit_types.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
-                            {{ commit_types.test_feature_ratio }}
-                        </span>
-                        <span class="ml-2 text-lg font-semibold {% if commit_types.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
-                            {% if commit_types.test_feature_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
-                        </span>
-                    </div>
-                    <div class="text-sm text-dark-gray mt-1">{{ commit_types.test_feature_message }}</div>
-                </div>
-                
-                <!-- Focus Ratio Block -->
-                <div class="p-4 rounded-xl shadow-sm bg-light-gray">
-                    <div class="flex items-center mb-2">
-                        <span class="text-lg font-semibold text-dark-gray mr-2">Focus Ratio</span>
-                        <span class="text-sm text-medium-gray">(Chore + Docs &lt; 30%)</span>
-                    </div>
-                    <div class="flex items-center mb-1">
-                        <span class="text-2xl font-bold mr-3 {% if commit_types.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
-                            {{ commit_types.chore_docs_ratio|floatformat:2 }}
-                        </span>
-                        <span class="ml-2 text-lg font-semibold {% if commit_types.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
-                            {% if commit_types.chore_docs_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
-                        </span>
-                    </div>
-                    <div class="text-sm text-dark-gray mt-1">{{ commit_types.chore_docs_message }}</div>
-                </div>
-                {% else %}
-                <p class="text-center text-medium-gray py-8">No commit types to display</p>
-                {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- PR Health Metrics -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="text-xl font-semibold text-dark-gray mb-6">🔍 Pull Request Health</h3>
+
+
+        <!-- Pull Request Health Section -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-bold text-dark-gray mb-6">
+                <svg class="w-8 h-8 text-purple-500 inline mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Pull Request Health
+            </h2>
             {% if pr_health_metrics.total_prs > 0 %}
             <!-- Summary Cards -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                 <div class="text-center p-4 bg-light-gray rounded-xl">
-                    <p class="text-2xl font-bold text-primary-green">{{ pr_health_metrics.total_prs }}</p>
+                    <p class="text-2xl font-bold text-purple-500">{{ pr_health_metrics.total_prs }}</p>
                     <p class="text-sm text-medium-gray">Total PRs</p>
                 </div>
                 <div class="text-center p-4 bg-light-gray rounded-xl">
-                    <p class="text-2xl font-bold text-blue-500">{{ pr_health_metrics.merged_prs }}</p>
+                    <p class="text-2xl font-bold text-purple-500">{{ pr_health_metrics.merged_prs }}</p>
                     <p class="text-sm text-medium-gray">Merged ({{ pr_health_metrics.merged_prs_percentage }}%)</p>
                 </div>
                 <div class="text-center p-4 bg-light-gray rounded-xl">
-                    <p class="text-2xl font-bold text-yellow-500">{{ pr_health_metrics.self_merged_prs }}</p>
+                    <p class="text-2xl font-bold text-purple-500">{{ pr_health_metrics.self_merged_prs }}</p>
                     <p class="text-sm text-medium-gray">Self-merged ({{ pr_health_metrics.self_merged_rate }}%)</p>
+                </div>
+                <div class="p-4 bg-light-gray rounded-xl">
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Left side: Main value and label -->
+                        <div class="text-center">
+                            <p class="text-2xl font-bold text-purple-500">{{ pr_cycle_time_median|floatformat:1 }}h</p>
+                            <p class="text-sm text-medium-gray">PR Cycle Time</p>
+                        </div>
+                        <!-- Right side: min and max stacked -->
+                        <div class="text-center">
+                            <p class="text-xs text-medium-gray">min: {{ pr_cycle_time_min|floatformat:1 }}h</p>
+                            <p class="text-xs text-medium-gray">max: {{ pr_cycle_time_max|floatformat:1 }}h</p>
+                        </div>
+                    </div>
                 </div>
                 <div class="text-center p-4 bg-light-gray rounded-xl">
                     <p class="text-2xl font-bold text-purple-500">{{ pr_health_metrics.avg_merge_time_hours }}h</p>
-                    <p class="text-sm text-medium-gray">Avg Merge Time</p>
+                    <p class="text-sm text-medium-gray">Avg Cycle Time</p>
                 </div>
             </div>
 
@@ -684,8 +310,360 @@
             {% endif %}
         </div>
 
+        <!-- Releases & Deployments Section -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-bold text-dark-gray mb-6">
+                <svg class="w-8 h-8 text-yellow-500 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                Releases & Deployments
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Release Frequency -->
+                <div class="bg-gray-50 p-4 rounded-lg cursor-pointer hover:shadow-md transition-shadow duration-200" 
+                     role="button" tabindex="0" onclick="openReleasesList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openReleasesList(); }">
+                    <h3 class="text-lg font-semibold text-dark-gray mb-4">
+                        <span class="inline-flex items-center justify-center p-2 bg-yellow-500 bg-opacity-10 rounded-xl mr-2">
+                            <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </span>
+                        Release Frequency
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-medium-gray text-sm">Releases per Month</span>
+                            <span class="font-medium text-sm">
+                                {% if release_frequency and release_frequency.releases_per_month is not None %}
+                                    {{ release_frequency.releases_per_month }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-medium-gray text-sm">Releases per Week</span>
+                            <span class="font-medium text-sm">
+                                {% if release_frequency and release_frequency.releases_per_week is not None %}
+                                    {{ release_frequency.releases_per_week }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-medium-gray text-sm">Total Releases</span>
+                            <span class="font-medium text-sm">{{ total_releases|default:"0" }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Deployments -->
+                <div class="bg-gray-50 p-4 rounded-lg cursor-pointer hover:shadow-md transition-shadow duration-200" 
+                     role="button" tabindex="0" onclick="openDeploymentsList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openDeploymentsList(); }">
+                    <h3 class="text-lg font-semibold text-dark-gray mb-4">
+                        <span class="inline-flex items-center justify-center p-2 bg-pink-500 bg-opacity-10 rounded-xl mr-2">
+                            <svg class="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                            </svg>
+                        </span>
+                        Deployments
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-medium-gray text-sm">Total Deployments</span>
+                            <span class="font-medium text-sm">{{ total_deployments }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-medium-gray text-sm">Deployments per Week</span>
+                            <span class="font-medium text-sm">
+                                {% if deployment_frequency and deployment_frequency.deployments_per_week is not None %}
+                                    {{ deployment_frequency.deployments_per_week }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-medium-gray text-sm">Last Deployment</span>
+                            <span class="font-medium text-sm">
+                                {% if last_deployment_date %}
+                                    {{ last_deployment_date|date:"M d, Y" }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quality & Compliance Section -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-bold text-dark-gray mb-6">
+                <svg class="w-8 h-8 text-blue-500 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Quality & Compliance
+            </h2>
+            
+            <!-- First Row: Code Quality, Security Health Score, Licensing -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- Code Quality Metrics -->
+                <div class="bg-gray-50 p-4 rounded-lg cursor-pointer hover:shadow-md transition-shadow duration-200" 
+                     role="button" tabindex="0" onclick="openSonarCloudAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openSonarCloudAnalysis(); }">
+                    <div class="flex items-start">
+                        <div class="p-2 bg-orange-500 bg-opacity-10 rounded-lg mr-3">
+                            <svg class="w-6 h-6 text-orange-500" fill="currentColor" viewBox="0 0 24 24" role="img" xmlns="http://www.w3.org/2000/svg">
+                                <title>SonarCloud icon</title>
+                                <path d="M22.406 10.9a7.088 7.088 0 00-3.377-2.358v-.085c0-4.035-3.156-7.324-7.047-7.324-3.893 0-7.05 3.282-7.05 7.325v.1C2.081 9.492 0 12.268 0 15.542c0 4.035 3.159 7.325 7.05 7.325a6.907 6.907 0 004.952-2.108 6.885 6.885 0 004.947 2.108c3.884 0 7.051-3.282 7.051-7.325a7.572 7.572 0 00-1.594-4.643zM16.95 21.014c-2.903 0-5.267-2.456-5.267-5.474a.91.91 0 00-.89-.924.906.906 0 00-.892.925c0 1.368.367 2.651.994 3.748a5.156 5.156 0 01-3.845 1.733c-2.904 0-5.27-2.457-5.27-5.474 0-3.016 2.366-5.473 5.27-5.473.63 0 1.241.117 1.827.335.007 0 .013.007.02.007.203.071.489.21.578.287a.858.858 0 001.249-.1.942.942 0 00-.097-1.3c-.39-.342-.995-.575-1.144-.63a6.814 6.814 0 00-2.425-.443c-.113 0-.225 0-.338.007.12-2.916 2.433-5.247 5.27-5.247 2.903 0 5.267 2.456 5.267 5.474a5.569 5.569 0 01-2.215 4.463.948.948 0 00-.21 1.283c.171.25.45.39.727.39a.86.86 0 00.516-.172 7.381 7.381 0 002.709-4.02c2.035.785 3.449 2.829 3.449 5.139-.007 3.01-2.371 5.466-5.283 5.466z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-dark-gray mb-2">Code Quality Metrics</h3>
+                            {% if sonarcloud_metrics %}
+                            <div class="space-y-1 text-sm">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-medium-gray">Maintainability</span>
+                                    <span class="font-medium {% if sonarcloud_metrics.maintainability_rating == 'A' %}text-green-500{% elif sonarcloud_metrics.maintainability_rating == 'B' %}text-blue-500{% elif sonarcloud_metrics.maintainability_rating == 'C' %}text-yellow-500{% elif sonarcloud_metrics.maintainability_rating == 'D' %}text-orange-500{% elif sonarcloud_metrics.maintainability_rating == 'E' %}text-red-500{% else %}text-gray-400{% endif %}">
+                                        {{ sonarcloud_metrics.maintainability_rating|default:"N/A" }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-medium-gray">Reliability</span>
+                                    <span class="font-medium {% if sonarcloud_metrics.reliability_rating == 'A' %}text-green-500{% elif sonarcloud_metrics.reliability_rating == 'B' %}text-blue-500{% elif sonarcloud_metrics.reliability_rating == 'C' %}text-yellow-500{% elif sonarcloud_metrics.reliability_rating == 'D' %}text-orange-500{% elif sonarcloud_metrics.reliability_rating == 'E' %}text-red-500{% else %}text-gray-400{% endif %}">
+                                        {{ sonarcloud_metrics.reliability_rating|default:"N/A" }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-medium-gray">Security</span>
+                                    <span class="font-medium {% if sonarcloud_metrics.security_rating == 'A' %}text-green-500{% elif sonarcloud_metrics.security_rating == 'B' %}text-blue-500{% elif sonarcloud_metrics.security_rating == 'C' %}text-yellow-500{% elif sonarcloud_metrics.security_rating == 'D' %}text-orange-500{% elif sonarcloud_metrics.security_rating == 'E' %}text-red-500{% else %}text-gray-400{% endif %}">
+                                        {{ sonarcloud_metrics.security_rating|default:"N/A" }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% else %}
+                            <p class="text-sm text-medium-gray">No SonarCloud data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Health Score -->
+                <div class="bg-gray-50 p-4 rounded-lg cursor-pointer hover:shadow-md transition-shadow duration-200" 
+                     role="button" tabindex="0" onclick="openCodeQLAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openCodeQLAnalysis(); }">
+                    <div class="flex items-start">
+                        <div class="p-2 bg-red-500 bg-opacity-10 rounded-lg mr-3">
+                            <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M435.209,96.685l-19.627-1.077c-53.229-2.957-99.37-23.39-126.611-56.099L255.999,0l-32.98,39.509
+		c-27.24,32.709-73.391,53.142-126.611,56.099l-40.497,2.24v187.094c0,26.61,8.059,51.698,20.878,74.642
+		c44.26,79.84,144.978,134.496,159.311,142.02L255.999,512l19.891-10.396c18.454-9.678,180.198-97.664,180.198-216.662V97.848
+		L435.209,96.685z M98.737,261.106c0-46.326,0-122.674,0-122.674c64.333-3.579,121.509-28.578,157.263-71.5v194.174h157.247v23.836
+		c0,96.501-157.247,178.668-157.247,178.668V261.106H98.737z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-dark-gray mb-2">Security Health Score</h3>
+                            <p class="text-sm text-medium-gray mb-2">CodeQL vulnerability analysis</p>
+                            
+                            {% if codeql_metrics %}
+                                {% if codeql_metrics.status == 'not_available' %}
+                                    <div class="text-sm">
+                                        <div class="flex items-center text-gray-500 mb-1">
+                                            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span>Not available</span>
+                                        </div>
+                                        <p class="text-xs text-gray-400">CodeQL analysis not enabled</p>
+                                    </div>
+                                {% else %}
+                                    <div class="space-y-1 text-sm">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-medium-gray">Security Health Score</span>
+                                            <span class="font-medium {% if codeql_metrics.shs_score >= 70 %}text-green-500{% elif codeql_metrics.shs_score >= 50 %}text-orange-500{% else %}text-red-500{% endif %}">
+                                                {{ codeql_metrics.shs_display }}
+                                            </span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-medium-gray">Open Vulnerabilities</span>
+                                            <span class="font-medium {% if codeql_metrics.total_vulnerabilities == 0 %}text-green-500{% elif codeql_metrics.total_vulnerabilities < 5 %}text-yellow-500{% else %}text-red-500{% endif %}">
+                                                {{ codeql_metrics.total_vulnerabilities }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% else %}
+                                <div class="text-sm">
+                                    <div class="flex items-center text-gray-500">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <span>Loading...</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Licensing -->
+                <div class="bg-gray-50 p-4 rounded-lg cursor-pointer hover:shadow-md transition-shadow duration-200" 
+                     role="button" tabindex="0" onclick="openLicensingAnalysis()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openLicensingAnalysis(); }">
+                    <div class="flex items-start">
+                        <div class="p-2 bg-green-500 bg-opacity-10 rounded-lg mr-3">
+                            <svg class="w-6 h-6 text-green-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path opacity="0.1" d="M12 17H7C5.89543 17 5 16.1046 5 15V5C5 3.89543 5.89543 3 7 3H16C17.1046 3 18 3.89543 18 5V19C18 20.1046 17.1046 21 16 21C14.8954 21 14 20.1046 14 19C14 17.8954 13.1046 17 12 17Z" fill="currentColor"/>
+                                <path d="M19 3H9V3C7.11438 3 6.17157 3 5.58579 3.58579C5 4.17157 5 5.11438 5 7V10.5V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M14 17V19C14 20.1046 14.8954 21 16 21V21C17.1046 21 18 20.1046 18 19V9V4.5C18 3.67157 18.6716 3 19.5 3V3C20.3284 3 21 3.67157 21 4.5V4.5C21 5.32843 20.3284 6 19.5 6H18.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M16 21H5C3.89543 21 3 20.1046 3 19V19C3 17.8954 3.89543 17 5 17H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M9 7H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M9 11H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-dark-gray mb-2">Licensing</h3>
+                            <p class="text-2xl font-bold text-green-500 mb-1" id="licensing-status">Analyzing...</p>
+                            <p class="text-xs text-medium-gray">Commercial compatibility</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Second Row: Commit Type Distribution -->
+            <div class="bg-gray-50 p-6 rounded-lg">
+                <h3 class="text-xl font-semibold text-dark-gray mb-4">
+                    <span class="inline-flex items-center justify-center p-2 bg-blue-500 bg-opacity-10 rounded-xl mr-2">
+                        <svg class="w-5 h-5 text-blue-500" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M14 13v-1c0-0.2 0-4.1-2.8-5.4-2.2-1-2.2-3.5-2.2-3.6v-3h-2v3c0 0.1 0 2.6-2.2 3.6-2.8 1.3-2.8 5.2-2.8 5.4v1h-2l3 3 3-3h-2v-1c0 0 0-2.8 1.7-3.6 1.1-0.5 1.8-1.3 2.3-2 0.5 0.8 1.2 1.5 2.3 2 1.7 0.8 1.7 3.6 1.7 3.6v1h-2l3 3 3-3h-2z"/>
+                        </svg>
+                    </span>
+                    Commit Type Distribution
+                </h3>
+                {% if commit_types.counts %}
+                <div class="flex items-start gap-8">
+                    <!-- Left side: Chart and Legend (40%) -->
+                    <div class="w-2/5 flex items-start space-x-6">
+                        <div class="relative flex-1" style="min-height: 126px;">
+                            <canvas id="commitTypeDoughnut" class="w-full h-full"></canvas>
+                        </div>
+                        <div class="flex flex-col space-y-3 flex-shrink-0">
+                            {% for item in commit_type_legend %}
+                                <div class="flex items-center space-x-2">
+                                    <span class="inline-block w-4 h-4 rounded-full" style="background-color: {{ item.color }};"></span>
+                                    <span class="text-sm text-dark-gray font-medium">{{ item.label|title }} ({{ item.count }})</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Right side: Indicators (60%) -->
+                    <div class="w-3/5 flex flex-col space-y-4">
+                    
+                    <!-- Feature-to-Fix Ratio Block -->
+                    <div class="p-4 rounded-xl shadow-sm bg-white">
+                        <div class="flex items-center mb-2">
+                            <span class="text-lg font-semibold text-dark-gray mr-2">Feature-to-Fix Ratio</span>
+                            <span class="text-sm text-medium-gray">(Feature / Fix &gt; 1)</span>
+                        </div>
+                        <div class="flex items-center mb-1">
+                            <span class="text-2xl font-bold mr-3 {% if commit_types.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                {{ commit_types.feature_fix_ratio }}
+                            </span>
+                            <span class="ml-2 text-lg font-semibold {% if commit_types.feature_fix_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                {% if commit_types.feature_fix_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                            </span>
+                        </div>
+                        <div class="text-sm text-medium-gray mt-1">{{ commit_types.feature_fix_message }}</div>
+                    </div>
+                    
+                    <!-- Test Coverage Ratio Block -->
+                    <div class="p-4 rounded-xl shadow-sm bg-white">
+                        <div class="flex items-center mb-2">
+                            <span class="text-lg font-semibold text-dark-gray mr-2">Test Coverage Ratio</span>
+                            <span class="text-sm text-medium-gray">(Test / Feature ≥ 0.3)</span>
+                        </div>
+                        <div class="flex items-center mb-1">
+                            <span class="text-2xl font-bold mr-3 {% if commit_types.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                {{ commit_types.test_feature_ratio }}
+                            </span>
+                            <span class="ml-2 text-lg font-semibold {% if commit_types.test_feature_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                {% if commit_types.test_feature_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                            </span>
+                        </div>
+                        <div class="text-sm text-medium-gray mt-1">{{ commit_types.test_feature_message }}</div>
+                    </div>
+                    
+                    <!-- Focus Ratio Block -->
+                    <div class="p-4 rounded-xl shadow-sm bg-white">
+                        <div class="flex items-center mb-2">
+                            <span class="text-lg font-semibold text-dark-gray mr-2">Focus Ratio</span>
+                            <span class="text-sm text-medium-gray">(Chore + Docs &lt; 30%)</span>
+                        </div>
+                        <div class="flex items-center mb-1">
+                            <span class="text-2xl font-bold mr-3 {% if commit_types.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                {{ commit_types.chore_docs_ratio|floatformat:2 }}
+                            </span>
+                            <span class="ml-2 text-lg font-semibold {% if commit_types.chore_docs_status == 'good' %}text-green-600{% else %}text-red-600{% endif %}">
+                                {% if commit_types.chore_docs_status == 'good' %}🟢 Good Ratio{% else %}🔴 Poor Ratio{% endif %}
+                            </span>
+                        </div>
+                        <div class="text-sm text-medium-gray mt-1">{{ commit_types.chore_docs_message }}</div>
+                    </div>
+                    {% else %}
+                    <p class="text-center text-medium-gray py-8">No commit types to display</p>
+                    {% endif %}
+                    </div>
+                </div>
+                </div>
+            </div>
+            
+            <!-- Licensing Script -->
+            <script>
+            (function initLicensingTileImmediately(){
+                try {
+                    const el = document.getElementById('licensing-status');
+                    if (!el) return;
+                    const repoId = {{ repository.id }};
+                    // Baseline (SBOM-based) status only; NO LLM call here
+                    fetch(`/repositories/api/${repoId}/licensing-analysis/`, { credentials: 'same-origin' })
+                        .then(r => r.ok ? r.json() : Promise.reject(r))
+                        .then(d => {
+                            if (!d || !d.success || !d.analysis) return;
+                            const a = d.analysis;
+                            if (!a.has_sbom) {
+                                el.textContent = 'No SBOM';
+                                el.className = 'text-2xl font-bold text-gray-400 mb-1';
+                                return;
+                            }
+                            const hasWarnings = Array.isArray(a.warnings) && a.warnings.length > 0;
+                            const hasIncompat = Array.isArray(a.incompatible_components) && a.incompatible_components.length > 0;
+                            if (a.compatible === false || hasIncompat) {
+                                el.textContent = '❌ Not Compatible';
+                                el.className = 'text-2xl font-bold text-red-500 mb-1';
+                            } else if (hasWarnings) {
+                                el.textContent = '⚠️ Caution';
+                                el.className = 'text-2xl font-bold text-yellow-500 mb-1';
+                            } else {
+                                el.textContent = '✅ Compatible';
+                                el.className = 'text-2xl font-bold text-green-500 mb-1';
+                            }
+                        })
+                        .catch(() => {/* keep default */});
+                } catch(e) { /* no-op */ }
+            })();
+            </script>
+        </div>
+
+        <!-- Spacing between sections -->
+        <div class="mb-8"></div>
+
         <!-- Top Contributors -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
             <h3 class="text-xl font-semibold text-dark-gray mb-6">🏆 Top 10 Contributors by Net Lines</h3>
             {% if top_contributors %}
             <div class="overflow-x-auto">
@@ -764,7 +742,7 @@
         </div>
 
         <!-- Commit Activity Bubble Chart -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
             <h3 class="text-xl font-semibold text-dark-gray mb-6">🕐 Commit Activity by Hour (Last 30 Days)</h3>
             {% if activity_heatmap.total_commits > 0 %}
             <div class="relative" style="height: 500px;">
@@ -848,9 +826,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const doughnutCtx = document.getElementById('commitTypeDoughnut');
     if (doughnutCtx) {
         new Chart(doughnutCtx, {
-            type: 'doughnut',
+            type: 'pie',
             data: commitTypeData,
             options: {
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false }
                 }

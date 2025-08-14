@@ -196,6 +196,13 @@
                                 N/A
                             {% endif %}
                         </p>
+                        <p class="text-xs text-medium-gray">
+                            {% if release_frequency and release_frequency.releases_per_week is not None %}
+                                {{ release_frequency.releases_per_week }}/week
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -449,7 +456,7 @@
                 </div>
                 <div class="text-center p-4 bg-light-gray rounded-xl">
                     <p class="text-2xl font-bold text-purple-500">{{ pr_health_metrics.avg_merge_time_hours|default:"0" }}h</p>
-                    <p class="text-sm text-medium-gray">Avg Merge Time</p>
+                    <p class="text-sm text-medium-gray">Avg Cycle Time</p>
                 </div>
             </div>
 

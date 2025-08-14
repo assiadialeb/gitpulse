@@ -246,6 +246,8 @@ def repository_detail(request, repo_id):
         # Calculate PR cycle time statistics for template
         pr_cycle_time_median = pr_cycle_time.get('median_cycle_time_hours', 0)
         pr_cycle_time_avg = pr_cycle_time.get('avg_cycle_time_hours', 0)
+        pr_cycle_time_min = pr_cycle_time.get('min_cycle_time_hours', 0)
+        pr_cycle_time_max = pr_cycle_time.get('max_cycle_time_hours', 0)
         pr_cycle_time_count = pr_cycle_time.get('total_prs', 0)
         
         # Prepare chart data for doughnut chart (like applications)
@@ -351,6 +353,8 @@ def repository_detail(request, repo_id):
             'total_deployments': total_deployments,
             'pr_cycle_time_median': pr_cycle_time_median,
             'pr_cycle_time_avg': pr_cycle_time_avg,
+            'pr_cycle_time_min': pr_cycle_time_min,
+            'pr_cycle_time_max': pr_cycle_time_max,
             'pr_cycle_time_count': pr_cycle_time_count,
             'commit_quality': commit_quality,
             'commit_types': commit_types,
@@ -386,6 +390,8 @@ def repository_detail(request, repo_id):
             'total_releases': 0,
             'pr_cycle_time_median': 0,
             'pr_cycle_time_avg': 0,
+            'pr_cycle_time_min': 0,
+            'pr_cycle_time_max': 0,
             'pr_cycle_time_count': 0,
             'commit_quality': {'total_commits': 0, 'explicit_ratio': 0, 'generic_ratio': 0},
             'commit_types': {'counts': {}},
