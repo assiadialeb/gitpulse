@@ -201,9 +201,6 @@
                                             {% endif %}">
                                             {{ vuln.severity|title }}
                                         </div>
-                                        {% if vuln.confidence %}
-                                            <div class="text-xs text-gray-500">{{ vuln.confidence|title }} confidence</div>
-                                        {% endif %}
                                     </td>
                                     <td class="py-3 px-4">
                                         {% if vuln.file_path %}
@@ -263,12 +260,8 @@
                         <span><strong>High severity issues detected.</strong> Review and fix high-priority vulnerabilities to improve security posture.</span>
                     </div>
                 {% endif %}
+
                 <div class="flex items-start">
-                    <span class="text-blue-500 font-bold mr-2">💡</span>
-                    <span>Regular security scans help maintain code quality. Consider setting up automated CodeQL workflows.</span>
-                </div>
-                <div class="flex items-start">
-                    <span class="text-green-500 font-bold mr-2">✅</span>
                     <span>Keep dependencies updated and follow secure coding practices to prevent future vulnerabilities.</span>
                 </div>
             </div>

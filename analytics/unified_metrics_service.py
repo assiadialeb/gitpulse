@@ -664,6 +664,15 @@ class UnifiedMetricsService:
             'period_days': period_days
         }
     
+    def get_last_deployment_date(self):
+        """Get the date of the most recent deployment"""
+        if self.entity_type == 'developer':
+            return None  # Developers don't own deployments
+        
+        # Get the most recent deployment
+        latest_deployment = self.deployments.order_by('-created_at').first()
+        return latest_deployment.created_at if latest_deployment else None
+    
     # Comprehensive metrics getter
     def get_all_metrics(self) -> Dict:
         """Get all metrics for the entity"""
@@ -707,6 +716,7 @@ class UnifiedMetricsService:
                 'pr_health_metrics': self.get_pr_health_metrics(),
                 'total_deployments': self.get_total_deployments(),
                 'deployment_frequency': self.get_deployment_frequency(),
+                'last_deployment_date': self.get_last_deployment_date(),
             })
         
         # Ajout des stats de changements de commit

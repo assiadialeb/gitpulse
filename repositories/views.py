@@ -236,6 +236,7 @@ def repository_detail(request, repo_id):
         total_releases = all_metrics['total_releases']
         deployment_frequency = all_metrics['deployment_frequency']
         total_deployments = all_metrics['total_deployments']
+        last_deployment_date = all_metrics.get('last_deployment_date')
         pr_cycle_time = all_metrics['pr_cycle_time']
         commit_quality = all_metrics['commit_quality']
         commit_types = all_metrics['commit_type_distribution']
@@ -351,6 +352,7 @@ def repository_detail(request, repo_id):
             'total_releases': total_releases,
             'deployment_frequency': deployment_frequency,
             'total_deployments': total_deployments,
+            'last_deployment_date': last_deployment_date,
             'pr_cycle_time_median': pr_cycle_time_median,
             'pr_cycle_time_avg': pr_cycle_time_avg,
             'pr_cycle_time_min': pr_cycle_time_min,
@@ -388,6 +390,9 @@ def repository_detail(request, repo_id):
             'commit_frequency': {'avg_commits_per_day': 0, 'recent_activity_score': 0, 'consistency_score': 0, 'overall_frequency_score': 0, 'commits_last_30_days': 0, 'commits_last_90_days': 0, 'days_since_last_commit': None, 'active_days': 0, 'total_days': 0},
             'release_frequency': {'releases_per_month': 0, 'releases_per_week': 0, 'total_releases': 0, 'period_days': 90},
             'total_releases': 0,
+            'deployment_frequency': {'total_deployments': 0, 'deployments_per_week': 0, 'period_days': 90},
+            'total_deployments': 0,
+            'last_deployment_date': None,
             'pr_cycle_time_median': 0,
             'pr_cycle_time_avg': 0,
             'pr_cycle_time_min': 0,
