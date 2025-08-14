@@ -597,7 +597,7 @@ class UnifiedMetricsService:
                 'x': days_ago,
                 'y': hour,
                 'r': min(data['commits'] * 3, 20),
-                'commits': data['commits']
+                'commits': int(data['commits'])
             })
             max_commits = max(max_commits, data['commits'])
         

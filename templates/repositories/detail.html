@@ -878,7 +878,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                const commits = context.raw.r / 2;
+                                const commits = Math.round(context.raw.commits);
                                 return `${commits} commits`;
                             }
                         }
