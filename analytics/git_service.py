@@ -48,7 +48,7 @@ class GitService:
                 self._clone_locks[clone_key] = threading.Lock()
             return self._clone_locks[clone_key]
     
-    def clone_repository(self, repo_url: str, repo_full_name: str, github_token: str = None) -> str:
+    def clone_repository(self, repo_url: str, repo_full_name: str, github_token: str = None, default_branch: str = None) -> str:
         """
         Clone a repository to a temporary directory with concurrency protection
         
@@ -56,6 +56,7 @@ class GitService:
             repo_url: Git repository URL (HTTPS or SSH)
             repo_full_name: Repository name in format "owner/repo"
             github_token: GitHub token for authentication (optional)
+            default_branch: Default branch to clone (optional, will use repository default if not specified)
             
         Returns:
             Path to cloned repository
@@ -124,14 +125,31 @@ class GitService:
                         shutil.rmtree(repo_dir)
                     
                     # Clone with multiple strategies for robustness
-                    clone_strategies = [
-                        # Strategy 1: Shallow clone without LFS (fastest, most reliable)
+                    clone_strategies = []
+                    
+                    if default_branch:
+                        # Strategy 1: Clone specific default branch (most reliable for KLOC)
+                        clone_strategies.append(
+                            self._build_git_command('clone', clone_url, repo_dir, 
+                                                  extra=['--branch', default_branch, '--depth=1', '--quiet'], 
+                                                  disable_lfs=True)
+                        )
+                        # Strategy 2: Clone specific default branch without depth limit
+                        clone_strategies.append(
+                            self._build_git_command('clone', clone_url, repo_dir, 
+                                                  extra=['--branch', default_branch, '--quiet'], 
+                                                  disable_lfs=True)
+                        )
+                    
+                    # Fallback strategies (original ones)
+                    clone_strategies.extend([
+                        # Strategy 3: Shallow clone without LFS (fastest, most reliable)
                         self._build_git_command('clone', clone_url, repo_dir, extra=['--depth=1', '--no-single-branch', '--quiet'], disable_lfs=True),
-                        # Strategy 2: Full clone without LFS (if shallow fails)
+                        # Strategy 4: Full clone without LFS (if shallow fails)
                         self._build_git_command('clone', clone_url, repo_dir, extra=['--quiet'], disable_lfs=True),
-                        # Strategy 3: Bare clone (minimal, no working directory)
+                        # Strategy 5: Bare clone (minimal, no working directory)
                         self._build_git_command('clone', clone_url, repo_dir, extra=['--bare', '--quiet'], disable_lfs=True),
-                    ]
+                    ])
                     
                     result = None
                     strategy_used = None

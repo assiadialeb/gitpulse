@@ -326,15 +326,29 @@ class IntelligentIndexingService:
             return result
             
         except Exception as e:
-            logger.error(f"Error during batch indexing for {self.repository.full_name} - {self.entity_type}: {str(e)}")
+            error_msg = str(e)
+            logger.error(f"Error during batch indexing for {self.repository.full_name} - {self.entity_type}: {error_msg}")
+            
+            # Handle specific error types intelligently
+            if self._should_retry_error(error_msg):
+                if self.state.retry_count < self.state.max_retries:
+                    logger.warning(f"Retryable error for {self.repository.full_name} - {self.entity_type}, retry {self.state.retry_count + 1}/{self.state.max_retries}")
+                    self.state.status = 'pending'  # Allow retry
+                else:
+                    logger.error(f"Max retries exceeded for {self.repository.full_name} - {self.entity_type}")
+                    self.state.status = 'error'
+            else:
+                # Non-retryable error, mark as error
+                self.state.status = 'error'
             
             # Update state with error
-            self.state.status = 'error'
-            self.state.error_message = str(e)
+            self.state.error_message = error_msg
             self.state.updated_at = timezone.now()
             self.state.save()
             
-            raise
+            # Don't raise for retryable errors, let the task system handle retries
+            if not self._should_retry_error(error_msg):
+                raise
     
     def reset_indexing_state(self):
         """Reset the indexing state (useful for debugging or re-indexing from scratch)"""
@@ -359,7 +373,65 @@ class IntelligentIndexingService:
             'last_run_at': self.state.last_run_at.isoformat() if self.state.last_run_at else None,
             'retry_count': self.state.retry_count,
             'error_message': self.state.error_message
-        } 
+        }
+    
+    def _should_retry_error(self, error_msg: str) -> bool:
+        """
+        Determine if an error should be retried
+        
+        Args:
+            error_msg: Error message to analyze
+            
+        Returns:
+            True if error should be retried, False otherwise
+        """
+        error_lower = error_msg.lower()
+        
+        # Retryable errors
+        retryable_patterns = [
+            'rate limit',
+            '429',
+            'timeout',
+            'connection',
+            'network',
+            'temporary',
+            'server error',
+            '500',
+            '502',
+            '503',
+            '504',
+            '409 conflict',  # GitHub API conflict, often temporary
+            'too many requests',
+            'quota exceeded'
+        ]
+        
+        # Non-retryable errors
+        non_retryable_patterns = [
+            'not found',
+            '404',
+            'unauthorized',
+            '401',
+            'forbidden',
+            '403',
+            'bad request',
+            '400',
+            'repository not found',
+            'invalid repository',
+            'access denied'
+        ]
+        
+        # Check for non-retryable errors first
+        for pattern in non_retryable_patterns:
+            if pattern in error_lower:
+                return False
+        
+        # Check for retryable errors
+        for pattern in retryable_patterns:
+            if pattern in error_lower:
+                return True
+        
+        # Default: retry unknown errors (conservative approach)
+        return True 
 
     def should_do_full_indexing(self) -> bool:
         """

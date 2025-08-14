@@ -22,6 +22,7 @@ from .pullrequest_indexing_service import PullRequestIndexingService
 from .release_indexing_service import ReleaseIndexingService
 from analytics.models import IndexingState
 from .sanitization import assert_safe_repository_full_name
+from .decorators import handle_repository_not_found, handle_indexing_errors, monitor_indexing_performance
 
 logger = logging.getLogger(__name__)
 
@@ -1513,7 +1514,7 @@ def index_commits_intelligent_task(repository_id):
                     # Clone repository
                     from .git_service import GitService
                     git_service = GitService()
-                    repo_path = git_service.clone_repository(repository.clone_url, repository.full_name, token)
+                    repo_path = git_service.clone_repository(repository.clone_url, repository.full_name, token, repository.default_branch)
                     logger.info(f"----------Cloned repository for KLOC: {repository.full_name} at {repo_path}")
 
                     # Validate safe repo path before KLOC
@@ -2633,6 +2634,74 @@ def daily_codeql_analysis_task():
         
     except Exception as e:
         logger.error(f"Daily CodeQL analysis task failed: {e}")
+        raise
+
+
+def cleanup_old_tasks_task():
+    """
+    Django-Q task to clean up old completed tasks
+    """
+    logger.info("Starting cleanup of old completed tasks")
+    
+    try:
+        # Delete tasks older than 30 days
+        cutoff_date = timezone.now() - timedelta(days=30)
+        old_tasks = Task.objects.filter(
+            success=True,
+            stopped__lt=cutoff_date
+        )
+        
+        count = old_tasks.count()
+        old_tasks.delete()
+        
+        logger.info(f"Cleaned up {count} old completed tasks")
+        return {'cleaned_count': count}
+        
+    except Exception as e:
+        logger.error(f"Cleanup old tasks failed: {e}")
+        raise
+
+
+def cleanup_stuck_indexing_task():
+    """
+    Django-Q task to clean up stuck indexing operations
+    """
+    logger.info("Starting cleanup of stuck indexing operations")
+    
+    try:
+        from .monitoring_service import IndexingMonitoringService
+        cleaned_count = IndexingMonitoringService.cleanup_stuck_indexing()
+        
+        logger.info(f"Cleaned up {cleaned_count} stuck indexing operations")
+        return {'cleaned_count': cleaned_count}
+        
+    except Exception as e:
+        logger.error(f"Cleanup stuck indexing failed: {e}")
+        raise
+
+
+def monitoring_health_check_task():
+    """
+    Django-Q task to run health check and generate alerts
+    """
+    logger.info("Starting indexing health check")
+    
+    try:
+        from .monitoring_service import IndexingMonitoringService
+        health_report = IndexingMonitoringService.get_indexing_health_report()
+        
+        # Log alerts
+        for alert in health_report.get('alerts', []):
+            if alert['level'] == 'warning':
+                logger.warning(f"Indexing alert: {alert['message']}")
+            elif alert['level'] == 'error':
+                logger.error(f"Indexing alert: {alert['message']}")
+        
+        logger.info(f"Health check completed: {health_report['overview']['successful_tasks_1h']} successful, {health_report['overview']['failed_tasks_1h']} failed")
+        return health_report
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
         raise
 
 

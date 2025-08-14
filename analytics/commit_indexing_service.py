@@ -7,6 +7,7 @@ import requests
 from datetime import datetime, timezone as dt_timezone, timedelta
 from typing import List, Dict, Optional
 from mongoengine.errors import NotUniqueError
+from django.utils import timezone
 
 from .models import Commit, FileChange
 from .intelligent_indexing_service import IntelligentIndexingService
@@ -59,13 +60,46 @@ class CommitIndexingService:
                 # Handle 409 Conflict error specifically
                 if response.status_code == 409:
                     logger.warning(f"409 Conflict for {owner}/{repo} - possible date range issue. Retrying with adjusted dates.")
-                    # Try with a smaller date range
-                    adjusted_since = since + timedelta(days=1)
-                    adjusted_until = until - timedelta(days=1)
-                    if adjusted_since < adjusted_until:
-                        params["since"] = adjusted_since.strftime('%Y-%m-%dT%H:%M:%SZ')
-                        params["until"] = adjusted_until.strftime('%Y-%m-%dT%H:%M:%SZ')
-                        response = requests.get(url, headers=headers, params=params)
+                    
+                    # Try multiple strategies to resolve the conflict
+                    strategies = [
+                        # Strategy 1: Skip the problematic date range entirely (most aggressive)
+                        lambda: (since + timedelta(days=30), until),
+                        # Strategy 2: Use a smaller date range
+                        lambda: (since + timedelta(days=1), until - timedelta(days=1)),
+                        # Strategy 3: Use a much smaller date range
+                        lambda: (since + timedelta(days=7), until - timedelta(days=7)),
+                        # Strategy 4: Skip this batch entirely by using recent dates
+                        lambda: (timezone.now() - timedelta(days=1), timezone.now()),
+                    ]
+                    
+                    conflict_resolved = False
+                    for i, strategy in enumerate(strategies):
+                        try:
+                            adjusted_since, adjusted_until = strategy()
+                            if adjusted_since < adjusted_until:
+                                logger.info(f"409 Conflict - trying strategy {i+1} for {owner}/{repo}: {adjusted_since} to {adjusted_until}")
+                                params["since"] = adjusted_since.strftime('%Y-%m-%dT%H:%M:%SZ')
+                                params["until"] = adjusted_until.strftime('%Y-%m-%dT%H:%M:%SZ')
+                                response = requests.get(url, headers=headers, params=params)
+                                
+                                if response.status_code != 409:
+                                    conflict_resolved = True
+                                    logger.info(f"409 Conflict resolved with strategy {i+1} for {owner}/{repo}")
+                                    break
+                        except Exception as e:
+                            logger.warning(f"Strategy {i+1} failed for {owner}/{repo}: {e}")
+                            continue
+                    
+                    if not conflict_resolved:
+                        logger.error(f"Could not resolve 409 Conflict for {owner}/{repo} - skipping this batch")
+                        # Return empty list to skip this problematic batch
+                        return []
+                    
+                    # If we resolved the conflict but got no data, that's fine
+                    if response.status_code == 200 and not response.json():
+                        logger.info(f"409 Conflict resolved for {owner}/{repo} but no commits found in adjusted range")
+                        return []
                 
                 response.raise_for_status()
                 
