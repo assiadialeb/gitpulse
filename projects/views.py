@@ -41,13 +41,12 @@ def project_detail(request, project_id):
     end_str = request.GET.get('end')
     
     # Parse dates if provided
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone as dt_timezone
     from django.utils import timezone
-    import pytz
     if start_str and end_str:
         try:
-            start_dt = datetime.strptime(start_str, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
-            end_dt = datetime.strptime(end_str, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            start_dt = datetime.strptime(start_str, '%Y-%m-%d').replace(tzinfo=dt_timezone.utc)
+            end_dt = datetime.strptime(end_str, '%Y-%m-%d').replace(tzinfo=dt_timezone.utc)
             # Add one day to end_date to include the full day
             end_dt = end_dt + timedelta(days=1)
         except ValueError:

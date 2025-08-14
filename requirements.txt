@@ -4,7 +4,6 @@ django-picklefield==3.3
 django-q2==1.8.0
 mongoengine==0.29.1
 pymongo==4.13.2
-pytz==2025.2
 python-decouple==3.8
 requests==2.32.4
 urllib3>=2.5.0
