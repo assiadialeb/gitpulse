@@ -84,6 +84,16 @@ class KLOCService:
         '.idr',
         # Coq
         '.v',
+        # Infrastructure as Code
+        '.tf', '.tfvars', '.hcl',
+        # Configuration files that are code
+        '.yml', '.yaml', '.json', '.xml', '.toml', '.ini', '.cfg', '.conf',
+        # Docker
+        '.dockerfile', 'Dockerfile',
+        # Makefiles
+        'Makefile', '.mk',
+        # Other configuration as code
+        '.env.example', '.env.template',
     }
     
     @staticmethod

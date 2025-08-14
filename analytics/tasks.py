@@ -1215,9 +1215,17 @@ def index_deployments_intelligent_task(repository_id=None, args=None, **kwargs):
     logger = logging.getLogger(__name__)
 
     try:
-        repository = Repository.objects.get(id=repository_id)
-        assert_safe_repository_full_name(repository.full_name)
-        user_id = repository.owner.id
+        try:
+            repository = Repository.objects.get(id=repository_id)
+            assert_safe_repository_full_name(repository.full_name)
+            user_id = repository.owner.id
+        except Repository.DoesNotExist:
+            logger.warning(f"Repository {repository_id} no longer exists, skipping deployment indexing")
+            return {
+                'status': 'skipped',
+                'repository_id': repository_id,
+                'message': f'Repository {repository_id} no longer exists'
+            }
         now = timezone.now()
         entity_type = 'deployments'
 
@@ -1388,8 +1396,16 @@ def index_commits_intelligent_task(repository_id):
     try:
         # Get repository to get user_id
         from repositories.models import Repository
-        repository = Repository.objects.get(id=repository_id)
-        user_id = repository.owner.id
+        try:
+            repository = Repository.objects.get(id=repository_id)
+            user_id = repository.owner.id
+        except Repository.DoesNotExist:
+            logger.warning(f"Repository {repository_id} no longer exists, skipping commit indexing")
+            return {
+                'status': 'skipped',
+                'repository_id': repository_id,
+                'message': f'Repository {repository_id} no longer exists'
+            }
         
         # Choose indexing service based on configuration
         from django.conf import settings
@@ -1584,9 +1600,17 @@ def index_commits_git_local_task(repository_id):
     try:
         print(f"DEBUG: Starting git_local task for repository {repository_id}")
         from repositories.models import Repository
-        repository = Repository.objects.get(id=repository_id)
-        user_id = repository.owner.id
-        print(f"DEBUG: Repository: {repository.full_name}, User: {user_id}")
+        try:
+            repository = Repository.objects.get(id=repository_id)
+            user_id = repository.owner.id
+            print(f"DEBUG: Repository: {repository.full_name}, User: {user_id}")
+        except Repository.DoesNotExist:
+            logger.warning(f"Repository {repository_id} no longer exists, skipping git local commit indexing")
+            return {
+                'status': 'skipped',
+                'repository_id': repository_id,
+                'message': f'Repository {repository_id} no longer exists'
+            }
         
         # Simple time-based check to avoid too frequent syncing
         from .models import Commit
@@ -1875,8 +1899,16 @@ def index_pullrequests_intelligent_task(repository_id=None, args=None, **kwargs)
     try:
         # Get repository to get user_id
         from repositories.models import Repository
-        repository = Repository.objects.get(id=repository_id)
-        user_id = repository.owner.id
+        try:
+            repository = Repository.objects.get(id=repository_id)
+            user_id = repository.owner.id
+        except Repository.DoesNotExist:
+            logger.warning(f"Repository {repository_id} no longer exists, skipping pull request indexing")
+            return {
+                'status': 'skipped',
+                'repository_id': repository_id,
+                'message': f'Repository {repository_id} no longer exists'
+            }
         
         # Intelligent rate limit check before proceeding
         from .github_token_service import GitHubTokenService
@@ -2064,8 +2096,16 @@ def index_releases_intelligent_task(repository_id=None, args=None, **kwargs):
     try:
         # Get repository to get user_id
         from repositories.models import Repository
-        repository = Repository.objects.get(id=repository_id)
-        user_id = repository.owner.id
+        try:
+            repository = Repository.objects.get(id=repository_id)
+            user_id = repository.owner.id
+        except Repository.DoesNotExist:
+            logger.warning(f"Repository {repository_id} no longer exists, skipping release indexing")
+            return {
+                'status': 'skipped',
+                'repository_id': repository_id,
+                'message': f'Repository {repository_id} no longer exists'
+            }
         
         # Intelligent rate limit check before proceeding
         from .github_token_service import GitHubTokenService
@@ -2247,8 +2287,16 @@ def generate_sbom_task(repository_id: int, force_generate: bool = False):
         from .sbom_service import SBOMService
         
         # Get repository
-        repository = Repository.objects.get(id=repository_id)
-        user_id = repository.owner.id
+        try:
+            repository = Repository.objects.get(id=repository_id)
+            user_id = repository.owner.id
+        except Repository.DoesNotExist:
+            logger.warning(f"Repository {repository_id} no longer exists, skipping SBOM generation")
+            return {
+                'status': 'skipped',
+                'repository_id': repository_id,
+                'message': f'Repository {repository_id} no longer exists'
+            }
         
         # Check if SBOM already exists (unless forced)
         if not force_generate:
@@ -2391,8 +2439,16 @@ def index_codeql_intelligent_task(repository_id=None, args=None, **kwargs):
     try:
         # Get repository to get user_id
         from repositories.models import Repository
-        repository = Repository.objects.get(id=repository_id)
-        user_id = repository.owner.id
+        try:
+            repository = Repository.objects.get(id=repository_id)
+            user_id = repository.owner.id
+        except Repository.DoesNotExist:
+            logger.warning(f"Repository {repository_id} no longer exists, skipping CodeQL indexing")
+            return {
+                'status': 'skipped',
+                'repository_id': repository_id,
+                'message': f'Repository {repository_id} no longer exists'
+            }
         
         # Intelligent rate limit check before proceeding
         from .github_token_service import GitHubTokenService

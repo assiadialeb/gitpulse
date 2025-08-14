@@ -41,6 +41,7 @@ class IntelligentIndexingService:
         try:
             self.repository = Repository.objects.get(id=repository_id)
         except Repository.DoesNotExist:
+            logger.warning(f"Repository with ID {repository_id} not found, skipping indexing")
             raise ValueError(f"Repository with ID {repository_id} not found")
         
         # Get or create indexing state
