@@ -279,7 +279,7 @@ def repository_detail(request, repo_id):
         activity_heatmap_data = json.dumps([int(hourly_data.get(str(hour), 0)) for hour in range(24)])
         
         # Bubble chart data
-        bubble_chart = metrics_service.get_bubble_chart_data(days=30)
+        bubble_chart = metrics_service.get_bubble_chart_data(days=90)
         bubble_chart_data = json.dumps(bubble_chart.get('datasets', []))
         
         # Ajout stats changements commit (calcul et conversion explicite)
