@@ -4,21 +4,26 @@
 {% block title %}Login - GitPulse{% endblock title %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
+<div class="flex items-start justify-center pt-16 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-6">
         <!-- Header Hero Section -->
         <div class="text-center">
-            <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-primary-green to-primary-blue rounded-2xl shadow-glow mb-6">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            <div class="flex items-center justify-center mb-4">
+                <svg width="56" height="56" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" class="mr-4">
+                    <defs>
+                        <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#10B981" stop-opacity="1" />
+                            <stop offset="100%" stop-color="#3B82F6" stop-opacity="1" />
+                        </linearGradient>
+                    </defs>
+                    <path stroke="url(#logoGradient)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h4l3 7 4-14 3 7h4"/>
                 </svg>
+                <span class="text-6xl font-bold gradient-text">GitPulse</span>
             </div>
-            <h1 class="text-4xl font-bold gradient-text mb-4">Welcome Back</h1>
-            <p class="text-xl text-medium-gray">Sign in to your GitPulse account</p>
         </div>
 
         <!-- Login Form -->
-        <div class="card-modern p-8">
+        <div class="card-modern p-6">
             <div class="flex items-center mb-6">
                 <div class="w-12 h-12 bg-gradient-to-r from-primary-green to-primary-blue rounded-xl flex items-center justify-center mr-4">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -31,7 +36,20 @@
                 </div>
             </div>
 
-            <form method="post" class="space-y-6">
+            {% if github_provider_exists %}
+            <div class="text-center mb-6">
+                <a href="{% provider_login_url 'github' %}" class="btn w-full flex items-center justify-center bg-white border border-primary-blue text-primary-blue hover:bg-primary-blue hover:text-white rounded-xl font-semibold shadow-soft transition-all duration-300 transform hover:scale-105">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 0.297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.387 0.6 0.113 0.82-0.258 0.82-0.577 0-0.285-0.011-1.04-0.017-2.04-3.338 0.726-4.042-1.61-4.042-1.61-0.546-1.387-1.333-1.756-1.333-1.756-1.089-0.745 0.083-0.729 0.083-0.729 1.205 0.084 1.84 1.236 1.84 1.236 1.07 1.834 2.809 1.304 3.495 0.997 0.108-0.775 0.418-1.305 0.762-1.605-2.665-0.305-5.466-1.334-5.466-5.931 0-1.31 0.469-2.381 1.236-3.221-0.124-0.303-0.535-1.523 0.117-3.176 0 0 1.008-0.322 3.301 1.23 0.957-0.266 1.984-0.399 3.003-0.404 1.019 0.005 2.047 0.138 3.006 0.404 2.291-1.553 3.297-1.23 3.297-1.23 0.653 1.653 0.242 2.873 0.118 3.176 0.77 0.84 1.235 1.911 1.235 3.221 0 4.609-2.803 5.624-5.475 5.921 0.43 0.372 0.823 1.102 0.823 2.222 0 1.606-0.014 2.898-0.014 3.293 0 0.322 0.216 0.694 0.825 0.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+                    </svg>
+                    Sign in with GitHub
+                </a>
+            </div>
+
+            <div class="divider text-medium-gray my-6">or</div>
+            {% endif %}
+
+            <form method="post" class="space-y-4">
                 {% csrf_token %}
                 
                 {% if form.non_field_errors %}
@@ -80,44 +98,6 @@
                     </button>
                 </div>
             </form>
-
-            {% if github_provider_exists %}
-            <div class="divider text-medium-gray my-8">or</div>
-
-            <div class="text-center mb-6">
-                <a href="{% provider_login_url 'github' %}" class="btn w-full flex items-center justify-center bg-white border border-primary-blue text-primary-blue hover:bg-primary-blue hover:text-white rounded-xl font-semibold shadow-soft transition-all duration-300 transform hover:scale-105">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0.297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.387 0.6 0.113 0.82-0.258 0.82-0.577 0-0.285-0.011-1.04-0.017-2.04-3.338 0.726-4.042-1.61-4.042-1.61-0.546-1.387-1.333-1.756-1.333-1.756-1.089-0.745 0.083-0.729 0.083-0.729 1.205 0.084 1.84 1.236 1.84 1.236 1.07 1.834 2.809 1.304 3.495 0.997 0.108-0.775 0.418-1.305 0.762-1.605-2.665-0.305-5.466-1.334-5.466-5.931 0-1.31 0.469-2.381 1.236-3.221-0.124-0.303-0.535-1.523 0.117-3.176 0 0 1.008-0.322 3.301 1.23 0.957-0.266 1.984-0.399 3.003-0.404 1.019 0.005 2.047 0.138 3.006 0.404 2.291-1.553 3.297-1.23 3.297-1.23 0.653 1.653 0.242 2.873 0.118 3.176 0.77 0.84 1.235 1.911 1.235 3.221 0 4.609-2.803 5.624-5.475 5.921 0.43 0.372 0.823 1.102 0.823 2.222 0 1.606-0.014 2.898-0.014 3.293 0 0.322 0.216 0.694 0.825 0.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-                    </svg>
-                    Sign in with GitHub
-                </a>
-            </div>
-            {% endif %}
-
-            <div class="text-center">
-                <p class="text-medium-gray mb-4">Don't have an account yet?</p>
-                <a href="{% url 'users:register' %}" class="btn btn-outline border-primary-green text-primary-green hover:bg-primary-green hover:text-white rounded-xl w-full font-semibold transition-all duration-300 transform hover:scale-105">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
-                    </svg>
-                    Create Account
-                </a>
-            </div>
-        </div>
-
-        <!-- Additional information -->
-        <div class="text-center">
-            <div class="bg-gradient-to-r from-primary-blue/10 to-primary-green/10 rounded-2xl p-6 border border-primary-blue/20">
-                <div class="flex items-center justify-center mb-3">
-                    <div class="w-8 h-8 bg-primary-blue rounded-lg flex items-center justify-center mr-3">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                    <span class="font-semibold text-dark-gray">GitPulse Analytics</span>
-                </div>
-                <p class="text-medium-gray text-sm">Analytics for your GitHub organizations</p>
-            </div>
         </div>
     </div>
 </div>
