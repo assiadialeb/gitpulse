@@ -167,46 +167,6 @@ GitPulse uses `python-decouple` to manage configuration through environment vari
 cp env.example .env
 ```
 
-## 🔐 GitHub OAuth2 Setup
-
-GitPulse uses OAuth2 to connect to GitHub. You need to create a GitHub App and configure it with GitPulse.
-
-### Step 1: Create a GitHub App
-
-1. Go to[GitHub Apps settings](https://github.com/settings/apps)
-2. Click "New GitHub App"
-3. Fill in the app details:
-   - **App name**: GitPulse (or your preferred name)
-   - **Homepage URL**:`http://localhost:8000`
-   - **Authorization callback URL**:`http://localhost:8000/github/oauth/callback/`
-4. Set permissions:
-   - **Repository permissions**: Contents (Read)
-   - **User permissions**: Email addresses (Read)
-5. Click "Create GitHub App"
-
-### Step 2: Configure GitPulse
-
-**Option A: Use the setup script (Recommended)**
-
-```bash
-python setup_github_app.py
-```
-
-**Option B: Manual configuration**
-
-1. Go to http://localhost:8000/github/admin/ (superuser only)
-2. Enter your GitHub App credentials:
-   - Client ID (found in your GitHub App settings)
-   - Client Secret (generate a new one)
-   - App ID (found in your GitHub App settings)
-
-### Step 3: Connect Your Account
-
-1. Go to http://localhost:8000/github/setup/
-2. Click "Connect to GitHub"
-3. Authorize GitPulse to access your GitHub account
-4. You'll be redirected back to GitPulse with your account connected
-
 ## 🏗️ Architecture
 
 - **Backend**: Django (Python 3.12+)
