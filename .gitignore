@@ -213,3 +213,4 @@ node_modules/*
 .cursor/*
 .sonarlint/*
 templates/repositories/Design-ideas/*
+staticfiles/*
