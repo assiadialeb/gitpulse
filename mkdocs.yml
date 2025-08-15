@@ -11,7 +11,7 @@ theme:
   name: material
   logo: null
   icon:
-    logo: material/git
+    logo: material/pulse
   language: en
   features:
     - navigation.expand
