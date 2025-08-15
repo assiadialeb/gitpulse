@@ -223,9 +223,9 @@ python manage.py migrate
 
 ### Planned Features
 
-- 🔄 GitHub data synchronization
 - 📈 Analytics dashboard
 - 📊 Repository statistics
+- 👨🏽‍💻 Developer statistics
 - 👥 Team analytics
 - 📋 Custom reports
 

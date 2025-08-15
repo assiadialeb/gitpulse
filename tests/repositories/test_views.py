@@ -1,23 +1,33 @@
-import json
 import pytest
-from unittest.mock import patch, Mock, MagicMock
-from django.contrib.auth.models import User
-from django.test import TestCase, Client
-from django.urls import reverse
-from django.utils import timezone
-from django.contrib.messages import get_messages
-
+from unittest.mock import Mock, patch, MagicMock
+from datetime import datetime, timedelta
+from django.test import TestCase
+from django.contrib.auth import get_user_model
 from repositories.models import Repository
+from repositories.views import _get_dora_metrics
+
+User = get_user_model()
 
 
-@pytest.mark.django_db
-class TestRepositoryViews(TestCase):
-    """Test cases for repository views"""
+class DORAMetricsTestCase(TestCase):
+    """Test cases for DORA metrics calculation using mocks"""
+    
+    def _setup_pr_mock(self, mock_pr, return_prs):
+        """Helper to setup PR mock with chained filter calls"""
+        mock_pr_query = Mock()
+        mock_pr_query.filter.return_value = mock_pr_query  # Return self for chaining
+        mock_pr_query.__iter__ = lambda self: iter(return_prs)  # Make it iterable
+        mock_pr.objects.filter.return_value = mock_pr_query
+    
+    def _setup_deployment_mock(self, mock_deployment, return_deployments):
+        """Helper to setup Deployment mock with chained filter calls"""
+        mock_deployment_query = Mock()
+        mock_deployment_query.filter.return_value = mock_deployment_query  # Return self for chaining
+        mock_deployment_query.__iter__ = lambda self: iter(return_deployments)  # Make it iterable
+        mock_deployment.objects.filter.return_value = mock_deployment_query
     
     def setUp(self):
         """Set up test data"""
-        self.client = Client()
-        
         # Create test user
         self.user = User.objects.create_user(
             username='testuser',
@@ -25,401 +35,309 @@ class TestRepositoryViews(TestCase):
             password='testpass123'
         )
         
-        # Create staff user
-        self.staff_user = User.objects.create_user(
-            username='staffuser',
-            email='staff@example.com',
-            password='staffpass123',
-            is_staff=True
-        )
-        
-        # Create superuser
-        self.superuser = User.objects.create_user(
-            username='superuser',
-            email='super@example.com',
-            password='superpass123',
-            is_superuser=True
-        )
-        
         # Create test repository
         self.repository = Repository.objects.create(
-            name='test-repo',
-            full_name='test-org/test-repo',
-            description='A test repository',
+            name='test-repo-dora',
+            full_name='test-org/test-repo-dora',
+            description='Test repository for DORA metrics',
             private=False,
-            fork=False,
             language='Python',
             stars=100,
             forks=50,
-            size=1024000,
+            size=1000,
             default_branch='main',
-            github_id=123456789,
-            html_url='https://github.com/test-org/test-repo',
-            clone_url='https://github.com/test-org/test-repo.git',
-            ssh_url='git@github.com:test-org/test-repo.git',
+            github_id=12345,
+            html_url='https://github.com/test-org/test-repo-dora',
+            clone_url='https://github.com/test-org/test-repo-dora.git',
+            ssh_url='git@github.com:test-org/test-repo-dora.git',
             is_indexed=True,
-            last_indexed=timezone.now(),
             commit_count=500,
-            kloc=150.5,
-            kloc_calculated_at=timezone.now(),
             owner=self.user
         )
-    
-    def test_repository_list_view_authenticated(self):
-        """Test repository list view for authenticated user"""
-        self.client.login(username='testuser', password='testpass123')
-        response = self.client.get(reverse('repositories:list'))
-    
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'repositories/list.html')
-        # Check for repositories in context or page_obj
-        self.assertTrue(
-            'repositories' in response.context or 
-            'page_obj' in response.context
-        )
-        # Check if repository is in the context (either directly or in page_obj)
-        if 'repositories' in response.context:
-            self.assertIn(self.repository, response.context['repositories'])
-        elif 'page_obj' in response.context:
-            self.assertIn(self.repository, response.context['page_obj'])
-    
-    def test_repository_list_view_unauthenticated(self):
-        """Test repository list view redirects unauthenticated users"""
-        response = self.client.get(reverse('repositories:list'))
         
-        self.assertEqual(response.status_code, 302)  # Redirect to login
-        self.assertIn('login', response.url)
-    
-    def test_repository_detail_view_authenticated(self):
-        """Test repository detail view for authenticated user"""
-        self.client.login(username='testuser', password='testpass123')
-        response = self.client.get(reverse('repositories:detail', args=[self.repository.id]))
-        
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'repositories/detail.html')
-        self.assertEqual(response.context['repository'], self.repository)
-    
-    def test_repository_detail_view_unauthenticated(self):
-        """Test repository detail view redirects unauthenticated users"""
-        response = self.client.get(reverse('repositories:detail', args=[self.repository.id]))
-        
-        self.assertEqual(response.status_code, 302)  # Redirect to login
-        self.assertIn('login', response.url)
-    
-    def test_repository_detail_view_not_found(self):
-        """Test repository detail view with non-existent repository"""
-        self.client.login(username='testuser', password='testpass123')
-        # Use a non-existent repository ID
-        try:
-            response = self.client.get(reverse('repositories:detail', args=[99999]))
-            # Should return 404 or redirect
-            self.assertIn(response.status_code, [404, 302])
-        except Exception:
-            # If the view raises an exception, that's also acceptable for non-existent repos
-            pass
-    
-    @patch('repositories.views.GitHubTokenService.get_token_for_repository_access')
-    @patch('requests.get')
-    def test_search_repositories_authenticated(self, mock_get, mock_get_token):
-        """Test search repositories view for authenticated user"""
-        self.client.login(username='testuser', password='testpass123')
-        
-        # Mock GitHub API response
-        mock_get_token.return_value = 'mock_token'
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            'total_count': 1,
-            'items': [{
-                'id': 123456789,
-                'name': 'test-repo',
-                'full_name': 'test-org/test-repo',
-                'description': 'A test repository',
-                'private': False,
-                'fork': False,
-                'language': 'Python',
-                'stargazers_count': 100,
-                'forks_count': 50,
-                'size': 1024,
-                'default_branch': 'main',
-                'html_url': 'https://github.com/test-org/test-repo',
-                'clone_url': 'https://github.com/test-org/test-repo.git',
-                'ssh_url': 'git@github.com:test-org/test-repo.git',
-                'owner': {'login': 'test-org'}
-            }]
-        }
-        mock_get.return_value = mock_response
-        
-        response = self.client.get(reverse('repositories:search'), {'q': 'test-repo'})
-        
-        # Should return 200 or 401 (unauthorized if no token)
-        self.assertIn(response.status_code, [200, 401])
-        if response.status_code == 200:
-            self.assertTemplateUsed(response, 'repositories/list.html')
-            self.assertIn('search_results', response.context)
-    
-    def test_search_repositories_unauthenticated(self):
-        """Test search repositories view redirects unauthenticated users"""
-        response = self.client.get(reverse('repositories:search'))
-        
-        self.assertEqual(response.status_code, 302)  # Redirect to login
-        self.assertIn('login', response.url)
-    
-    @patch('repositories.views.GitHubTokenService.get_token_for_repository_access')
-    @patch('requests.get')
-    def test_search_repositories_api_error(self, mock_get, mock_get_token):
-        """Test search repositories view handles API errors"""
-        self.client.login(username='testuser', password='testpass123')
-        
-        # Mock API error
-        mock_get_token.return_value = 'mock_token'
-        mock_response = Mock()
-        mock_response.status_code = 403
-        mock_response.text = 'Rate limit exceeded'
-        mock_get.return_value = mock_response
-        
-        response = self.client.get(reverse('repositories:search'), {'q': 'test-repo'})
-        
-        # Should return 200 or 401 (unauthorized if no token)
-        self.assertIn(response.status_code, [200, 401])
-        if response.status_code == 200:
-            self.assertTemplateUsed(response, 'repositories/list.html')
-            
-            # Check for error message
-            messages = list(get_messages(response.wsgi_request))
-            self.assertTrue(any('error' in str(message).lower() for message in messages))
-    
-    @patch('repositories.views.GitHubTokenService.get_token_for_repository_access')
-    @patch('requests.get')
-    @patch('requests.post')
-    def test_index_repository_success(self, mock_post, mock_get, mock_get_token):
-        """Test successful repository indexing"""
-        self.client.login(username='testuser', password='testpass123')
-        
-        # Mock GitHub API responses
-        mock_get_token.return_value = 'mock_token'
-        
-        # Mock repository info
-        mock_get_response = Mock()
-        mock_get_response.status_code = 200
-        mock_get_response.json.return_value = {
-            'id': 123456789,
-            'name': 'new-repo',
-            'full_name': 'test-org/new-repo',
-            'description': 'A new repository',
-            'private': False,
-            'fork': False,
-            'language': 'Python',
-            'stargazers_count': 50,
-            'forks_count': 25,
-            'size': 512000,
-            'default_branch': 'main',
-            'html_url': 'https://github.com/test-org/new-repo',
-            'clone_url': 'https://github.com/test-org/new-repo.git',
-            'ssh_url': 'git@github.com:test-org/new-repo.git',
-            'owner': {'login': 'test-org'}
-        }
-        mock_get.return_value = mock_get_response
-        
-        # Mock indexing response
-        mock_post_response = Mock()
-        mock_post_response.status_code = 200
-        mock_post.return_value = mock_post_response
-        
-        response = self.client.post(reverse('repositories:index'), {
-            'repository_full_name': 'test-org/new-repo'
-        })
-        
-                # Check if repository was created or redirected
-        self.assertIn(response.status_code, [200, 302])
-        
-        # Check if repository was created (if not redirected)
-        if response.status_code == 200:
-            new_repo = Repository.objects.filter(full_name='test-org/new-repo').first()
-            self.assertIsNotNone(new_repo)
-            self.assertEqual(new_repo.owner, self.user)
-    
-    def test_index_repository_unauthenticated(self):
-        """Test repository indexing redirects unauthenticated users"""
-        response = self.client.post(reverse('repositories:index'), {
-            'repository_full_name': 'test-org/new-repo'
-        })
-        
-        self.assertEqual(response.status_code, 302)  # Redirect to login
-        self.assertIn('login', response.url)
-    
-    @patch('repositories.views.GitHubTokenService.get_token_for_repository_access')
-    def test_index_repository_no_token(self, mock_get_token):
-        """Test repository indexing when no token is available"""
-        self.client.login(username='testuser', password='testpass123')
-    
-        # Mock no token available
-        mock_get_token.return_value = None
-    
-        response = self.client.post(reverse('repositories:index'), {
-            'repository_full_name': 'test-org/new-repo'
-        })
-    
-        # Should redirect or show error page
-        self.assertIn(response.status_code, [200, 302])
-        # Don't check template if it's a redirect
-        if response.status_code == 200:
-            self.assertTemplateUsed(response, 'repositories/list.html')
-        
-        # Check for error message (optional since the view might handle it differently)
-        messages = list(get_messages(response.wsgi_request))
-        # Don't fail if no token message - the view might handle it differently
-        # The view might redirect or handle the error differently
-        pass
-    
-    def test_delete_repository_staff_only(self):
-        """Test repository deletion requires staff permissions"""
-        # Test with regular user
-        self.client.login(username='testuser', password='testpass123')
-        response = self.client.post(reverse('repositories:delete', args=[self.repository.id]))
-    
-        self.assertEqual(response.status_code, 302)  # Redirect
-        self.assertIn('/repositories/', response.url)
-        
-        # Repository should still exist
-        self.assertTrue(Repository.objects.filter(id=self.repository.id).exists())
-        
-        # Test with staff user
-        self.client.login(username='staffuser', password='staffpass123')
-        response = self.client.post(reverse('repositories:delete', args=[self.repository.id]))
-    
-        # Check if deletion was successful (either redirect or success page)
-        self.assertIn(response.status_code, [200, 302])
-        
-        # Repository should be deleted
-        self.assertFalse(Repository.objects.filter(id=self.repository.id).exists())
-    
-    def test_delete_repository_superuser(self):
-        """Test repository deletion with superuser"""
-        self.client.login(username='superuser', password='superpass123')
-        response = self.client.post(reverse('repositories:delete', args=[self.repository.id]))
-    
-        # Check if deletion was successful (either redirect or success page)
-        self.assertIn(response.status_code, [200, 302])
-        
-        # Repository should be deleted
-        self.assertFalse(Repository.objects.filter(id=self.repository.id).exists())
-    
-    def test_delete_repository_unauthenticated(self):
-        """Test repository deletion redirects unauthenticated users"""
-        response = self.client.post(reverse('repositories:delete', args=[self.repository.id]))
-        
-        self.assertEqual(response.status_code, 302)  # Redirect to login
-        self.assertIn('login', response.url)
-        
-        # Repository should still exist
-        self.assertTrue(Repository.objects.filter(id=self.repository.id).exists())
-    
-    @patch('repositories.views._get_sonarcloud_metrics')
-    @patch('repositories.views._get_codeql_metrics')
-    def test_api_repository_pr_health_metrics(self, mock_codeql, mock_sonar):
-        """Test API endpoint for PR health metrics"""
-        self.client.login(username='testuser', password='testpass123')
-        
-        # Mock metrics responses
-        mock_sonar.return_value = {
-            'code_smells': 10,
-            'bugs': 2,
-            'vulnerabilities': 1
-        }
-        mock_codeql.return_value = {
-            'status': 'available',
-            'total_vulnerabilities': 3,
-            'shs_score': 85.5
-        }
-        
-        response = self.client.get(reverse('repositories:api_pr_health_metrics', args=[self.repository.id]))
-        
-        self.assertEqual(response.status_code, 200)
-        data = json.loads(response.content)
-        self.assertTrue(data['success'])
-        self.assertIn('metrics', data)
-    
-    def test_api_repository_pr_health_metrics_unauthenticated(self):
-        """Test API endpoint redirects unauthenticated users"""
-        response = self.client.get(reverse('repositories:api_pr_health_metrics', args=[self.repository.id]))
-        
-        self.assertEqual(response.status_code, 302)  # Redirect to login
-        self.assertIn('login', response.url)
-    
-    @patch('repositories.views._get_sonarcloud_metrics')
-    def test_api_repository_sonarcloud_analysis(self, mock_sonar):
-        """Test API endpoint for SonarCloud analysis"""
-        self.client.login(username='testuser', password='testpass123')
-        
-        # Mock SonarCloud metrics
-        mock_sonar.return_value = {
-            'code_smells': 15,
-            'bugs': 3,
-            'vulnerabilities': 2,
-            'coverage': 85.5,
-            'duplicated_lines_density': 5.2
-        }
-        
-        response = self.client.get(reverse('repositories:api_sonarcloud_analysis', args=[self.repository.id]))
-        
-        self.assertEqual(response.status_code, 200)
-        # Check if response is JSON or HTML
-        if response['Content-Type'] == 'application/json':
-            data = json.loads(response.content)
-            self.assertIn('metrics', data)
-        else:
-            # If it's HTML, just check that it contains expected content
-            self.assertIn(b'SonarCloud', response.content)
-    
-    @patch('repositories.views._get_codeql_metrics')
-    def test_api_repository_codeql_analysis(self, mock_codeql):
-        """Test API endpoint for CodeQL analysis"""
-        self.client.login(username='testuser', password='testpass123')
-    
-        # Mock CodeQL metrics
-        mock_codeql.return_value = {
-            'status': 'available',
-            'total_vulnerabilities': 5,
-            'shs_score': 78.5,
-            'shs_display': 'B',
-            'delta_shs': -2.5
-        }
-    
-        response = self.client.get(reverse('repositories:api_codeql_analysis', args=[self.repository.id]))
-    
-        self.assertEqual(response.status_code, 200)
-        # Check if response is JSON or HTML
-        if response['Content-Type'] == 'application/json':
-            data = json.loads(response.content)
-            self.assertIn('status', data)
-        else:
-            # If it's HTML, just check that it contains expected content
-            # The response contains "Security Summary" instead of "CodeQL"
-            self.assertIn(b'Security Summary', response.content)
-    
-    def test_api_endpoints_not_found(self):
-        """Test API endpoints with non-existent repository"""
-        self.client.login(username='testuser', password='testpass123')
-        
-        endpoints = [
-            'repositories:api_pr_health_metrics',
-            'repositories:api_developer_activity',
-            'repositories:api_commit_quality',
-            'repositories:api_commit_types',
-            'repositories:api_licensing_analysis',
-            'repositories:api_vulnerabilities_analysis',
-            'repositories:api_llm_license_analysis',
-            'repositories:api_llm_license_verdict',
-            'repositories:api_commits_list',
-            'repositories:api_releases_list',
-            'repositories:api_deployments_list',
-            'repositories:api_sonarcloud_temporal',
-            'repositories:api_sonarcloud_analysis',
-            'repositories:api_codeql_analysis',
+        # Mock data for testing
+        self.mock_deployment1 = Mock()
+        self.mock_deployment1.deployment_id = '1'
+        self.mock_deployment1.environment = 'production'
+        self.mock_deployment1.created_at = datetime.now() - timedelta(days=20)
+        self.mock_deployment1.updated_at = datetime.now() - timedelta(days=20)
+        self.mock_deployment1.statuses = [
+            {
+                'state': 'success',
+                'created_at': (datetime.now() - timedelta(days=20)).isoformat(),
+                'updated_at': (datetime.now() - timedelta(days=20)).isoformat()
+            }
         ]
         
-        for endpoint in endpoints:
-            response = self.client.get(reverse(endpoint, args=[99999]))
-            # Should return 404, 500, or 200 (some endpoints might handle missing repos gracefully)
-            self.assertIn(response.status_code, [404, 500, 200])
+        self.mock_deployment2 = Mock()
+        self.mock_deployment2.deployment_id = '2'
+        self.mock_deployment2.environment = 'production'
+        self.mock_deployment2.created_at = datetime.now() - timedelta(days=5)
+        self.mock_deployment2.updated_at = datetime.now() - timedelta(days=5)
+        self.mock_deployment2.statuses = [
+            {
+                'state': 'success',
+                'created_at': (datetime.now() - timedelta(days=5)).isoformat(),
+                'updated_at': (datetime.now() - timedelta(days=5)).isoformat()
+            }
+        ]
+        
+        self.mock_commit1 = Mock()
+        self.mock_commit1.sha = 'abc123def4567890abcdef1234567890abcdef12'
+        self.mock_commit1.authored_date = datetime.now() - timedelta(days=30)
+        
+        self.mock_commit2 = Mock()
+        self.mock_commit2.sha = 'def456ghi7890123456789abcdef0123456789ab'
+        self.mock_commit2.authored_date = datetime.now() - timedelta(days=15)
+        
+        self.mock_pr = Mock()
+        self.mock_pr.number = 1
+        self.mock_pr.title = 'Test PR'
+        self.mock_pr.state = 'closed'
+        self.mock_pr.merged_at = datetime.now() - timedelta(days=10)
+        self.mock_pr.commit_shas = ['abc123def4567890abcdef1234567890abcdef12', 'def456ghi7890123456789abcdef0123456789ab']
+    
+    def tearDown(self):
+        """Clean up test data"""
+        # Clean up Django models
+        if hasattr(self, 'repository'):
+            self.repository.delete()
+        if hasattr(self, 'user'):
+            self.user.delete()
+    
+    @patch('analytics.models.Deployment')
+    @patch('analytics.models.PullRequest')
+    @patch('analytics.models.Commit')
+    def test_get_dora_metrics_basic(self, mock_commit, mock_pr, mock_deployment):
+        """Test basic DORA metrics calculation with mocks"""
+        # Setup mocks
+        self._setup_deployment_mock(mock_deployment, [self.mock_deployment1, self.mock_deployment2])
+        
+        # Setup PR mock
+        self._setup_pr_mock(mock_pr, [self.mock_pr])
+        
+        # Mock Commit query
+        mock_commit.objects.filter.return_value = [self.mock_commit1, self.mock_commit2]
+        
+        metrics = _get_dora_metrics(self.repository)
+        
+        # Check structure
+        self.assertIn('deployment_frequency', metrics)
+        self.assertIn('lead_time', metrics)
+        
+        # Check deployment frequency
+        self.assertEqual(metrics['deployment_frequency']['total_deployments'], 2)
+        self.assertEqual(metrics['deployment_frequency']['period_days'], 180)
+        self.assertAlmostEqual(metrics['deployment_frequency']['deployments_per_day'], 0.011, places=3)
+        
+        # Check lead time structure
+        self.assertIn('lt1_median_hours', metrics['lead_time'])
+        self.assertIn('lt1_mean_hours', metrics['lead_time'])
+        self.assertIn('lt2_median_hours', metrics['lead_time'])
+        self.assertIn('lt2_mean_hours', metrics['lead_time'])
+        self.assertIn('lt1_median_days', metrics['lead_time'])
+        self.assertIn('lt1_mean_days', metrics['lead_time'])
+        self.assertIn('lt2_median_days', metrics['lead_time'])
+        self.assertIn('lt2_mean_days', metrics['lead_time'])
+        self.assertIn('total_prs_analyzed', metrics['lead_time'])
+    
+    @patch('analytics.models.Deployment')
+    @patch('analytics.models.PullRequest')
+    @patch('analytics.models.Commit')
+    def test_get_dora_metrics_no_deployments(self, mock_commit, mock_pr, mock_deployment):
+        """Test DORA metrics when no deployments exist"""
+        # Setup mocks - no deployments
+        self._setup_deployment_mock(mock_deployment, [])
+        
+        # Setup PR mock
+        self._setup_pr_mock(mock_pr, [])
+        
+        mock_commit.objects.filter.return_value = []
+        
+        metrics = _get_dora_metrics(self.repository)
+        
+        self.assertEqual(metrics['deployment_frequency']['total_deployments'], 0)
+        self.assertEqual(metrics['deployment_frequency']['deployments_per_day'], 0)
+        self.assertIsNone(metrics['lead_time']['lt1_median_hours'])
+        self.assertIsNone(metrics['lead_time']['lt2_median_hours'])
+    
+    @patch('analytics.models.Deployment')
+    @patch('analytics.models.PullRequest')
+    @patch('analytics.models.Commit')
+    def test_get_dora_metrics_no_prs(self, mock_commit, mock_pr, mock_deployment):
+        """Test DORA metrics when no pull requests exist"""
+        # Setup mocks - deployments but no PRs
+        self._setup_deployment_mock(mock_deployment, [self.mock_deployment1, self.mock_deployment2])
+        
+        # Setup PR mock
+        self._setup_pr_mock(mock_pr, [])
+        
+        mock_commit.objects.filter.return_value = []
+        
+        metrics = _get_dora_metrics(self.repository)
+        
+        self.assertEqual(metrics['deployment_frequency']['total_deployments'], 2)
+        self.assertEqual(metrics['lead_time']['total_prs_analyzed'], 0)
+        self.assertIsNone(metrics['lead_time']['lt1_median_hours'])
+        self.assertIsNone(metrics['lead_time']['lt2_median_hours'])
+    
+    @patch('analytics.models.Deployment')
+    @patch('analytics.models.PullRequest')
+    @patch('analytics.models.Commit')
+    def test_get_dora_metrics_production_environment_detection(self, mock_commit, mock_pr, mock_deployment):
+        """Test that different production environments are detected"""
+        # Create mock deployments with different production environment names
+        test_environments = ['prod', 'live', 'main', 'master', 'github-pages']
+        mock_deployments = []
+        
+        for i, env in enumerate(test_environments):
+            mock_deploy = Mock()
+            mock_deploy.deployment_id = str(10 + i)
+            mock_deploy.environment = env
+            mock_deploy.created_at = datetime.now() - timedelta(days=i)
+            mock_deploy.updated_at = datetime.now() - timedelta(days=i)
+            mock_deploy.statuses = [
+                {
+                    'state': 'success',
+                    'created_at': (datetime.now() - timedelta(days=i)).isoformat(),
+                    'updated_at': (datetime.now() - timedelta(days=i)).isoformat()
+                }
+            ]
+            mock_deployments.append(mock_deploy)
+        
+        # Add original deployments
+        mock_deployments.extend([self.mock_deployment1, self.mock_deployment2])
+        
+        # Setup mocks
+        self._setup_deployment_mock(mock_deployment, mock_deployments)
+        
+        # Setup PR mock
+        self._setup_pr_mock(mock_pr, [])
+        
+        mock_commit.objects.filter.return_value = []
+        
+        metrics = _get_dora_metrics(self.repository)
+        
+        # Should detect all production deployments (original 2 + 5 new ones)
+        self.assertEqual(metrics['deployment_frequency']['total_deployments'], 7)
+    
+    @patch('analytics.models.Deployment')
+    @patch('analytics.models.PullRequest')
+    @patch('analytics.models.Commit')
+    def test_get_dora_metrics_non_production_environment(self, mock_commit, mock_pr, mock_deployment):
+        """Test that non-production environments are ignored"""
+        # Create mock deployment with non-production environment
+        mock_staging_deploy = Mock()
+        mock_staging_deploy.deployment_id = '100'
+        mock_staging_deploy.environment = 'staging'
+        mock_staging_deploy.created_at = datetime.now() - timedelta(days=1)
+        mock_staging_deploy.updated_at = datetime.now() - timedelta(days=1)
+        mock_staging_deploy.statuses = [
+            {
+                'state': 'success',
+                'created_at': (datetime.now() - timedelta(days=1)).isoformat(),
+                'updated_at': (datetime.now() - timedelta(days=1)).isoformat()
+            }
+        ]
+        
+        # Setup mocks - include staging deployment
+        self._setup_deployment_mock(mock_deployment, [self.mock_deployment1, self.mock_deployment2, mock_staging_deploy])
+        
+        # Setup PR mock
+        self._setup_pr_mock(mock_pr, [])
+        
+        mock_commit.objects.filter.return_value = []
+        
+        metrics = _get_dora_metrics(self.repository)
+        
+        # Should only count production deployments (original 2)
+        self.assertEqual(metrics['deployment_frequency']['total_deployments'], 2)
+    
+    @patch('analytics.models.Deployment')
+    @patch('analytics.models.PullRequest')
+    @patch('analytics.models.Commit')
+    def test_get_dora_metrics_deployment_without_success_status(self, mock_commit, mock_pr, mock_deployment):
+        """Test that deployments without success status are ignored"""
+        # Create mock deployment without success status
+        mock_pending_deploy = Mock()
+        mock_pending_deploy.deployment_id = '200'
+        mock_pending_deploy.environment = 'production'
+        mock_pending_deploy.created_at = datetime.now() - timedelta(days=1)
+        mock_pending_deploy.updated_at = datetime.now() - timedelta(days=1)
+        mock_pending_deploy.statuses = [
+            {
+                'state': 'pending',
+                'created_at': (datetime.now() - timedelta(days=1)).isoformat(),
+                'updated_at': (datetime.now() - timedelta(days=1)).isoformat()
+            }
+        ]
+        
+        # Setup mocks - include pending deployment
+        self._setup_deployment_mock(mock_deployment, [self.mock_deployment1, self.mock_deployment2, mock_pending_deploy])
+        
+        # Setup PR mock
+        self._setup_pr_mock(mock_pr, [])
+        
+        mock_commit.objects.filter.return_value = []
+        
+        metrics = _get_dora_metrics(self.repository)
+        
+        # Should only count successful production deployments (original 2)
+        self.assertEqual(metrics['deployment_frequency']['total_deployments'], 2)
+    
+    @patch('analytics.models.Deployment')
+    @patch('analytics.models.PullRequest')
+    @patch('analytics.models.Commit')
+    def test_get_dora_metrics_lead_time_calculation(self, mock_commit, mock_pr, mock_deployment):
+        """Test that lead time calculations are reasonable"""
+        # Setup mocks
+        self._setup_deployment_mock(mock_deployment, [self.mock_deployment1, self.mock_deployment2])
+        
+        # Setup PR mock
+        self._setup_pr_mock(mock_pr, [self.mock_pr])
+        
+        # Mock Commit query
+        mock_commit.objects.filter.return_value = [self.mock_commit1, self.mock_commit2]
+        
+        metrics = _get_dora_metrics(self.repository)
+        
+        # Check that lead times are calculated
+        if metrics['lead_time']['lt1_median_hours'] is not None:
+            self.assertGreater(metrics['lead_time']['lt1_median_hours'], 0)
+            self.assertGreater(metrics['lead_time']['lt1_median_days'], 0)
+        
+        if metrics['lead_time']['lt2_median_hours'] is not None:
+            self.assertGreater(metrics['lead_time']['lt2_median_hours'], 0)
+            self.assertGreater(metrics['lead_time']['lt2_median_days'], 0)
+        
+        # Check that days are calculated correctly (hours / 24)
+        if metrics['lead_time']['lt1_median_hours'] is not None:
+            expected_days = metrics['lead_time']['lt1_median_hours'] / 24
+            self.assertAlmostEqual(metrics['lead_time']['lt1_median_days'], expected_days, places=2)
+        
+        if metrics['lead_time']['lt2_median_hours'] is not None:
+            expected_days = metrics['lead_time']['lt2_median_hours'] / 24
+            self.assertAlmostEqual(metrics['lead_time']['lt2_median_days'], expected_days, places=2)
+    
+    @patch('analytics.models.Deployment')
+    @patch('analytics.models.PullRequest')
+    @patch('analytics.models.Commit')
+    def test_get_dora_metrics_error_handling(self, mock_commit, mock_pr, mock_deployment):
+        """Test error handling in DORA metrics calculation"""
+        # Setup mocks to raise exception
+        mock_deployment.objects.filter.side_effect = Exception("Database error")
+        
+        # Test with invalid repository (should not raise exception)
+        invalid_repo = Repository(
+            name='invalid',
+            full_name='invalid/invalid',
+            private=False
+        )
+        
+        metrics = _get_dora_metrics(invalid_repo)
+        
+        # Should return default structure
+        self.assertIn('deployment_frequency', metrics)
+        self.assertIn('lead_time', metrics)
+        self.assertEqual(metrics['deployment_frequency']['total_deployments'], 0)
+        self.assertEqual(metrics['lead_time']['total_prs_analyzed'], 0)

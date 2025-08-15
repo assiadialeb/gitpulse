@@ -65,6 +65,180 @@ def _is_sonarcloud_configured():
         return False
 
 
+def _get_dora_metrics(repository):
+    """Calculate DORA metrics for a repository"""
+    try:
+        from analytics.models import Deployment, PullRequest, Commit
+        from datetime import datetime, timedelta
+        import statistics
+        
+        # Get date range (last 6 months)
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=180)
+        
+        # Get production deployments with success
+        deployments_query = Deployment.objects.filter(repository_full_name=repository.full_name)
+        if start_date:
+            deployments_query = deployments_query.filter(created_at__gte=start_date)
+        if end_date:
+            deployments_query = deployments_query.filter(created_at__lte=end_date)
+        
+        deployments = list(deployments_query)
+        
+        # Filter production deployments with success
+        def is_production_deployment(deployment):
+            if not deployment.environment:
+                return False
+            env_lower = deployment.environment.lower()
+            prod_envs = ['production', 'prod', 'live', 'main', 'master', 'github-pages']
+            return any(prod_env in env_lower for prod_env in prod_envs)
+        
+        def get_deployment_success_time(deployment):
+            if not deployment.statuses:
+                return None
+            for status in deployment.statuses:
+                if status.get('state', '').lower() == 'success':
+                    timestamp_str = status.get('created_at') or status.get('updated_at')
+                    if timestamp_str:
+                        try:
+                            return datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        except (ValueError, TypeError):
+                            continue
+            return None
+        
+        prod_deployments = []
+        for deployment in deployments:
+            if is_production_deployment(deployment):
+                success_time = get_deployment_success_time(deployment)
+                if success_time:
+                    prod_deployments.append({
+                        'deployment': deployment,
+                        'success_time': success_time
+                    })
+        
+        prod_deployments.sort(key=lambda x: x['success_time'])
+        
+        # Get merged PRs
+        prs_query = PullRequest.objects.filter(
+            repository_full_name=repository.full_name,
+            state='closed'
+        )
+        if start_date:
+            prs_query = prs_query.filter(merged_at__gte=start_date)
+        if end_date:
+            prs_query = prs_query.filter(merged_at__lte=end_date)
+        
+        merged_prs = [pr for pr in prs_query if pr.merged_at is not None]
+        
+        # Calculate metrics
+        result = {
+            'deployment_frequency': {
+                'total_deployments': len(prod_deployments),
+                'period_days': 180,
+                'deployments_per_day': len(prod_deployments) / 180 if prod_deployments else 0
+            },
+            'lead_time': {
+                'lt1_median_hours': None,
+                'lt1_mean_hours': None,
+                'lt2_median_hours': None,
+                'lt2_mean_hours': None,
+                'total_prs_analyzed': 0
+            }
+        }
+        
+        # Calculate Lead Time if we have deployments
+        if len(prod_deployments) >= 2:
+            lead_times_lt1 = []  # first_commit -> deployment
+            lead_times_lt2 = []  # merged_at -> deployment
+            
+            for i, prod_deploy in enumerate(prod_deployments):
+                deploy_time = prod_deploy['success_time']
+                
+                # Define deployment window
+                if i == 0:
+                    window_start = datetime(2020, 1, 1, tzinfo=deploy_time.tzinfo)
+                else:
+                    window_start = prod_deployments[i-1]['success_time']
+                
+                # Ensure timezone consistency
+                if window_start.tzinfo is None:
+                    window_start = window_start.replace(tzinfo=deploy_time.tzinfo)
+                if deploy_time.tzinfo is None:
+                    deploy_time = deploy_time.replace(tzinfo=window_start.tzinfo)
+                
+                window_end = deploy_time
+                
+                # Find PRs merged in this window
+                prs_in_window = []
+                for pr in merged_prs:
+                    merged_at = pr.merged_at
+                    if merged_at.tzinfo is None:
+                        merged_at = merged_at.replace(tzinfo=deploy_time.tzinfo)
+                    
+                    if window_start < merged_at <= window_end:
+                        prs_in_window.append(pr)
+                
+                for pr in prs_in_window:
+                    # Calculate LT1: first_commit -> deployment
+                    if pr.commit_shas:
+                        # Get all commits for this PR
+                        commits = Commit.objects.filter(
+                            repository_full_name=repository.full_name,
+                            sha__in=pr.commit_shas
+                        )
+                        if commits:
+                            # Find the earliest commit (authored_date)
+                            first_commit = min(commits, key=lambda c: c.authored_date)
+                            first_commit_time = first_commit.authored_date
+                            
+                            # Ensure timezone consistency
+                            if first_commit_time.tzinfo is None:
+                                first_commit_time = first_commit_time.replace(tzinfo=deploy_time.tzinfo)
+                            
+                            lt1_hours = (deploy_time - first_commit_time).total_seconds() / 3600
+                            lead_times_lt1.append(lt1_hours)
+                    
+                    # Calculate LT2: merged_at -> deployment
+                    merged_at = pr.merged_at
+                    if merged_at.tzinfo is None:
+                        merged_at = merged_at.replace(tzinfo=deploy_time.tzinfo)
+                    
+                    lt2_hours = (deploy_time - merged_at).total_seconds() / 3600
+                    lead_times_lt2.append(lt2_hours)
+            
+            if lead_times_lt1:
+                result['lead_time']['lt1_median_hours'] = statistics.median(lead_times_lt1)
+                result['lead_time']['lt1_mean_hours'] = statistics.mean(lead_times_lt1)
+                result['lead_time']['lt1_median_days'] = statistics.median(lead_times_lt1) / 24
+                result['lead_time']['lt1_mean_days'] = statistics.mean(lead_times_lt1) / 24
+            
+            if lead_times_lt2:
+                result['lead_time']['lt2_median_hours'] = statistics.median(lead_times_lt2)
+                result['lead_time']['lt2_mean_hours'] = statistics.mean(lead_times_lt2)
+                result['lead_time']['lt2_median_days'] = statistics.median(lead_times_lt2) / 24
+                result['lead_time']['lt2_mean_days'] = statistics.mean(lead_times_lt2) / 24
+                result['lead_time']['total_prs_analyzed'] = len(lead_times_lt2)
+        
+        return result
+        
+    except Exception as e:
+        logger.warning(f"Error calculating DORA metrics for {repository.full_name}: {e}")
+        return {
+            'deployment_frequency': {
+                'total_deployments': 0,
+                'period_days': 180,
+                'deployments_per_day': 0
+            },
+            'lead_time': {
+                'lt1_median_hours': None,
+                'lt1_mean_hours': None,
+                'lt2_median_hours': None,
+                'lt2_mean_hours': None,
+                'total_prs_analyzed': 0
+            }
+        }
+
+
 def _get_codeql_metrics(repository, user_id: int):
     """Get latest CodeQL metrics for a repository"""
     import logging
@@ -371,6 +545,9 @@ def repository_detail(request, repo_id):
         # Get CodeQL metrics
         codeql_metrics = _get_codeql_metrics(repository, request.user.id)
         
+        # Get DORA metrics
+        dora_metrics = _get_dora_metrics(repository)
+        
         # Build context
         context = {
             'repository': repository,
@@ -408,6 +585,7 @@ def repository_detail(request, repo_id):
             'vulnerability_stats': vulnerability_stats,
             'sonarcloud_metrics': sonarcloud_metrics,
             'codeql_metrics': codeql_metrics,
+            'dora_metrics': dora_metrics,
         }
         
     except Exception as e:

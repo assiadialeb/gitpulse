@@ -115,8 +115,129 @@
     <!-- Analytics Dashboard -->
     <div class="space-y-8">
 
-
-
+        <!-- DORA Section -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-bold text-dark-gray mb-6">
+                <svg class="w-8 h-8 text-green-500 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M10 9.41721C9.16169 8.57524 8.20668 8 7 8C4.79086 8 3 9.79086 3 12C3 14.2091 4.79086 16 7 16C11.5 16 12.5 8 17 8C19.2091 8 21 9.79086 21 12C21 14.2091 19.2091 16 17 16C15.7933 16 14.8383 15.4248 14 14.5828" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                DevOps Research and Assessment (DORA)
+            </h2>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left side: 2x2 grid of tiles -->
+                <div class="lg:col-span-2">
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Deployment Frequency -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-green-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Deployment Frequency</p>
+                                    <p class="text-xl font-bold text-green-500">
+                                        {% if dora_metrics.deployment_frequency.deployments_per_day > 0 %}
+                                            {{ dora_metrics.deployment_frequency.deployments_per_day|floatformat:3 }}/day
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Total Deployments -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-orange-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Total Deployments</p>
+                                    <p class="text-xl font-bold text-orange-500">{{ dora_metrics.deployment_frequency.total_deployments }}</p>
+                                    <p class="text-xs text-gray-500">last 6 months</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Lead Time LT1 -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-blue-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Lead Time LT1</p>
+                                    <p class="text-xl font-bold text-blue-500">
+                                        {% if dora_metrics.lead_time.lt1_median_days %}
+                                            {{ dora_metrics.lead_time.lt1_median_days|floatformat:1 }}d
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </p>
+                                    <p class="text-xs text-gray-500">first commit → deploy</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Lead Time LT2 -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-purple-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-medium-gray text-sm">Lead Time LT2</p>
+                                    <p class="text-xl font-bold text-purple-500">
+                                        {% if dora_metrics.lead_time.lt2_median_days %}
+                                            {{ dora_metrics.lead_time.lt2_median_days|floatformat:1 }}d
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </p>
+                                    <p class="text-xs text-gray-500">merge → deploy</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right side: DORA metrics detailed block -->
+                <div class="lg:col-span-1">
+                    <div class="bg-gray-50 p-4 rounded-lg h-full">
+                        <h3 class="text-lg font-semibold text-dark-gray mb-4">📊 DORA Metrics</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-medium-gray text-sm">Deployments</span>
+                                <span class="font-medium text-sm">{{ dora_metrics.deployment_frequency.total_deployments }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-medium-gray text-sm">PRs Analyzed</span>
+                                <span class="font-medium text-sm">{{ dora_metrics.lead_time.total_prs_analyzed }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-medium-gray text-sm">Period</span>
+                                <span class="font-medium text-sm">{{ dora_metrics.deployment_frequency.period_days }} days</span>
+                            </div>
+                            {% if dora_metrics.lead_time.lt2_mean_hours %}
+                            <div class="flex justify-between">
+                                <span class="text-medium-gray text-sm">Avg LT2</span>
+                                <span class="font-medium text-sm">{{ dora_metrics.lead_time.lt2_mean_hours|floatformat:1 }}h</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Commits Section -->
         <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
