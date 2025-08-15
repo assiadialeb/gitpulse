@@ -42,8 +42,7 @@ GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, an
 - Python 3.12+
 - PostgreSQL (recommended) or SQLite
 - MongoDB
-- Redis
-- Git
+
 
 1. **Clone the repository**
 
