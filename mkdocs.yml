@@ -78,6 +78,7 @@ nav:
       - GitHub Setup: user-guide/github-setup.md
       - Repository :
           - Overview: user-guide/repositories/overview.md
+          - Dora Metrics: user-guide/repositories/dora-metrics.md
           - Commit Frequency: user-guide/repositories/commit-frequency.md
           - Commit Classification: user-guide/repositories/commit-classification.md
           - Pull Requests: user-guide/repositories/pull-requests.md
