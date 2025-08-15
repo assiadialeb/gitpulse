@@ -128,21 +128,24 @@
                 <div class="lg:col-span-2">
                     <div class="grid grid-cols-2 gap-4">
                         <!-- Deployment Frequency -->
-                        <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors duration-200" role="button" tabindex="0" onclick="openDeploymentsList()" onkeydown="if (event.key === 'Enter' || event.code === 'Space') { event.preventDefault(); openDeploymentsList(); }">
                             <div class="flex items-center">
-                                <div class="p-2 bg-green-500 bg-opacity-10 rounded-lg mr-3">
-                                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                <div class="p-2 bg-pink-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
                                     </svg>
                                 </div>
                                 <div>
                                     <p class="text-medium-gray text-sm">Deployment Frequency</p>
-                                    <p class="text-xl font-bold text-green-500">
+                                    <p class="text-xl font-bold {{ dora_metrics.deployment_frequency.performance.color }}">
                                         {% if dora_metrics.deployment_frequency.deployments_per_day > 0 %}
                                             {{ dora_metrics.deployment_frequency.deployments_per_day|floatformat:3 }}/day
                                         {% else %}
                                             N/A
                                         {% endif %}
+                                    </p>
+                                    <p class="text-xs {{ dora_metrics.deployment_frequency.performance.color }} font-medium">
+                                        {{ dora_metrics.deployment_frequency.performance.grade }}
                                     </p>
                                 </div>
                             </div>
@@ -151,14 +154,14 @@
                         <!-- Total Deployments -->
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <div class="flex items-center">
-                                <div class="p-2 bg-orange-500 bg-opacity-10 rounded-lg mr-3">
-                                    <svg class="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="p-2 bg-pink-500 bg-opacity-10 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
                                     </svg>
                                 </div>
                                 <div>
                                     <p class="text-medium-gray text-sm">Total Deployments</p>
-                                    <p class="text-xl font-bold text-orange-500">{{ dora_metrics.deployment_frequency.total_deployments }}</p>
+                                    <p class="text-xl font-bold {{ dora_metrics.deployment_frequency.performance.color }}">{{ dora_metrics.deployment_frequency.total_deployments }}</p>
                                     <p class="text-xs text-gray-500">last 6 months</p>
                                 </div>
                             </div>
@@ -174,7 +177,7 @@
                                 </div>
                                 <div>
                                     <p class="text-medium-gray text-sm">Lead Time LT1</p>
-                                    <p class="text-xl font-bold text-blue-500">
+                                    <p class="text-xl font-bold {{ dora_metrics.lead_time.lt1_performance.color }}">
                                         {% if dora_metrics.lead_time.lt1_median_days %}
                                             {{ dora_metrics.lead_time.lt1_median_days|floatformat:1 }}d
                                         {% else %}
@@ -182,6 +185,9 @@
                                         {% endif %}
                                     </p>
                                     <p class="text-xs text-gray-500">first commit → deploy</p>
+                                    <p class="text-xs {{ dora_metrics.lead_time.lt1_performance.color }} font-medium">
+                                        {{ dora_metrics.lead_time.lt1_performance.grade }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -196,7 +202,7 @@
                                 </div>
                                 <div>
                                     <p class="text-medium-gray text-sm">Lead Time LT2</p>
-                                    <p class="text-xl font-bold text-purple-500">
+                                    <p class="text-xl font-bold {{ dora_metrics.lead_time.lt2_performance.color }}">
                                         {% if dora_metrics.lead_time.lt2_median_days %}
                                             {{ dora_metrics.lead_time.lt2_median_days|floatformat:1 }}d
                                         {% else %}
@@ -204,6 +210,9 @@
                                         {% endif %}
                                     </p>
                                     <p class="text-xs text-gray-500">merge → deploy</p>
+                                    <p class="text-xs {{ dora_metrics.lead_time.lt2_performance.color }} font-medium">
+                                        {{ dora_metrics.lead_time.lt2_performance.grade }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -503,8 +512,7 @@
                     <h3 class="text-lg font-semibold text-dark-gray mb-4">
                         <span class="inline-flex items-center justify-center p-2 bg-pink-500 bg-opacity-10 rounded-xl mr-2">
                             <svg class="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
                             </svg>
                         </span>
                         Deployments

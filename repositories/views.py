@@ -65,6 +65,56 @@ def _is_sonarcloud_configured():
         return False
 
 
+def _classify_dora_performance(metric_type, value):
+    """
+    Classify DORA metric performance based on Google's State of DevOps Report benchmarks.
+    
+    Args:
+        metric_type (str): 'deployment_frequency', 'lt1', or 'lt2'
+        value (float): The metric value
+    
+    Returns:
+        dict: {'grade': 'Elite|High|Medium|Low', 'color': 'text-green-600|text-blue-600|text-yellow-600|text-red-600'}
+    """
+    if value is None or value <= 0:
+        return {'grade': 'N/A', 'color': 'text-gray-500'}
+    
+    if metric_type == 'deployment_frequency':
+        # Deployments per day
+        if value >= 1.0:  # Several times per day
+            return {'grade': 'Elite', 'color': 'text-green-600'}
+        elif value >= 0.14:  # Once per day to once per week (1/7)
+            return {'grade': 'High', 'color': 'text-blue-600'}
+        elif value >= 0.03:  # Once per week to once per month (1/30)
+            return {'grade': 'Medium', 'color': 'text-yellow-600'}
+        else:  # Less than once per month
+            return {'grade': 'Low', 'color': 'text-red-600'}
+    
+    elif metric_type == 'lt1':
+        # Lead Time LT1 in days (first commit to production)
+        if value < 0.042:  # Less than 1 hour (1/24)
+            return {'grade': 'Elite', 'color': 'text-green-600'}
+        elif value < 1.0:  # Less than 1 day
+            return {'grade': 'High', 'color': 'text-blue-600'}
+        elif value <= 7.0:  # 1 day to 1 week
+            return {'grade': 'Medium', 'color': 'text-yellow-600'}
+        else:  # More than 1 week
+            return {'grade': 'Low', 'color': 'text-red-600'}
+    
+    elif metric_type == 'lt2':
+        # Lead Time LT2 in days (merge to production)
+        if value < 0.042:  # Less than 1 hour (1/24)
+            return {'grade': 'Elite', 'color': 'text-green-600'}
+        elif value < 0.5:  # Less than 12 hours (1/2 day)
+            return {'grade': 'High', 'color': 'text-blue-600'}
+        elif value <= 2.0:  # 12 hours to 2 days
+            return {'grade': 'Medium', 'color': 'text-yellow-600'}
+        else:  # More than 2 days
+            return {'grade': 'Low', 'color': 'text-red-600'}
+    
+    return {'grade': 'N/A', 'color': 'text-gray-500'}
+
+
 def _get_dora_metrics(repository):
     """Calculate DORA metrics for a repository"""
     try:
@@ -130,18 +180,29 @@ def _get_dora_metrics(repository):
         
         merged_prs = [pr for pr in prs_query if pr.merged_at is not None]
         
+        # Calculate deployment frequency
+        deployments_per_day = len(prod_deployments) / 180 if prod_deployments else 0
+        deployment_frequency_performance = _classify_dora_performance('deployment_frequency', deployments_per_day)
+        
         # Calculate metrics
         result = {
             'deployment_frequency': {
                 'total_deployments': len(prod_deployments),
                 'period_days': 180,
-                'deployments_per_day': len(prod_deployments) / 180 if prod_deployments else 0
+                'deployments_per_day': deployments_per_day,
+                'performance': deployment_frequency_performance
             },
             'lead_time': {
                 'lt1_median_hours': None,
                 'lt1_mean_hours': None,
+                'lt1_median_days': None,
+                'lt1_mean_days': None,
+                'lt1_performance': {'grade': 'N/A', 'color': 'text-gray-500'},
                 'lt2_median_hours': None,
                 'lt2_mean_hours': None,
+                'lt2_median_days': None,
+                'lt2_mean_days': None,
+                'lt2_performance': {'grade': 'N/A', 'color': 'text-gray-500'},
                 'total_prs_analyzed': 0
             }
         }
@@ -207,16 +268,22 @@ def _get_dora_metrics(repository):
                     lead_times_lt2.append(lt2_hours)
             
             if lead_times_lt1:
+                lt1_median_days = statistics.median(lead_times_lt1) / 24
+                lt1_mean_days = statistics.mean(lead_times_lt1) / 24
                 result['lead_time']['lt1_median_hours'] = statistics.median(lead_times_lt1)
                 result['lead_time']['lt1_mean_hours'] = statistics.mean(lead_times_lt1)
-                result['lead_time']['lt1_median_days'] = statistics.median(lead_times_lt1) / 24
-                result['lead_time']['lt1_mean_days'] = statistics.mean(lead_times_lt1) / 24
+                result['lead_time']['lt1_median_days'] = lt1_median_days
+                result['lead_time']['lt1_mean_days'] = lt1_mean_days
+                result['lead_time']['lt1_performance'] = _classify_dora_performance('lt1', lt1_median_days)
             
             if lead_times_lt2:
+                lt2_median_days = statistics.median(lead_times_lt2) / 24
+                lt2_mean_days = statistics.mean(lead_times_lt2) / 24
                 result['lead_time']['lt2_median_hours'] = statistics.median(lead_times_lt2)
                 result['lead_time']['lt2_mean_hours'] = statistics.mean(lead_times_lt2)
-                result['lead_time']['lt2_median_days'] = statistics.median(lead_times_lt2) / 24
-                result['lead_time']['lt2_mean_days'] = statistics.mean(lead_times_lt2) / 24
+                result['lead_time']['lt2_median_days'] = lt2_median_days
+                result['lead_time']['lt2_mean_days'] = lt2_mean_days
+                result['lead_time']['lt2_performance'] = _classify_dora_performance('lt2', lt2_median_days)
                 result['lead_time']['total_prs_analyzed'] = len(lead_times_lt2)
         
         return result
@@ -227,13 +294,20 @@ def _get_dora_metrics(repository):
             'deployment_frequency': {
                 'total_deployments': 0,
                 'period_days': 180,
-                'deployments_per_day': 0
+                'deployments_per_day': 0,
+                'performance': {'grade': 'N/A', 'color': 'text-gray-500'}
             },
             'lead_time': {
                 'lt1_median_hours': None,
                 'lt1_mean_hours': None,
+                'lt1_median_days': None,
+                'lt1_mean_days': None,
+                'lt1_performance': {'grade': 'N/A', 'color': 'text-gray-500'},
                 'lt2_median_hours': None,
                 'lt2_mean_hours': None,
+                'lt2_median_days': None,
+                'lt2_mean_days': None,
+                'lt2_performance': {'grade': 'N/A', 'color': 'text-gray-500'},
                 'total_prs_analyzed': 0
             }
         }

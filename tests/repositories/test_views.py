@@ -130,6 +130,11 @@ class DORAMetricsTestCase(TestCase):
         self.assertEqual(metrics['deployment_frequency']['period_days'], 180)
         self.assertAlmostEqual(metrics['deployment_frequency']['deployments_per_day'], 0.011, places=3)
         
+        # Check deployment frequency performance
+        self.assertIn('performance', metrics['deployment_frequency'])
+        self.assertIn('grade', metrics['deployment_frequency']['performance'])
+        self.assertIn('color', metrics['deployment_frequency']['performance'])
+        
         # Check lead time structure
         self.assertIn('lt1_median_hours', metrics['lead_time'])
         self.assertIn('lt1_mean_hours', metrics['lead_time'])
@@ -139,7 +144,15 @@ class DORAMetricsTestCase(TestCase):
         self.assertIn('lt1_mean_days', metrics['lead_time'])
         self.assertIn('lt2_median_days', metrics['lead_time'])
         self.assertIn('lt2_mean_days', metrics['lead_time'])
+        self.assertIn('lt1_performance', metrics['lead_time'])
+        self.assertIn('lt2_performance', metrics['lead_time'])
         self.assertIn('total_prs_analyzed', metrics['lead_time'])
+        
+        # Check performance structure
+        self.assertIn('grade', metrics['lead_time']['lt1_performance'])
+        self.assertIn('color', metrics['lead_time']['lt1_performance'])
+        self.assertIn('grade', metrics['lead_time']['lt2_performance'])
+        self.assertIn('color', metrics['lead_time']['lt2_performance'])
     
     @patch('analytics.models.Deployment')
     @patch('analytics.models.PullRequest')
@@ -341,3 +354,34 @@ class DORAMetricsTestCase(TestCase):
         self.assertIn('lead_time', metrics)
         self.assertEqual(metrics['deployment_frequency']['total_deployments'], 0)
         self.assertEqual(metrics['lead_time']['total_prs_analyzed'], 0)
+        
+        # Check performance fields exist even on error
+        self.assertIn('performance', metrics['deployment_frequency'])
+        self.assertIn('lt1_performance', metrics['lead_time'])
+        self.assertIn('lt2_performance', metrics['lead_time'])
+
+    def test_classify_dora_performance(self):
+        """Test DORA performance classification function"""
+        from repositories.views import _classify_dora_performance
+        
+        # Test deployment frequency classification
+        self.assertEqual(_classify_dora_performance('deployment_frequency', 2.0)['grade'], 'Elite')
+        self.assertEqual(_classify_dora_performance('deployment_frequency', 0.5)['grade'], 'High')
+        self.assertEqual(_classify_dora_performance('deployment_frequency', 0.1)['grade'], 'Medium')
+        self.assertEqual(_classify_dora_performance('deployment_frequency', 0.01)['grade'], 'Low')
+        
+        # Test LT1 classification
+        self.assertEqual(_classify_dora_performance('lt1', 0.01)['grade'], 'Elite')
+        self.assertEqual(_classify_dora_performance('lt1', 0.5)['grade'], 'High')
+        self.assertEqual(_classify_dora_performance('lt1', 3.0)['grade'], 'Medium')
+        self.assertEqual(_classify_dora_performance('lt1', 10.0)['grade'], 'Low')
+        
+        # Test LT2 classification
+        self.assertEqual(_classify_dora_performance('lt2', 0.01)['grade'], 'Elite')
+        self.assertEqual(_classify_dora_performance('lt2', 0.2)['grade'], 'High')
+        self.assertEqual(_classify_dora_performance('lt2', 1.0)['grade'], 'Medium')
+        self.assertEqual(_classify_dora_performance('lt2', 3.0)['grade'], 'Low')
+        
+        # Test edge cases
+        self.assertEqual(_classify_dora_performance('deployment_frequency', 0)['grade'], 'N/A')
+        self.assertEqual(_classify_dora_performance('deployment_frequency', None)['grade'], 'N/A')
