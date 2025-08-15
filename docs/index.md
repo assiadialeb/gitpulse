@@ -6,7 +6,8 @@
 
 **GitPulse** is an open-source dashboard designed to analyze and contextualize developer activity and contribution trends within a GitHub organization.
 
-I started building it as a CTO because I couldn't find a tool that was simple and reliable enough to truly understand the work of my teams and products. Most analytics tools are focused on superficial vanity metrics. GitPulse goes beyond the commit count to provide a qualitative and transparent view of development efforts.
+I started building it as a CTO because I couldn't find a tool that was simple and reliable enough to truly understand the work of my teams and products. Most analytics tools are focused on superficial vanity metrics and risk turning into tools for surveillance. GitPulse is different. It’s an analytical tool to drive a culture of performance, not a tracking tool for surveillance. It’s built to foster transparency and dialogue, and to help teams grow by valuing real impact over simple activity.
+
 
 GitPulse is a personal project, developed during my free time. It will evolve based on my availability and interests. Unlike most solutions that focus on repository-level data, GitPulse lets you group multiple repositories into a single logical project—reflecting how real software is built and delivered. This holistic approach is perfect for tracking large apps, microservices, or monorepo-like architectures.
 
