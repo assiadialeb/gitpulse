@@ -118,29 +118,60 @@ def repository_list(request):
     if sort_by not in allowed_sort_fields:
         sort_by = 'full_name'
     
-    # Build order_by
-    if order == 'desc':
-        sort_by = f'-{sort_by}'
+    # Filter repositories (all repositories visible to all users)
+    repositories = Repository.objects.all()
     
-    # Filter repositories and sort (all repositories visible to all users)
-    repositories = Repository.objects.all().order_by(sort_by)
+    # Handle KLOC sorting separately since it's now a property, not a database field
+    if sort_by == 'kloc':
+        # Apply search filter first if needed
+        if search_query:
+            repositories = repositories.filter(
+                Q(name__icontains=search_query) |
+                Q(full_name__icontains=search_query) |
+                Q(description__icontains=search_query)
+            )
+        
+        # Get all repositories and sort them in Python using the property
+        repos_list = list(repositories)
+        reverse_sort = (order == 'desc')
+        repos_list.sort(key=lambda x: x.kloc, reverse=reverse_sort)
+        
+        # Use the sorted list for pagination
+        paginator = Paginator(repos_list, 50)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        
+        # Stats
+        total_repos = len(repos_list)
+        indexed_repos = sum(1 for repo in repos_list if repo.is_indexed)
+        total_commits = sum(repo.commit_count for repo in repos_list)
+    else:
+        # Build order_by for database fields
+        if order == 'desc':
+            sort_by = f'-{sort_by}'
+        
+        # Sort by database field
+        repositories = repositories.order_by(sort_by)
+        
+        # Apply search filter
+        if search_query:
+            repositories = repositories.filter(
+                Q(name__icontains=search_query) |
+                Q(full_name__icontains=search_query) |
+                Q(description__icontains=search_query)
+            )
+        
+        # Pagination
+        paginator = Paginator(repositories, 50)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        
+        # Stats
+        total_repos = repositories.count()
+        indexed_repos = repositories.filter(is_indexed=True).count()
+        total_commits = repositories.aggregate(total=Sum('commit_count'))['total'] or 0
     
-    if search_query:
-        repositories = repositories.filter(
-            Q(name__icontains=search_query) |
-            Q(full_name__icontains=search_query) |
-            Q(description__icontains=search_query)
-        )
-    
-    # Pagination
-    paginator = Paginator(repositories, 50)  # Increased page size for better UX
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    # Stats
-    total_repos = repositories.count()
-    indexed_repos = repositories.filter(is_indexed=True).count()
-    total_commits = repositories.aggregate(total=Sum('commit_count'))['total'] or 0
+
     
     # If AJAX request, return JSON
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':

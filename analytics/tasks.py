@@ -372,11 +372,6 @@ def background_indexing_task(repository_id: int, user_id: int, task_id: Optional
                         kloc_service = KLOCService()
                         kloc_data = kloc_service.calculate_kloc(repo_path)
 
-                        # Update repository with KLOC data
-                        repository.kloc = kloc_data['kloc']
-                        repository.kloc_calculated_at = timezone.now()
-                        repository.save()
-
                         # Save KLOC history
                         kloc_history = RepositoryKLOCHistory(
                             repository_full_name=repository.full_name,
@@ -1493,16 +1488,10 @@ def index_commits_intelligent_task(repository_id):
             should_calculate_kloc = True
             kloc_reason = "backfill_complete"
             
-            # Check if KLOC needs recalculation (missing or older than 30 days)
-            if repository.kloc_calculated_at:
-                days_since_kloc = (timezone.now() - repository.kloc_calculated_at).days
-                if days_since_kloc < 30:
-                    should_calculate_kloc = False
-                    logger.info(f"KLOC for {repository.full_name} was calculated {days_since_kloc} days ago, skipping recalculation")
-                else:
-                    kloc_reason = f"kloc_old_{days_since_kloc}_days"
-            else:
-                kloc_reason = "kloc_missing"
+            # Check if KLOC needs recalculation using MongoDB history
+            should_calculate_kloc, kloc_reason = repository.should_calculate_kloc(max_days=30)
+            if not should_calculate_kloc:
+                logger.info(f"KLOC for {repository.full_name} is recent, skipping recalculation: {kloc_reason}")
             
             if should_calculate_kloc:
                 try:
@@ -1528,11 +1517,6 @@ def index_commits_intelligent_task(repository_id):
                     # Calculate KLOC
                     from .kloc_service import KLOCService
                     kloc_data = KLOCService.calculate_kloc(safe_repo_path or repo_path)
-
-                    # Persist KLOC on relational model
-                    repository.kloc = kloc_data.get('kloc', 0.0)
-                    repository.kloc_calculated_at = timezone.now()
-                    repository.save()
 
                     # Save KLOC history in Mongo
                     try:
@@ -1698,16 +1682,10 @@ def index_commits_git_local_task(repository_id):
         should_calculate_kloc = True
         kloc_reason = "git_local_backfill"
         
-        # Check if KLOC needs recalculation (missing or older than 30 days)
-        if repository.kloc_calculated_at:
-            days_since_kloc = (timezone.now() - repository.kloc_calculated_at).days
-            if days_since_kloc < 30:
-                should_calculate_kloc = False
-                logger.info(f"KLOC for {repository.full_name} was calculated {days_since_kloc} days ago, skipping recalculation")
-            else:
-                kloc_reason = f"kloc_old_{days_since_kloc}_days"
-        else:
-            kloc_reason = "kloc_missing"
+        # Check if KLOC needs recalculation using MongoDB history
+        should_calculate_kloc, kloc_reason = repository.should_calculate_kloc(max_days=30)
+        if not should_calculate_kloc:
+            logger.info(f"KLOC for {repository.full_name} is recent, skipping recalculation: {kloc_reason}")
         
         if should_calculate_kloc:
             try:
@@ -1727,11 +1705,6 @@ def index_commits_git_local_task(repository_id):
                 # Calculate KLOC
                 from .kloc_service import KLOCService
                 kloc_data = KLOCService.calculate_kloc(safe_repo_path or repo_path)
-
-                # Persist KLOC on relational model
-                repository.kloc = kloc_data.get('kloc', 0.0)
-                repository.kloc_calculated_at = timezone.now()
-                repository.save()
 
                 # Save KLOC history in Mongo
                 try:

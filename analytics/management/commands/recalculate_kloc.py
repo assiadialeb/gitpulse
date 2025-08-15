@@ -52,15 +52,16 @@ class Command(BaseCommand):
             if not force:
                 # Only include repositories where KLOC was never calculated or calculated more than 7 days ago
                 from django.utils import timezone
-                from datetime import timedelta
-                cutoff_date = timezone.now() - timedelta(days=7)
-                from django.db.models import Q
-                repositories = repositories.filter(
-                    Q(kloc_calculated_at__isnull=True) | 
-                    Q(kloc_calculated_at__lt=cutoff_date)
-                )
+                # Filter repositories that need KLOC recalculation using MongoDB
+                repositories_to_recalculate = []
+                for repo in repositories:
+                    should_calc, reason = repo.should_calculate_kloc(max_days=7)
+                    if should_calc:
+                        repositories_to_recalculate.append(repo)
+                
+                repositories = repositories_to_recalculate
         
-        count = repositories.count()
+        count = len(repositories)
         self.stdout.write(f"Found {count} repositories to recalculate KLOC for")
         
         if count == 0:
@@ -131,11 +132,6 @@ class Command(BaseCommand):
             # Calculate KLOC
             kloc_service = KLOCService()
             kloc_data = kloc_service.calculate_kloc(safe_repo_path)
-            
-            # Update repository
-            repository.kloc = kloc_data.get('kloc', 0.0)
-            repository.kloc_calculated_at = timezone.now()
-            repository.save()
             
             # Save KLOC history
             try:

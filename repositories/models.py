@@ -31,9 +31,9 @@ class Repository(models.Model):
     last_indexed = models.DateTimeField(null=True, blank=True)
     commit_count = models.IntegerField(default=0)
     
-    # KLOC (Kilo Lines of Code) tracking
-    kloc = models.FloatField(default=0.0)  # Current KLOC value
-    kloc_calculated_at = models.DateTimeField(null=True, blank=True)  # When KLOC was last calculated
+    # KLOC (Kilo Lines of Code) tracking - now using MongoDB via properties
+    # kloc = models.FloatField(default=0.0)  # Current KLOC value - REMOVED
+    # kloc_calculated_at = models.DateTimeField(null=True, blank=True)  # When KLOC was last calculated - REMOVED
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -59,6 +59,74 @@ class Repository(models.Model):
         """Extract repository name from full_name"""
         return self.full_name.split('/')[1] if '/' in self.full_name else self.name
     
+    def should_calculate_kloc(self, max_days=30):
+        """
+        Check if KLOC should be recalculated based on MongoDB history
+        
+        Args:
+            max_days: Maximum days since last calculation before requiring recalculation
+            
+        Returns:
+            tuple: (should_calculate, reason)
+        """
+        try:
+            from analytics.models import RepositoryKLOCHistory
+            latest = RepositoryKLOCHistory.objects.filter(
+                repository_id=self.id
+            ).order_by('-calculated_at').first()
+            
+            if not latest:
+                return True, "kloc_missing"
+            
+            from django.utils import timezone
+            from datetime import timezone as dt_timezone
+            
+            # Ensure both dates are timezone-aware
+            now = timezone.now()
+            calculated_at = latest.calculated_at
+            
+            # If calculated_at is naive, assume UTC
+            if calculated_at.tzinfo is None:
+                calculated_at = calculated_at.replace(tzinfo=dt_timezone.utc)
+            
+            days_since = (now - calculated_at).days
+            
+            if days_since >= max_days:
+                return True, f"kloc_old_{days_since}_days"
+            else:
+                return False, f"kloc_recent_{days_since}_days"
+                
+        except Exception as e:
+            # Log error but default to calculating
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error checking KLOC history for {self.full_name}: {e}")
+            return True, "kloc_error"
+
+    @property
+    def kloc(self):
+        """Get the latest KLOC value from MongoDB history"""
+        try:
+            from analytics.models import RepositoryKLOCHistory
+            latest = RepositoryKLOCHistory.objects.filter(
+                repository_id=self.id
+            ).order_by('-calculated_at').first()
+            return latest.kloc if latest else 0.0
+        except Exception:
+            return 0.0
+
+    @property
+    def kloc_calculated_at(self):
+        """Get the latest KLOC calculation date from MongoDB history"""
+        try:
+            from analytics.models import RepositoryKLOCHistory
+            latest = RepositoryKLOCHistory.objects.filter(
+                repository_id=self.id
+            ).order_by('-calculated_at').first()
+            return latest.calculated_at if latest else None
+        except Exception:
+            return None
+
     def delete(self, *args, **kwargs):
         """
         Standard delete method - no cascade delete by default.

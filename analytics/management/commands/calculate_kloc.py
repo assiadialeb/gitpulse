@@ -63,11 +63,11 @@ class Command(BaseCommand):
             return
 
         # Check if KLOC was recently calculated (unless --force)
-        if not options['force'] and repository.kloc_calculated_at:
-            days_since = (timezone.now() - repository.kloc_calculated_at).days
-            if days_since < 7:  # Skip if calculated less than 7 days ago
+        if not options['force']:
+            should_calculate, reason = repository.should_calculate_kloc(max_days=7)
+            if not should_calculate:
                 self.stdout.write(
-                    self.style.WARNING(f'KLOC was calculated {days_since} days ago. Use --force to recalculate.')
+                    self.style.WARNING(f'KLOC is recent: {reason}. Use --force to recalculate.')
                 )
                 return
 
@@ -101,11 +101,6 @@ class Command(BaseCommand):
             if options['dry_run']:
                 self.stdout.write(f'[DRY RUN] KLOC result: {kloc_data}')
                 return
-
-            # Update repository
-            repository.kloc = kloc_data.get('kloc', 0.0)
-            repository.kloc_calculated_at = timezone.now()
-            repository.save()
 
             # Save KLOC history
             kloc_history = RepositoryKLOCHistory(
