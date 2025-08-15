@@ -223,7 +223,7 @@ class DeploymentIndexingService:
                 deployment.payload = deployment_data.get('payload', {})
                 
                 # Fetch deployment statuses (refresh logic: new/missing, non-terminal, or metadata changed)
-                refresh_needed = created or not deployment.statuses
+                refresh_needed = created or not deployment.statuses or len(deployment.statuses) == 0
                 if not refresh_needed:
                     try:
                         last_state = str((deployment.statuses or [{}])[-1].get('state', '')).lower()
