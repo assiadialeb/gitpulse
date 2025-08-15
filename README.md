@@ -4,6 +4,8 @@ GitPulse is an open-source analytics dashboard designed for CTOs, tech leads, an
 
 🚨 **GitPulse is under alpha dev process, i can introduce breaking changes**
 
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=assiadialeb_gitpulse&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=assiadialeb_gitpulse) [![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=assiadialeb_gitpulse&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=assiadialeb_gitpulse) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=assiadialeb_gitpulse&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=assiadialeb_gitpulse)
+
 📄 [Documentation](https://assiadialeb.github.io/gitpulse/)
 
 ## 🚀 Quick Start
