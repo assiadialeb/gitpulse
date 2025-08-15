@@ -64,9 +64,9 @@ class CodeQLIndexingService:
             
             logger.info("Fetched %d CodeQL alerts for %s", len(alerts), repository_full_name)
             
-            self._process_alerts(alerts, codeql_service, repository_full_name, results)
+            current_alert_ids = self._process_alerts(alerts, codeql_service, repository_full_name, results)
             
-            self._cleanup_obsolete_vulnerabilities(repository_full_name, results)
+            self._cleanup_obsolete_vulnerabilities(repository_full_name, results, current_alert_ids)
             
             self._complete_indexing(state, results, repository_full_name)
             
@@ -168,7 +168,7 @@ class CodeQLIndexingService:
         state.save()
         return results
 
-    def _process_alerts(self, alerts: List, codeql_service, repository_full_name: str, results: Dict):
+    def _process_alerts(self, alerts: List, codeql_service, repository_full_name: str, results: Dict) -> List[str]:
         """Process all alerts"""
         processed_alert_ids = []
         open_alert_ids = []
@@ -202,10 +202,12 @@ class CodeQLIndexingService:
                 error_msg = f"Error processing alert {alert_data.get('id')}: {e}"
                 logger.error(error_msg)
                 results['errors'].append(error_msg)
+        
+        return processed_alert_ids
 
-    def _cleanup_obsolete_vulnerabilities(self, repository_full_name: str, results: Dict):
+    def _cleanup_obsolete_vulnerabilities(self, repository_full_name: str, results: Dict, current_alert_ids: List[str]):
         """Remove obsolete vulnerabilities"""
-        removed_count = self._remove_obsolete_vulnerabilities(repository_full_name, [])
+        removed_count = self._remove_obsolete_vulnerabilities(repository_full_name, current_alert_ids)
         results['vulnerabilities_removed'] = removed_count
 
     def _complete_indexing(self, state: IndexingState, results: Dict, repository_full_name: str):
@@ -277,7 +279,13 @@ class CodeQLIndexingService:
         
         # Skip if indexed in the last 6 hours (CodeQL analysis doesn't change frequently)
         min_interval = timedelta(hours=6)
-        time_since_last = datetime.now(dt_timezone.utc) - state.last_indexed_at
+        
+        # Ensure last_indexed_at is timezone-aware
+        last_indexed_at = state.last_indexed_at
+        if last_indexed_at and last_indexed_at.tzinfo is None:
+            last_indexed_at = last_indexed_at.replace(tzinfo=dt_timezone.utc)
+        
+        time_since_last = datetime.now(dt_timezone.utc) - last_indexed_at
         
         if time_since_last < min_interval:
             logger.info("Skipping CodeQL indexing - last indexed %s ago", time_since_last)
