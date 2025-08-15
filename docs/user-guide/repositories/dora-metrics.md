@@ -109,15 +109,12 @@ To calculate DORA metrics, GitPulse requires:
 ### For Deployment Frequency:
 
 - Production deployments with success statuses
-- Deployment timestamps
 - Environment information (to identify production deployments)
 
 ### For Lead Time Calculations:
 
-- Pull requests with merge timestamps
-- Commits associated with each PR
-- Commit authorship timestamps
-- Deployment timestamps
+- Pull requests with merge
+- Deployment 
 
 ### Production Environment Detection:
 
@@ -137,7 +134,7 @@ GitPulse automatically identifies production deployments by looking for:
 
 ### Areas for Improvement:
 
-- **Low** or**Medium** grades
+- **Low** or **Medium** grades
 - High variance in lead times
 - Infrequent deployments
 - Long delays between merge and deployment
@@ -162,7 +159,6 @@ GitPulse plans to add:
 - **Change Failure Rate** calculation
 - **Mean Time to Recovery (MTTR)** metrics
 - Historical trend analysis
-- Team-level performance comparisons
 - Custom time period selection
 
 ## References
