@@ -1,15 +1,16 @@
-# GitPulse - GitHub Analytics Dashboard
+# GitPulse - Measure what matters.
 
-**GitHub Analytics Dashboard for CTOs, Tech Leads, and Curious Developers**
+**The Open Source GitHub Analytics Dashboard for CTOs, Tech Leads, and Curious Developers**
 
 # 🧭 What is GitPulse?
 
-**GitPulse** is an open-source dashboard designed to analyze developer activity and contribution trends within a GitHub organization.
+**GitPulse** is an open-source dashboard designed to analyze and contextualize developer activity and contribution trends within a GitHub organization.
 
-I started building it as a **CTO** because I couldn't find a tool that was simple and reliable enough to track the activity of my teams and products. GitPulse is a **personal project**, developed during my free time. It will evolve based on my availability and interests.
-Most GitHub/Git analytics tools focus on repository-level data. GitPulse lets you group multiple repositories into a single logical project — reflecting how real software is built and delivered. Perfect for tracking large apps, microservices, or monorepo-like architectures.
+I started building it as a CTO because I couldn't find a tool that was simple and reliable enough to truly understand the work of my teams and products. Most analytics tools are focused on superficial vanity metrics. GitPulse goes beyond the commit count to provide a qualitative and transparent view of development efforts.
 
-I'm currently building GitPulse **solo**, with no QA team. If you encounter bugs or unexpected behavior, **contributions are welcome**—as long as they stay aligned with the spirit of the project: useful, readable, and not overengineered.
+GitPulse is a personal project, developed during my free time. It will evolve based on my availability and interests. Unlike most solutions that focus on repository-level data, GitPulse lets you group multiple repositories into a single logical project—reflecting how real software is built and delivered. This holistic approach is perfect for tracking large apps, microservices, or monorepo-like architectures.
+
+I'm currently building GitPulse solo, with no QA team. If you encounter bugs or unexpected behavior, contributions are welcome—as long as they stay aligned with the spirit of the project: useful, readable, and not overengineered.
 
 <figure markdown="span">
 ![GitPulse Dashboard](images/dashboard.png){ width="400" }
@@ -99,13 +100,13 @@ This project is licensed under the AGPL v3 License - see the [LICENSE](licence/g
 
 ## 🙏 Acknowledgments
 
-- Crafted in [Python](https://python.org)
-- Built with [Django](https://djangoproject.com)
-- UI powered by [DaisyUI](https://daisyui.com)
-- Documentation with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
+- Crafted in[Python](https://python.org)
+- Built with[Django](https://djangoproject.com)
+- UI powered by[DaisyUI](https://daisyui.com)
+- Documentation with[MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
 - And yes, way too much JavaScript 😅
-- Backends provided by [Postgresql](https://www.postgresql.org) and [MongoDB](https://www.mongodb.com)
-- AI feature provided by [Ollama](https://ollama.org)
+- Backends provided by[Postgresql](https://www.postgresql.org) and[MongoDB](https://www.mongodb.com)
+- AI feature provided by[Ollama](https://ollama.org)
 - Plus countless other amazing Open Source libraries that make this project possible 💜
 
 **Crafted with ☕️ (and way too many late nights) for the tech managers community**
