@@ -443,7 +443,7 @@ class GitService:
             # Debug: Log the raw output length
             raw_output = result.stdout.strip()
             logger.info(f"Raw git output length: {len(raw_output)} characters")
-            logger.info(f"Raw git output lines: {len(raw_output.split('\n'))}")
+            logger.info(f"Raw git output lines: {len(raw_output.split(chr(10)))}")
             
             for line in result.stdout.strip().split('\n'):
                 total_lines += 1
