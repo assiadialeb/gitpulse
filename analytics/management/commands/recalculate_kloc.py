@@ -154,7 +154,9 @@ class Command(BaseCommand):
                 import tempfile
                 import os
                 import shutil
-                repo_path_unsanitized = os.path.join(tempfile.gettempdir(), f"gitpulse_{repository.full_name.replace('/', '_')}")
+                # Use sanitized directory name for safe path construction
+                safe_dir_name = git_service._sanitize_repo_dir_name(repository.full_name)
+                repo_path_unsanitized = os.path.join(tempfile.gettempdir(), f"gitpulse_{safe_dir_name}")
                 if os.path.exists(repo_path_unsanitized):
                     shutil.rmtree(repo_path_unsanitized)
                     logger.info(f"Cleaned up cloned repository for {repository.full_name}")

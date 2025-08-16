@@ -353,7 +353,10 @@ def background_indexing_task(repository_id: int, user_id: int, task_id: Optional
                 from .sanitization import assert_safe_repo_path
                 
                 # Get repository path (same as GitService)
-                repo_path_unsanitized = os.path.join(tempfile.gettempdir(), f"gitpulse_{repository.full_name.replace('/', '_')}")
+                from .git_service import GitService
+                git_service = GitService()
+                safe_dir_name = git_service._sanitize_repo_dir_name(repository.full_name)
+                repo_path_unsanitized = os.path.join(tempfile.gettempdir(), f"gitpulse_{safe_dir_name}")
 
                 # If no local clone exists, skip quietly (API flow handles KLOC now)
                 if not os.path.exists(repo_path_unsanitized):

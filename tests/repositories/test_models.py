@@ -37,8 +37,6 @@ class TestRepositoryModel(TestCase):
             is_indexed=True,
             last_indexed=timezone.now(),
             commit_count=500,
-            kloc=150.5,
-            kloc_calculated_at=timezone.now(),
             owner=self.user
         )
     
@@ -57,7 +55,8 @@ class TestRepositoryModel(TestCase):
         self.assertEqual(self.repository.github_id, 123456789)
         self.assertTrue(self.repository.is_indexed)
         self.assertEqual(self.repository.commit_count, 500)
-        self.assertEqual(self.repository.kloc, 150.5)
+        # kloc is now a property that retrieves from MongoDB, default to 0.0 if no history
+        self.assertEqual(self.repository.kloc, 0.0)
         self.assertEqual(self.repository.owner, self.user)
     
     def test_repository_str_representation(self):
