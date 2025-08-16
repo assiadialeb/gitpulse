@@ -916,13 +916,28 @@
             <p class="text-gray-600 mb-6">This repository will be automatically indexed during the next scheduled indexing run. Analytics will be available once indexing is complete.</p>
         </div>
         <div class="text-sm text-gray-500">
-            <p>Automatic indexing runs daily at:</p>
-            <ul class="list-disc list-inside mt-2">
-                <li>Commits: 03:24 UTC</li>
-                <li>Pull Requests: 00:06 UTC</li>
-                <li>Releases: 18:04 UTC</li>
-                <li>Deployments: 00:10 UTC</li>
-            </ul>
+            {% if indexing_schedule %}
+                <p>Next scheduled indexing runs:</p>
+                <ul class="list-disc list-inside mt-2">
+                    {% for task in indexing_schedule %}
+                        <li>
+                            {{ task.name }}: {{ task.next_run }}
+                            {% if not task.is_active %}
+                                <span class="text-orange-500">(inactive)</span>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>Automatic indexing runs daily at:</p>
+                <ul class="list-disc list-inside mt-2">
+                    <li>Commits: 03:24 UTC</li>
+                    <li>Pull Requests: 00:06 UTC</li>
+                    <li>Releases: 18:04 UTC</li>
+                    <li>Deployments: 00:10 UTC</li>
+                </ul>
+                <p class="text-xs text-gray-400 mt-2">(Schedule information not available)</p>
+            {% endif %}
         </div>
     </div>
     {% endif %}

@@ -488,10 +488,37 @@ def repository_detail(request, repo_id):
         messages.error(request, "Repository not found.")
         return redirect('repositories:list')
     
+    # Get scheduled tasks for indexing information (needed for both indexed and non-indexed repos)
+    from django_q.models import Schedule
+    scheduled_tasks = Schedule.objects.filter(
+        func__in=['analytics.tasks.index_all_commits_task', 'analytics.tasks.index_all_pullrequests_task', 
+                  'analytics.tasks.index_all_releases_task', 'analytics.tasks.index_all_deployments_task']
+    ).order_by('next_run')
+    
+    # Map function names to display names
+    task_display_names = {
+        'analytics.tasks.index_all_commits_task': 'Commits',
+        'analytics.tasks.index_all_pullrequests_task': 'Pull Requests', 
+        'analytics.tasks.index_all_releases_task': 'Releases',
+        'analytics.tasks.index_all_deployments_task': 'Deployments'
+    }
+    
+    # Format scheduled tasks for template
+    indexing_schedule = []
+    for task in scheduled_tasks:
+        if task.func in task_display_names:
+            next_run_local = timezone.localtime(task.next_run) if task.next_run else None
+            indexing_schedule.append({
+                'name': task_display_names[task.func],
+                'next_run': next_run_local.strftime("%H:%M") if next_run_local else "N/A",
+                'is_active': task.repeats != 0
+            })
+    
     if not repository.is_indexed:
         context = {
             'repository': repository,
-            'error_message': 'Repository is not indexed yet'
+            'error_message': 'Repository is not indexed yet',
+            'indexing_schedule': indexing_schedule
         }
         return render(request, 'repositories/detail.html', context)
     
@@ -660,6 +687,7 @@ def repository_detail(request, repo_id):
             'sonarcloud_metrics': sonarcloud_metrics,
             'codeql_metrics': codeql_metrics,
             'dora_metrics': dora_metrics,
+            'indexing_schedule': indexing_schedule,
         }
         
     except Exception as e:
@@ -692,6 +720,7 @@ def repository_detail(request, repo_id):
             'doughnut_colors': {},
             'activity_heatmap_data': json.dumps([0] * 24),
             'sonarcloud_metrics': None,
+            'indexing_schedule': indexing_schedule,
             'error_message': 'Failed to compute repository metrics',
             'error_id': str(uuid.uuid4())
         }
