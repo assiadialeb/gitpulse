@@ -1,0 +1,1933 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="GitHub Analytics Dashboard for CTOs and Tech Leads">
+      
+      
+        <meta name="author" content="assia_dialeb">
+      
+      
+        <link rel="canonical" href="https://assiadialeb.github.io/gitpulse/technical/management-commands.html">
+      
+      
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.17">
+    
+    
+      
+        <title>Management Commands Reference - GitPulse</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+   <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+    html.glightbox-open { overflow: initial; height: 100%; }
+    .gslide-title { margin-top: 0px; user-select: text; }
+    .gslide-desc { color: #666; user-select: text; }
+    .gslide-image img { background: white; }
+    .gscrollbar-fixer { padding-right: 15px; }
+    .gdesc-inner { font-size: 0.75rem; }
+    body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+    body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+    body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}</style> <script src="../assets/javascripts/glightbox.min.js"></script></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#management-commands-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="GitPulse" class="md-header__button md-logo" aria-label="GitPulse" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GitPulse
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Management Commands Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/assiadialeb/gitpulse" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    assiadialeb/gitpulse
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="GitPulse" class="md-nav__button md-logo" aria-label="GitPulse" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    GitPulse
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/assiadialeb/gitpulse" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    assiadialeb/gitpulse
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quick-start.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/github-setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    GitHub Setup
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Repository
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            Repository
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/dora-metrics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Dora Metrics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/commit-frequency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Commit Frequency
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/commit-classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Commit Classification
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/pull-requests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Pull Requests
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/releases.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Releases
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/deployments.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Deployments
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/security-health-score.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Security Health Score
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/sonarcloud-metrics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SonarCloud Metrics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/licensing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Licensing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Project Analytics
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            Project Analytics
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/projects/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/developers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Developer Analytics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/docker.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Docker
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/production.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Production
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/github-pages.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    GitHub Pages
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/assiadialeb/gitpulse/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Releases
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Security
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#automatic-indexing-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      🔄 Automatic Indexing Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔄 Automatic Indexing Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#indexing-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Indexing Setup
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Indexing Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setup_auto_indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      setup_auto_indexing
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setup_repository_indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      setup_repository_indexing
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setup_complete_indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      setup_complete_indexing
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setup_rate_limit_monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      setup_rate_limit_monitoring
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manual-indexing-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      🚀 Manual Indexing Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚀 Manual Indexing Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#intelligent-indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Intelligent Indexing
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Intelligent Indexing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#start_intelligent_indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      start_intelligent_indexing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#entity-specific-indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Entity-Specific Indexing
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Entity-Specific Indexing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#index_commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      index_commits
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#index_pullrequests" class="md-nav__link">
+    <span class="md-ellipsis">
+      index_pullrequests
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#index_releases" class="md-nav__link">
+    <span class="md-ellipsis">
+      index_releases
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#index_deployments" class="md-nav__link">
+    <span class="md-ellipsis">
+      index_deployments
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#index_repositories" class="md-nav__link">
+    <span class="md-ellipsis">
+      index_repositories
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#specialized-indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Specialized Indexing
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Specialized Indexing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#index_codeql_repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      index_codeql_repository
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backfill-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      🔄 Backfill Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔄 Backfill Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#backfill_commits_git_local" class="md-nav__link">
+    <span class="md-ellipsis">
+      backfill_commits_git_local
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backfill_sonarcloud" class="md-nav__link">
+    <span class="md-ellipsis">
+      backfill_sonarcloud
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#intelligent-analysis-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      🧠 Intelligent Analysis Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🧠 Intelligent Analysis Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#calculate_kloc" class="md-nav__link">
+    <span class="md-ellipsis">
+      calculate_kloc
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#classify_existing_commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      classify_existing_commits
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#calculate_shs_all_repos" class="md-nav__link">
+    <span class="md-ellipsis">
+      calculate_shs_all_repos
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generate_sbom" class="md-nav__link">
+    <span class="md-ellipsis">
+      generate_sbom
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#maintenance-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      🔧 Maintenance Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Maintenance Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reset_developer_groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      reset_developer_groups
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compare_indexing_methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      compare_indexing_methods
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django-q-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      🛠️ Django-Q Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛠️ Django-Q Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#qcluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      qcluster
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qmonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      qmonitor
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qinfo" class="md-nav__link">
+    <span class="md-ellipsis">
+      qinfo
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qmemory" class="md-nav__link">
+    <span class="md-ellipsis">
+      qmemory
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#base-django-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      📊 Base Django Commands
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Base Django Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#makemigrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      makemigrations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      migrate
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check" class="md-nav__link">
+    <span class="md-ellipsis">
+      check
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      shell
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      🎯 Recommended Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Recommended Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initial-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initial Setup
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Manual Indexing
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Maintenance
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="management-commands-reference">Management Commands Reference</h1>
+<p>This document provides a complete reference for all management commands available in GitPulse.</p>
+<h2 id="automatic-indexing-commands">🔄 Automatic Indexing Commands</h2>
+<h3 id="indexing-setup">Indexing Setup</h3>
+<h4 id="setup_auto_indexing"><code>setup_auto_indexing</code></h4>
+<p>Set up automatic daily indexing for all applications (deprecated - use <code>setup_repository_indexing</code>).</p>
+<pre><code class="language-bash"># Basic setup (02:00 UTC default)
+python manage.py setup_auto_indexing
+
+# Custom time
+python manage.py setup_auto_indexing --time 03:00
+
+# Force recreate all schedules
+python manage.py setup_auto_indexing --time 02:00 --force
+</code></pre>
+<p><strong>Options:</strong>
+- <code>--time HH:MM</code> : Set custom time (24-hour format)
+- <code>--force</code> : Recreate existing schedules</p>
+<h4 id="setup_repository_indexing"><code>setup_repository_indexing</code></h4>
+<p>Set up automatic daily indexing for repositories (recommended).</p>
+<pre><code class="language-bash"># Global task (recommended)
+python manage.py setup_repository_indexing --global-task --time 02:00
+
+# Individual tasks per repository
+python manage.py setup_repository_indexing --time 02:00
+
+# Force recreate
+python manage.py setup_repository_indexing --time 02:00 --force
+</code></pre>
+<p><strong>Options:</strong>
+- <code>--time HH:MM</code> : Execution time (default: 02:00)
+- <code>--force</code> : Recreate existing schedules
+- <code>--global-task</code> : Create a single global task instead of individual tasks</p>
+<h4 id="setup_complete_indexing"><code>setup_complete_indexing</code></h4>
+<p>Set up a complete indexing system with all tasks.</p>
+<pre><code class="language-bash"># Complete setup
+python manage.py setup_complete_indexing
+
+# Setup with task spreading
+python manage.py setup_complete_indexing --spread
+
+# Custom time
+python manage.py setup_complete_indexing --time 02:00 --force
+</code></pre>
+<p><strong>Options:</strong>
+- <code>--time HH:MM</code> : Base time for tasks
+- <code>--force</code> : Recreate all schedules
+- <code>--spread</code> : Spread tasks across different hours</p>
+<h4 id="setup_rate_limit_monitoring"><code>setup_rate_limit_monitoring</code></h4>
+<p>Set up automatic GitHub rate limit monitoring.</p>
+<pre><code class="language-bash">python manage.py setup_rate_limit_monitoring
+</code></pre>
+<p><strong>Features:</strong>
+- Process pending restarts every 5 minutes
+- Clean up old rate limit resets (daily)</p>
+<h2 id="manual-indexing-commands">🚀 Manual Indexing Commands</h2>
+<h3 id="intelligent-indexing">Intelligent Indexing</h3>
+<h4 id="start_intelligent_indexing"><code>start_intelligent_indexing</code></h4>
+<p>Start intelligent indexing for repositories.</p>
+<pre><code class="language-bash"># Complete indexing for all repositories
+python manage.py start_intelligent_indexing
+
+# Specific repository
+python manage.py start_intelligent_indexing --repository-id 123
+
+# Specific entity types
+python manage.py start_intelligent_indexing --entity-types commits pullrequests
+
+# Dry-run mode
+python manage.py start_intelligent_indexing --dry-run
+</code></pre>
+<p><strong>Options:</strong>
+- <code>--repository-id ID</code> : Specific repository
+- <code>--entity-types</code> : Entity types (commits, pullrequests, releases, deployments)
+- <code>--dry-run</code> : Simulation without starting tasks</p>
+<h3 id="entity-specific-indexing">Entity-Specific Indexing</h3>
+<h4 id="index_commits"><code>index_commits</code></h4>
+<p>Index GitHub commits with PR links.</p>
+<pre><code class="language-bash"># All repositories
+python manage.py index_commits --all
+
+# Specific repository
+python manage.py index_commits --repo-id 123
+
+# Synchronous mode
+python manage.py index_commits --repo-id 123 --sync
+
+# Reset indexing state
+python manage.py index_commits --repo-id 123 --reset
+
+# Show status
+python manage.py index_commits --status
+</code></pre>
+<p><strong>Options:</strong>
+- <code>--repo-id ID</code> : Specific repository
+- <code>--all</code> : All indexed repositories
+- <code>--batch-size N</code> : Batch size in days (default: 7)
+- <code>--sync</code> : Synchronous execution
+- <code>--reset</code> : Reset indexing state
+- <code>--status</code> : Show indexing status</p>
+<h4 id="index_pullrequests"><code>index_pullrequests</code></h4>
+<p>Index GitHub pull requests.</p>
+<pre><code class="language-bash"># All repositories
+python manage.py index_pullrequests --all
+
+# Specific repository
+python manage.py index_pullrequests --repo-id 123
+
+# Synchronous mode
+python manage.py index_pullrequests --repo-id 123 --sync
+</code></pre>
+<h4 id="index_releases"><code>index_releases</code></h4>
+<p>Index GitHub releases.</p>
+<pre><code class="language-bash"># All repositories
+python manage.py index_releases --all
+
+# Specific repository
+python manage.py index_releases --repo-id 123
+
+# Synchronous mode
+python manage.py index_releases --repo-id 123 --sync
+</code></pre>
+<h4 id="index_deployments"><code>index_deployments</code></h4>
+<p>Index GitHub deployments.</p>
+<pre><code class="language-bash"># All repositories
+python manage.py index_deployments --all
+
+# Specific repository
+python manage.py index_deployments --repo-id 123
+
+# Synchronous mode
+python manage.py index_deployments --repo-id 123 --sync
+</code></pre>
+<h4 id="index_repositories"><code>index_repositories</code></h4>
+<p>Index repository metadata.</p>
+<pre><code class="language-bash"># All repositories
+python manage.py index_repositories --all
+
+# Specific repository
+python manage.py index_repositories --repo-id 123
+
+# Synchronous mode
+python manage.py index_repositories --repo-id 123 --sync
+</code></pre>
+<h3 id="specialized-indexing">Specialized Indexing</h3>
+<h4 id="index_codeql_repository"><code>index_codeql_repository</code></h4>
+<p>Index CodeQL vulnerabilities for repositories.</p>
+<pre><code class="language-bash"># Specific repository
+python manage.py index_codeql_repository --repo-id 123
+
+# All repositories
+python manage.py index_codeql_repository --all
+
+# Synchronous mode
+python manage.py index_codeql_repository --repo-id 123 --sync
+</code></pre>
+<h2 id="backfill-commands">🔄 Backfill Commands</h2>
+<h4 id="backfill_commits_git_local"><code>backfill_commits_git_local</code></h4>
+<p>Complete commit backfill using Git local (no rate limits).</p>
+<pre><code class="language-bash"># All repositories
+python manage.py backfill_commits_git_local
+
+# Specific repository
+python manage.py backfill_commits_git_local --repository-id 123
+
+# Dry-run mode
+python manage.py backfill_commits_git_local --dry-run
+</code></pre>
+<p><strong>Advantages:</strong>
+- No GitHub rate limits
+- No pagination
+- Complete history</p>
+<h4 id="backfill_sonarcloud"><code>backfill_sonarcloud</code></h4>
+<p>Backfill SonarCloud metrics.</p>
+<pre><code class="language-bash"># All repositories
+python manage.py backfill_sonarcloud
+
+# Specific repository
+python manage.py backfill_sonarcloud --repo-id 123
+
+# Dry-run mode
+python manage.py backfill_sonarcloud --dry-run
+</code></pre>
+<h2 id="intelligent-analysis-commands">🧠 Intelligent Analysis Commands</h2>
+<h4 id="calculate_kloc"><code>calculate_kloc</code></h4>
+<p>Calculate KLOC (Kilo Lines of Code) for repositories.</p>
+<pre><code class="language-bash"># Specific repository
+python manage.py calculate_kloc --repo-id 123
+
+# All repositories
+python manage.py calculate_kloc --all
+
+# Force recalculation
+python manage.py calculate_kloc --repo-id 123 --force
+
+# Dry-run mode
+python manage.py calculate_kloc --repo-id 123 --dry-run
+</code></pre>
+<p><strong>Options:</strong>
+- <code>--repo-id N</code> : Repository ID to calculate KLOC for
+- <code>--all</code> : Calculate KLOC for all repositories
+- <code>--force</code> : Force recalculation even if recently calculated
+- <code>--dry-run</code> : Show what would be calculated without changes</p>
+<p><strong>Note:</strong> This command clones repositories locally to calculate KLOC, which can take time for large repositories.</p>
+<p><strong>Automatic KLOC Calculation:</strong>
+KLOC is automatically calculated during indexing in the following cases:
+- <strong>Backfill complete</strong>: When all commits have been indexed
+- <strong>KLOC missing</strong>: When no KLOC has been calculated yet
+- <strong>KLOC outdated</strong>: When KLOC was calculated more than 30 days ago</p>
+<p>This ensures KLOC stays fresh without unnecessary recalculations.</p>
+<h4 id="classify_existing_commits"><code>classify_existing_commits</code></h4>
+<p>Reclassify commits marked as "other" using Ollama LLM.</p>
+<pre><code class="language-bash"># Complete reclassification
+python manage.py classify_existing_commits
+
+# Dry-run mode
+python manage.py classify_existing_commits --dry-run
+
+# Limit for testing
+python manage.py classify_existing_commits --limit 50
+
+# Custom batch size
+python manage.py classify_existing_commits --batch-size 200
+</code></pre>
+<p><strong>Options:</strong>
+- <code>--dry-run</code> : Simulation without changes
+- <code>--batch-size N</code> : Batch size (default: 100)
+- <code>--limit N</code> : Limit for testing</p>
+<h4 id="calculate_shs_all_repos"><code>calculate_shs_all_repos</code></h4>
+<p>Calculate Security Health Score (SHS) for repositories.</p>
+<pre><code class="language-bash"># All repositories
+python manage.py calculate_shs_all_repos
+
+# Specific repository
+python manage.py calculate_shs_all_repos --repository-id 123
+
+# Force recalculation
+python manage.py calculate_shs_all_repos --force
+</code></pre>
+<p><strong>Options:</strong>
+- <code>--repository-id ID</code> : Specific repository
+- <code>--force</code> : Force recalculation even if SHS exists</p>
+<h4 id="generate_sbom"><code>generate_sbom</code></h4>
+<p>Generate SBOM (Software Bill of Materials) for repositories.</p>
+<pre><code class="language-bash"># All repositories
+python manage.py generate_sbom --all
+
+# Specific repository
+python manage.py generate_sbom --repo-id 123
+
+# Synchronous mode
+python manage.py generate_sbom --repo-id 123 --sync
+
+# Force generation
+python manage.py generate_sbom --repo-id 123 --force
+</code></pre>
+<p><strong>Options:</strong>
+- <code>--repo-id ID</code> : Specific repository
+- <code>--all</code> : All indexed repositories
+- <code>--sync</code> : Synchronous execution
+- <code>--force</code> : Force generation</p>
+<h2 id="maintenance-commands">🔧 Maintenance Commands</h2>
+<h4 id="reset_developer_groups"><code>reset_developer_groups</code></h4>
+<p>Reset developer groups.</p>
+<pre><code class="language-bash">python manage.py reset_developer_groups
+</code></pre>
+<h4 id="compare_indexing_methods"><code>compare_indexing_methods</code></h4>
+<p>Compare indexing methods (empty file - to be implemented).</p>
+<pre><code class="language-bash">python manage.py compare_indexing_methods
+</code></pre>
+<h2 id="django-q-commands">🛠️ Django-Q Commands</h2>
+<h4 id="qcluster"><code>qcluster</code></h4>
+<p>Start Django-Q cluster (required for scheduled tasks).</p>
+<pre><code class="language-bash">python manage.py qcluster
+</code></pre>
+<h4 id="qmonitor"><code>qmonitor</code></h4>
+<p>Monitor Django-Q cluster status.</p>
+<pre><code class="language-bash">python manage.py qmonitor
+</code></pre>
+<h4 id="qinfo"><code>qinfo</code></h4>
+<p>View task history and statistics.</p>
+<pre><code class="language-bash">python manage.py qinfo
+</code></pre>
+<h4 id="qmemory"><code>qmemory</code></h4>
+<p>View cluster memory usage.</p>
+<pre><code class="language-bash">python manage.py qmemory
+</code></pre>
+<h2 id="base-django-commands">📊 Base Django Commands</h2>
+<h4 id="makemigrations"><code>makemigrations</code></h4>
+<p>Create database migrations.</p>
+<pre><code class="language-bash">python manage.py makemigrations
+</code></pre>
+<h4 id="migrate"><code>migrate</code></h4>
+<p>Apply database migrations.</p>
+<pre><code class="language-bash">python manage.py migrate
+</code></pre>
+<h4 id="check"><code>check</code></h4>
+<p>Check project configuration.</p>
+<pre><code class="language-bash">python manage.py check
+</code></pre>
+<h4 id="shell"><code>shell</code></h4>
+<p>Open Django interactive shell.</p>
+<pre><code class="language-bash">python manage.py shell
+</code></pre>
+<h2 id="recommended-usage">🎯 Recommended Usage</h2>
+<h3 id="initial-setup">Initial Setup</h3>
+<ol>
+<li>
+<p><strong>Set up automatic indexing:</strong>
+   <code>bash
+   python manage.py setup_repository_indexing --global-task --time 02:00</code></p>
+</li>
+<li>
+<p><strong>Set up rate limit monitoring:</strong>
+   <code>bash
+   python manage.py setup_rate_limit_monitoring</code></p>
+</li>
+<li>
+<p><strong>Start Django-Q cluster:</strong>
+   <code>bash
+   python manage.py qcluster</code></p>
+</li>
+</ol>
+<h3 id="manual-indexing">Manual Indexing</h3>
+<ol>
+<li>
+<p><strong>Complete repository indexing:</strong>
+   <code>bash
+   python manage.py start_intelligent_indexing --repository-id 123</code></p>
+</li>
+<li>
+<p><strong>Git local backfill (no limits):</strong>
+   <code>bash
+   python manage.py backfill_commits_git_local --repository-id 123</code></p>
+</li>
+<li>
+<p><strong>Commit reclassification:</strong>
+   <code>bash
+   python manage.py classify_existing_commits --dry-run</code></p>
+</li>
+</ol>
+<h3 id="maintenance">Maintenance</h3>
+<ol>
+<li><strong>Calculate security scores:</strong>
+   <code>bash
+   python manage.py calculate_shs_all_repos</code></li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.expand", "navigation.top", "search.highlight", "search.suggest", "content.code.annotate", "content.tabs.link"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+    
+  <script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(() => { lightbox.reload() });
+</script></body>
+</html>

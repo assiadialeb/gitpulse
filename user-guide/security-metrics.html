@@ -1,0 +1,1775 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="GitHub Analytics Dashboard for CTOs and Tech Leads">
+      
+      
+        <meta name="author" content="assia_dialeb">
+      
+      
+        <link rel="canonical" href="https://assiadialeb.github.io/gitpulse/user-guide/security-metrics.html">
+      
+      
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.17">
+    
+    
+      
+        <title>Security Metrics Guide - GitPulse</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+   <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+    html.glightbox-open { overflow: initial; height: 100%; }
+    .gslide-title { margin-top: 0px; user-select: text; }
+    .gslide-desc { color: #666; user-select: text; }
+    .gslide-image img { background: white; }
+    .gscrollbar-fixer { padding-right: 15px; }
+    .gdesc-inner { font-size: 0.75rem; }
+    body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+    body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+    body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}</style> <script src="../assets/javascripts/glightbox.min.js"></script></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#security-metrics-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="GitPulse" class="md-header__button md-logo" aria-label="GitPulse" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GitPulse
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Security Metrics Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/assiadialeb/gitpulse" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    assiadialeb/gitpulse
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="GitPulse" class="md-nav__button md-logo" aria-label="GitPulse" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    GitPulse
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/assiadialeb/gitpulse" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    assiadialeb/gitpulse
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quick-start.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="github-setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    GitHub Setup
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Repository
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            Repository
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/dora-metrics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Dora Metrics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/commit-frequency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Commit Frequency
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/commit-classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Commit Classification
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/pull-requests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Pull Requests
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/releases.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Releases
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/deployments.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Deployments
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/security-health-score.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Security Health Score
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/sonarcloud-metrics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SonarCloud Metrics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="repositories/licensing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Licensing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Project Analytics
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            Project Analytics
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="projects/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="developers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Developer Analytics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/docker.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Docker
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/production.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Production
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/github-pages.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    GitHub Pages
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/assiadialeb/gitpulse/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Releases
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Security
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#security-health-score-shs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Security Health Score (SHS)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Security Health Score (SHS)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#understanding-shs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Understanding SHS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-shs-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      How SHS Works
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How SHS Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-vulnerability-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Vulnerability Analysis
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-size-normalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Size Normalization
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-score-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Score Calculation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interpreting-your-shs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Interpreting Your SHS
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Interpreting Your SHS">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#score-ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      Score Ranges
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trend-indicators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Trend Indicators
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-shs-in-practice" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using SHS in Practice
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using SHS in Practice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#for-development-teams" class="md-nav__link">
+    <span class="md-ellipsis">
+      For Development Teams
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      For Management
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-security-teams" class="md-nav__link">
+    <span class="md-ellipsis">
+      For Security Teams
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#codeql-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      CodeQL Integration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CodeQL Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-codeql" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is CodeQL?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-up-codeql" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting Up CodeQL
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting Up CodeQL">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-enable-codeql-in-your-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Enable CodeQL in Your Repository
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-configure-gitpulse-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Configure GitPulse Integration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#understanding-codeql-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Understanding CodeQL Data
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding CodeQL Data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vulnerability-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vulnerability Types
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#severity-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Severity Levels
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      Security Dashboard
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Security Dashboard">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#repository-security-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      Repository Security View
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detailed-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Detailed Analysis
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Best Practices
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#improving-your-shs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Improving Your SHS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring-security-trends" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monitoring Security Trends
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#team-collaboration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Team Collaboration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shs-not-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      SHS Not Available
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing-vulnerability-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Missing Vulnerability Data
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#incorrect-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Incorrect Scores
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getting-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      Getting Help
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-scoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      Custom Scoring
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Integration Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      📚 Related Documentation
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="security-metrics-guide">Security Metrics Guide</h1>
+<p>This guide explains GitPulse's security analytics features, with a focus on the Security Health Score (SHS) and CodeQL integration.</p>
+<h2 id="security-health-score-shs">Security Health Score (SHS)</h2>
+<p>The Security Health Score is GitPulse's flagship security metric, providing a comprehensive view of your codebase's security posture.</p>
+<h3 id="understanding-shs">Understanding SHS</h3>
+<p>The SHS is a sophisticated metric that goes beyond simple vulnerability counting. It provides:</p>
+<ul>
+<li><strong>Normalized Risk Assessment</strong>: Compares security across repositories of different sizes</li>
+<li><strong>Severity Weighting</strong>: Critical vulnerabilities have more impact than low-severity ones</li>
+<li><strong>Trend Analysis</strong>: Tracks security improvements over time</li>
+<li><strong>Actionable Insights</strong>: Helps prioritize security efforts</li>
+</ul>
+<h3 id="how-shs-works">How SHS Works</h3>
+<h4 id="1-vulnerability-analysis">1. Vulnerability Analysis</h4>
+<p>GitPulse analyzes CodeQL vulnerability data from your repositories:
+- <strong>Critical Vulnerabilities</strong>: Highest security risk (weight: 1.0)
+- <strong>High Vulnerabilities</strong>: Significant security risk (weight: 0.7)
+- <strong>Medium Vulnerabilities</strong>: Moderate security risk (weight: 0.4)
+- <strong>Low Vulnerabilities</strong>: Minimal security risk (weight: 0.1)</p>
+<h4 id="2-size-normalization">2. Size Normalization</h4>
+<p>The score is normalized by repository size (KLOC - Kilo Lines of Code):
+- Larger repositories naturally have more potential vulnerabilities
+- Normalization enables fair comparison across different-sized codebases
+- Formula: <code>weighted_vulnerabilities ÷ KLOC</code></p>
+<h4 id="3-score-calculation">3. Score Calculation</h4>
+<p>GitPulse applies an exponential decay function to create an intuitive 0-100 scale:
+- <strong>Higher scores</strong> = Better security posture
+- <strong>Lower scores</strong> = Higher security risk
+- <strong>100/100</strong> = Perfect security (no vulnerabilities)
+- <strong>0/100</strong> = Critical security issues (many high-severity vulnerabilities)</p>
+<h3 id="interpreting-your-shs">Interpreting Your SHS</h3>
+<h4 id="score-ranges">Score Ranges</h4>
+<table>
+<thead>
+<tr>
+<th>Score</th>
+<th>Security Level</th>
+<th>Description</th>
+<th>Action Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>90-100</td>
+<td>Excellent</td>
+<td>Very low security risk</td>
+<td>Maintain current practices</td>
+</tr>
+<tr>
+<td>80-89</td>
+<td>Good</td>
+<td>Low security risk</td>
+<td>Monitor for trends</td>
+</tr>
+<tr>
+<td>60-79</td>
+<td>Fair</td>
+<td>Moderate security risk</td>
+<td>Plan security improvements</td>
+</tr>
+<tr>
+<td>40-59</td>
+<td>Poor</td>
+<td>High security risk</td>
+<td>Immediate attention needed</td>
+</tr>
+<tr>
+<td>0-39</td>
+<td>Critical</td>
+<td>Very high security risk</td>
+<td>Urgent remediation required</td>
+</tr>
+</tbody>
+</table>
+<h4 id="trend-indicators">Trend Indicators</h4>
+<p>The SHS includes trend information showing security evolution:</p>
+<ul>
+<li><strong>🟢 Positive Trend</strong> (+2.1): Security is improving</li>
+<li><strong>🔴 Negative Trend</strong> (-1.5): Security is deteriorating</li>
+<li><strong>⚪ Stable</strong> (0.0): Security posture is unchanged</li>
+</ul>
+<h3 id="using-shs-in-practice">Using SHS in Practice</h3>
+<h4 id="for-development-teams">For Development Teams</h4>
+<ol>
+<li><strong>Set Security Goals</strong>: Aim for SHS &gt; 80 for production code</li>
+<li><strong>Track Improvements</strong>: Monitor SHS trends over time</li>
+<li><strong>Prioritize Fixes</strong>: Focus on critical and high-severity vulnerabilities</li>
+<li><strong>Code Reviews</strong>: Use SHS as a quality gate for new code</li>
+</ol>
+<h4 id="for-management">For Management</h4>
+<ol>
+<li><strong>Portfolio Overview</strong>: Compare SHS across all repositories</li>
+<li><strong>Resource Allocation</strong>: Direct security efforts to low-scoring repositories</li>
+<li><strong>Progress Tracking</strong>: Monitor security improvement initiatives</li>
+<li><strong>Risk Assessment</strong>: Identify high-risk codebases</li>
+</ol>
+<h4 id="for-security-teams">For Security Teams</h4>
+<ol>
+<li><strong>Vulnerability Prioritization</strong>: Focus on repositories with low SHS</li>
+<li><strong>Trend Analysis</strong>: Identify improving or deteriorating security posture</li>
+<li><strong>Compliance Monitoring</strong>: Track security metrics for reporting</li>
+<li><strong>Incident Response</strong>: Use SHS to assess impact of new vulnerabilities</li>
+</ol>
+<h2 id="codeql-integration">CodeQL Integration</h2>
+<h3 id="what-is-codeql">What is CodeQL?</h3>
+<p>CodeQL is GitHub's semantic code analysis engine that finds vulnerabilities and errors in your code. GitPulse integrates with CodeQL to provide:</p>
+<ul>
+<li><strong>Automated Vulnerability Detection</strong>: Finds security issues in your code</li>
+<li><strong>Severity Classification</strong>: Categorizes vulnerabilities by risk level</li>
+<li><strong>Detailed Analysis</strong>: Provides context and remediation guidance</li>
+<li><strong>Continuous Monitoring</strong>: Tracks vulnerabilities over time</li>
+</ul>
+<h3 id="setting-up-codeql">Setting Up CodeQL</h3>
+<h4 id="1-enable-codeql-in-your-repository">1. Enable CodeQL in Your Repository</h4>
+<ol>
+<li>Go to your repository on GitHub</li>
+<li>Navigate to <strong>Settings</strong> → <strong>Security &amp; analysis</strong></li>
+<li>Enable <strong>Code scanning</strong> with CodeQL</li>
+<li>Commit the generated workflow file</li>
+</ol>
+<h4 id="2-configure-gitpulse-integration">2. Configure GitPulse Integration</h4>
+<ol>
+<li>Ensure your GitHub token has <code>security_events</code> permission</li>
+<li>Index your repository in GitPulse</li>
+<li>CodeQL data will be automatically imported</li>
+</ol>
+<h3 id="understanding-codeql-data">Understanding CodeQL Data</h3>
+<h4 id="vulnerability-types">Vulnerability Types</h4>
+<p>CodeQL detects various security issues:</p>
+<ul>
+<li><strong>SQL Injection</strong>: Database query vulnerabilities</li>
+<li><strong>Cross-Site Scripting (XSS)</strong>: Web application vulnerabilities</li>
+<li><strong>Path Traversal</strong>: File access vulnerabilities</li>
+<li><strong>Insecure Deserialization</strong>: Object injection vulnerabilities</li>
+<li><strong>And many more...</strong></li>
+</ul>
+<h4 id="severity-levels">Severity Levels</h4>
+<ul>
+<li><strong>Critical</strong>: Immediate security risk, requires urgent attention</li>
+<li><strong>High</strong>: Significant security risk, should be addressed quickly</li>
+<li><strong>Medium</strong>: Moderate security risk, plan for remediation</li>
+<li><strong>Low</strong>: Minimal security risk, consider for future updates</li>
+</ul>
+<h2 id="security-dashboard">Security Dashboard</h2>
+<h3 id="repository-security-view">Repository Security View</h3>
+<p>Each repository displays security metrics:</p>
+<ul>
+<li><strong>Security Health Score</strong>: Primary security metric</li>
+<li><strong>Vulnerability Count</strong>: Total open vulnerabilities</li>
+<li><strong>Severity Breakdown</strong>: Distribution by risk level</li>
+<li><strong>Trend Information</strong>: Security improvement/deterioration</li>
+</ul>
+<h3 id="detailed-analysis">Detailed Analysis</h3>
+<p>Click on the Security Health Score card to see:</p>
+<ul>
+<li><strong>Vulnerability Details</strong>: List of all detected issues</li>
+<li><strong>Severity Distribution</strong>: Breakdown by risk level</li>
+<li><strong>Historical Trends</strong>: SHS evolution over time</li>
+<li><strong>Remediation Guidance</strong>: Links to GitHub security advisories</li>
+</ul>
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="improving-your-shs">Improving Your SHS</h3>
+<ol>
+<li><strong>Fix Critical Vulnerabilities First</strong>: Address the highest-risk issues</li>
+<li><strong>Regular Code Reviews</strong>: Catch security issues early</li>
+<li><strong>Automated Testing</strong>: Include security tests in CI/CD</li>
+<li><strong>Dependency Management</strong>: Keep dependencies updated</li>
+<li><strong>Security Training</strong>: Educate team on secure coding practices</li>
+</ol>
+<h3 id="monitoring-security-trends">Monitoring Security Trends</h3>
+<ol>
+<li><strong>Weekly Reviews</strong>: Check SHS trends regularly</li>
+<li><strong>Monthly Reports</strong>: Track security improvement progress</li>
+<li><strong>Quarterly Assessments</strong>: Evaluate overall security posture</li>
+<li><strong>Annual Planning</strong>: Set security goals for the year</li>
+</ol>
+<h3 id="team-collaboration">Team Collaboration</h3>
+<ol>
+<li><strong>Security Champions</strong>: Designate team members for security focus</li>
+<li><strong>Knowledge Sharing</strong>: Share security best practices</li>
+<li><strong>Code Reviews</strong>: Include security in review processes</li>
+<li><strong>Training Programs</strong>: Regular security awareness training</li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="common-issues">Common Issues</h3>
+<h4 id="shs-not-available">SHS Not Available</h4>
+<ul>
+<li><strong>Cause</strong>: CodeQL not enabled or no analysis data</li>
+<li><strong>Solution</strong>: Enable CodeQL in repository settings</li>
+</ul>
+<h4 id="missing-vulnerability-data">Missing Vulnerability Data</h4>
+<ul>
+<li><strong>Cause</strong>: GitHub token lacks security permissions</li>
+<li><strong>Solution</strong>: Update token with <code>security_events</code> scope</li>
+</ul>
+<h4 id="incorrect-scores">Incorrect Scores</h4>
+<ul>
+<li><strong>Cause</strong>: Outdated KLOC or vulnerability data</li>
+<li><strong>Solution</strong>: Re-run repository indexing</li>
+</ul>
+<h3 id="getting-help">Getting Help</h3>
+<ul>
+<li><strong>Documentation</strong>: Check technical documentation</li>
+<li><strong>GitHub Issues</strong>: Report bugs or feature requests</li>
+<li><strong>Community</strong>: Join discussions for help and tips</li>
+</ul>
+<h2 id="advanced-features">Advanced Features</h2>
+<h3 id="custom-scoring">Custom Scoring</h3>
+<p>Future versions will support:
+- Customizable vulnerability weights
+- Repository-specific scoring rules
+- Industry benchmark comparisons</p>
+<h3 id="integration-options">Integration Options</h3>
+<ul>
+<li><strong>CI/CD Integration</strong>: Automated security gates</li>
+<li><strong>Alert Systems</strong>: Security threshold notifications</li>
+<li><strong>Reporting Tools</strong>: Export security metrics</li>
+<li><strong>API Access</strong>: Programmatic access to security data</li>
+</ul>
+<h2 id="related-documentation">📚 Related Documentation</h2>
+<ul>
+<li><strong><a href="analytics.md">Analytics Guide</a></strong> - Comprehensive analytics overview</li>
+<li><strong><a href="github-setup.html">GitHub Setup</a></strong> - Configure GitHub integration</li>
+<li><strong><a href="../technical/security-health-score.html">Technical SHS Documentation</a></strong> - Technical implementation details </li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.expand", "navigation.top", "search.highlight", "search.suggest", "content.code.annotate", "content.tabs.link"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+    
+  <script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(() => { lightbox.reload() });
+</script></body>
+</html>

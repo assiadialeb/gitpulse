@@ -1,0 +1,46 @@
+/* docs/stylesheets/extra.css */
+
+:root {
+    --md-primary-fg-color: #1e40af;       /* Bleu profond pour la barre de titre */
+    --md-accent-fg-color: #2563eb;        /* Accent (liens, boutons) */
+    --md-typeset-a-color: #1d4ed8;        /* Couleur des liens */
+  }
+  
+  /* Titre principal */
+  .md-header__title {
+    font-weight: 600;
+  }
+  
+  /* Lien dans la barre de navigation */
+  .md-nav__link {
+    font-weight: 500;
+  }
+  
+  /* Code blocks (plus lisibles) */
+  code, pre code {
+    font-family: Consolas, monospace;
+    font-size: 0.875rem;
+  }
+  
+  /* Ajout d’un footer simple */
+  footer.md-footer {
+    font-size: 0.75rem;
+    color: #888;
+    text-align: center;
+  }
+
+  
+
+/* Custom logo size for MkDocs Material theme */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+    width: 2rem !important;
+    height: 2rem !important;
+}
+
+/* Alternative: make it even larger if needed */
+/* .md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+    width: 3rem !important;
+    height: 3rem !important;
+} */

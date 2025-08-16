@@ -1,0 +1,2547 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="GitHub Analytics Dashboard for CTOs and Tech Leads">
+      
+      
+        <meta name="author" content="assia_dialeb">
+      
+      
+        <link rel="canonical" href="https://assiadialeb.github.io/gitpulse/deployment/docker.html">
+      
+      
+        <link rel="prev" href="../user-guide/developers.html">
+      
+      
+        <link rel="next" href="production.html">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.17">
+    
+    
+      
+        <title>Docker - GitPulse</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+   <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+    html.glightbox-open { overflow: initial; height: 100%; }
+    .gslide-title { margin-top: 0px; user-select: text; }
+    .gslide-desc { color: #666; user-select: text; }
+    .gslide-image img { background: white; }
+    .gscrollbar-fixer { padding-right: 15px; }
+    .gdesc-inner { font-size: 0.75rem; }
+    body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+    body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+    body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}</style> <script src="../assets/javascripts/glightbox.min.js"></script></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#docker-deployment-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="GitPulse" class="md-header__button md-logo" aria-label="GitPulse" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GitPulse
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Docker
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/assiadialeb/gitpulse" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    assiadialeb/gitpulse
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="GitPulse" class="md-nav__button md-logo" aria-label="GitPulse" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    GitPulse
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/assiadialeb/gitpulse" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    assiadialeb/gitpulse
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quick-start.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/github-setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    GitHub Setup
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Repository
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            Repository
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/dora-metrics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Dora Metrics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/commit-frequency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Commit Frequency
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/commit-classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Commit Classification
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/pull-requests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Pull Requests
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/releases.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Releases
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/deployments.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Deployments
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/security-health-score.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Security Health Score
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/sonarcloud-metrics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SonarCloud Metrics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/repositories/licensing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Licensing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Project Analytics
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            Project Analytics
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/projects/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/developers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Developer Analytics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Docker
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="docker.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Docker
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      🐳 Quick Start
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🐳 Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-clone-and-configure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1: Clone and Configure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-start-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2: Start Services
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-initialize" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 3: Initialize
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 4: Access
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      🏗️ Architecture
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🏗️ Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#services-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Services Overview
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#service-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      Service Details
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Service Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#web-service-django" class="md-nav__link">
+    <span class="md-ellipsis">
+      Web Service (Django)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postgresql-user-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      PostgreSQL (User Data)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongodb-analytics" class="md-nav__link">
+    <span class="md-ellipsis">
+      MongoDB (Analytics)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#redis-cache-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      Redis (Cache &amp; Queue)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ollama-ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ollama (AI)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#database-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      📊 Database Schema
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Database Schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#postgresql-django" class="md-nav__link">
+    <span class="md-ellipsis">
+      PostgreSQL (Django)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongodb-analytics_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      MongoDB (Analytics)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      🔧 Configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Environment Variables
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-compose-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker Compose Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring-and-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      📈 Monitoring and Logs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📈 Monitoring and Logs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#application-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Application Logs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resource-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resource Monitoring
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Health Checks
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backup-and-restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      💾 Backup and Restore
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="💾 Backup and Restore">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#postgresql-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      PostgreSQL Backup
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongodb-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      MongoDB Backup
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Volume Backup
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      🚨 Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚨 Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-port-conflicts" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Port Conflicts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-services-not-starting" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Services Not Starting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-permission-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Permission Issues
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-ollama-not-responding" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Ollama Not Responding
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#complete-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Complete Cleanup
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      ⚡ Performance Optimization
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚡ Performance Optimization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resource-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resource Requirements
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimization-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optimization Tips
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monitoring Commands
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updates-and-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      🔄 Updates and Maintenance
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔄 Updates and Maintenance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updating-gitpulse" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating GitPulse
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#regular-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Regular Maintenance
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      🔐 Security Considerations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔐 Security Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#production-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      Production Security
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      Network Security
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      📚 Next Steps
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="production.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Production
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="github-pages.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    GitHub Pages
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/assiadialeb/gitpulse/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Releases
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Security
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      🐳 Quick Start
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🐳 Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-clone-and-configure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1: Clone and Configure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-start-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2: Start Services
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-initialize" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 3: Initialize
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 4: Access
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      🏗️ Architecture
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🏗️ Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#services-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Services Overview
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#service-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      Service Details
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Service Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#web-service-django" class="md-nav__link">
+    <span class="md-ellipsis">
+      Web Service (Django)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postgresql-user-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      PostgreSQL (User Data)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongodb-analytics" class="md-nav__link">
+    <span class="md-ellipsis">
+      MongoDB (Analytics)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#redis-cache-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      Redis (Cache &amp; Queue)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ollama-ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ollama (AI)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#database-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      📊 Database Schema
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Database Schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#postgresql-django" class="md-nav__link">
+    <span class="md-ellipsis">
+      PostgreSQL (Django)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongodb-analytics_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      MongoDB (Analytics)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      🔧 Configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Environment Variables
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-compose-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker Compose Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring-and-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      📈 Monitoring and Logs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📈 Monitoring and Logs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#application-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Application Logs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resource-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resource Monitoring
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Health Checks
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backup-and-restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      💾 Backup and Restore
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="💾 Backup and Restore">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#postgresql-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      PostgreSQL Backup
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongodb-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      MongoDB Backup
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Volume Backup
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      🚨 Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚨 Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-port-conflicts" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Port Conflicts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-services-not-starting" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Services Not Starting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-permission-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Permission Issues
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-ollama-not-responding" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Ollama Not Responding
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#complete-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Complete Cleanup
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      ⚡ Performance Optimization
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚡ Performance Optimization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resource-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resource Requirements
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimization-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optimization Tips
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monitoring Commands
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updates-and-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      🔄 Updates and Maintenance
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔄 Updates and Maintenance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updating-gitpulse" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating GitPulse
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#regular-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Regular Maintenance
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      🔐 Security Considerations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔐 Security Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#production-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      Production Security
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      Network Security
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      📚 Next Steps
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="docker-deployment-guide">Docker Deployment Guide</h1>
+<p>This guide covers Docker deployment for GitPulse, including setup, configuration, monitoring, and troubleshooting.</p>
+<h2 id="quick-start">🐳 Quick Start</h2>
+<h3 id="prerequisites">Prerequisites</h3>
+<ul>
+<li>Docker and Docker Compose installed</li>
+<li>Git installed</li>
+<li>At least 4GB of RAM available</li>
+<li>10GB of free disk space</li>
+</ul>
+<h3 id="step-1-clone-and-configure">Step 1: Clone and Configure</h3>
+<pre><code class="language-bash">git clone https://github.com/gitpulse/gitpulse.git
+cd GitPulse
+cp env.example .env
+</code></pre>
+<h3 id="step-2-start-services">Step 2: Start Services</h3>
+<pre><code class="language-bash">docker-compose up -d --build
+</code></pre>
+<h3 id="step-3-initialize">Step 3: Initialize</h3>
+<pre><code class="language-bash">docker-compose exec web python manage.py migrate
+docker-compose exec web python manage.py createsuperuser
+</code></pre>
+<h3 id="step-4-access">Step 4: Access</h3>
+<ul>
+<li><strong>Application</strong>: http://localhost:8000</li>
+<li><strong>Admin</strong>: http://localhost:8000/admin</li>
+</ul>
+<h2 id="architecture">🏗️ Architecture</h2>
+<h3 id="services-overview">Services Overview</h3>
+<p>GitPulse Docker setup includes the following services:</p>
+<ul>
+<li><strong>Web (Django)</strong>: Main application server</li>
+<li><strong>PostgreSQL</strong>: User and application data</li>
+<li><strong>MongoDB</strong>: Analytics data storage</li>
+<li><strong>Redis</strong>: Cache and task queue</li>
+<li><strong>Ollama</strong>: AI for commit classification</li>
+</ul>
+<h3 id="service-details">Service Details</h3>
+<h4 id="web-service-django">Web Service (Django)</h4>
+<ul>
+<li><strong>Port</strong>: 8000</li>
+<li><strong>Image</strong>: Custom Django application</li>
+<li><strong>Dependencies</strong>: PostgreSQL, MongoDB, Redis</li>
+<li><strong>Volumes</strong>: Static files, media files</li>
+</ul>
+<h4 id="postgresql-user-data">PostgreSQL (User Data)</h4>
+<ul>
+<li><strong>Port</strong>: 5432</li>
+<li><strong>Database</strong>: gitpulse</li>
+<li><strong>User</strong>: gitpulse</li>
+<li><strong>Password</strong>: gitpulse_password</li>
+<li><strong>Persistent Data</strong>: User accounts, projects, repositories</li>
+</ul>
+<h4 id="mongodb-analytics">MongoDB (Analytics)</h4>
+<ul>
+<li><strong>Port</strong>: 27017</li>
+<li><strong>Database</strong>: gitpulse</li>
+<li><strong>Persistent Data</strong>: Commits, pull requests, releases, deployments</li>
+</ul>
+<h4 id="redis-cache-queue">Redis (Cache &amp; Queue)</h4>
+<ul>
+<li><strong>Port</strong>: 6379</li>
+<li><strong>Purpose</strong>: Django cache and task queue</li>
+<li><strong>Data</strong>: Temporary cache and job queue</li>
+</ul>
+<h4 id="ollama-ai">Ollama (AI)</h4>
+<ul>
+<li><strong>Port</strong>: 11434</li>
+<li><strong>Model</strong>: llama3.2:3b (default)</li>
+<li><strong>Purpose</strong>: Commit classification and analysis</li>
+</ul>
+<h2 id="database-schema">📊 Database Schema</h2>
+<h3 id="postgresql-django">PostgreSQL (Django)</h3>
+<ul>
+<li><strong>Users</strong>: User accounts and authentication</li>
+<li><strong>Projects</strong>: Projects and their repositories</li>
+<li><strong>Repositories</strong>: GitHub repositories</li>
+<li><strong>Developers</strong>: Developer information</li>
+</ul>
+<h3 id="mongodb-analytics_1">MongoDB (Analytics)</h3>
+<ul>
+<li><strong>Commits</strong>: Commit data with classification</li>
+<li><strong>PullRequests</strong>: Pull request data</li>
+<li><strong>Releases</strong>: Release data</li>
+<li><strong>Deployments</strong>: Deployment data</li>
+<li><strong>Developers</strong>: Developer identity grouping</li>
+</ul>
+<h2 id="configuration">🔧 Configuration</h2>
+<h3 id="environment-variables">Environment Variables</h3>
+<p>Create a <code>.env</code> file with the following variables:</p>
+<pre><code class="language-env"># Django Settings
+DEBUG=True
+SECRET_KEY=your-secret-key-here
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# Database Settings
+POSTGRES_DB=gitpulse
+POSTGRES_USER=gitpulse
+POSTGRES_PASSWORD=gitpulse_password
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+
+# MongoDB Settings
+MONGODB_HOST=mongodb
+MONGODB_PORT=27017
+MONGODB_NAME=gitpulse
+
+# Redis Settings
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# Ollama Settings
+OLLAMA_HOST=ollama
+OLLAMA_PORT=11434
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+</code></pre>
+<h3 id="docker-compose-configuration">Docker Compose Configuration</h3>
+<p>The <code>docker-compose.yml</code> file defines all services:</p>
+<pre><code class="language-yaml">version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - &quot;8000:8000&quot;
+    environment:
+      - DEBUG=True
+    depends_on:
+      - postgres
+      - mongodb
+      - redis
+      - ollama
+    volumes:
+      - ./static:/app/static
+      - ./media:/app/media
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: gitpulse
+      POSTGRES_USER: gitpulse
+      POSTGRES_PASSWORD: gitpulse_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - &quot;5432:5432&quot;
+
+  mongodb:
+    image: mongo:6
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - &quot;27017:27017&quot;
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - &quot;6379:6379&quot;
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - &quot;11434:11434&quot;
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  ollama_data:
+</code></pre>
+<h2 id="monitoring-and-logs">📈 Monitoring and Logs</h2>
+<h3 id="application-logs">Application Logs</h3>
+<pre><code class="language-bash"># View application logs
+docker-compose logs -f web
+
+# View specific service logs
+docker-compose logs -f postgres
+docker-compose logs -f mongodb
+docker-compose logs -f ollama
+</code></pre>
+<h3 id="resource-monitoring">Resource Monitoring</h3>
+<pre><code class="language-bash"># Monitor resource usage
+docker stats
+
+# Check disk usage
+docker system df
+
+# View container status
+docker-compose ps
+</code></pre>
+<h3 id="health-checks">Health Checks</h3>
+<pre><code class="language-bash"># Check if all services are running
+docker-compose ps
+
+# Test database connections
+docker-compose exec web python manage.py dbshell
+docker-compose exec web python manage.py shell
+</code></pre>
+<h2 id="backup-and-restore">💾 Backup and Restore</h2>
+<h3 id="postgresql-backup">PostgreSQL Backup</h3>
+<pre><code class="language-bash"># Create backup
+docker-compose exec postgres pg_dump -U gitpulse gitpulse &gt; backup_postgres.sql
+
+# Restore backup
+docker-compose exec -T postgres psql -U gitpulse gitpulse &lt; backup_postgres.sql
+</code></pre>
+<h3 id="mongodb-backup">MongoDB Backup</h3>
+<pre><code class="language-bash"># Create backup
+docker-compose exec mongodb mongodump --db gitpulse --out /data/backup
+docker cp gitpulse_mongodb_1:/data/backup ./backup_mongodb
+
+# Restore backup
+docker cp ./backup_mongodb gitpulse_mongodb_1:/data/backup
+docker-compose exec mongodb mongorestore --db gitpulse /data/backup/gitpulse
+</code></pre>
+<h3 id="volume-backup">Volume Backup</h3>
+<pre><code class="language-bash"># Backup all volumes
+docker run --rm -v gitpulse_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_backup.tar.gz -C /data .
+docker run --rm -v gitpulse_mongodb_data:/data -v $(pwd):/backup alpine tar czf /backup/mongodb_backup.tar.gz -C /data .
+</code></pre>
+<h2 id="troubleshooting">🚨 Troubleshooting</h2>
+<h3 id="common-issues">Common Issues</h3>
+<h4 id="1-port-conflicts">1. Port Conflicts</h4>
+<pre><code class="language-bash"># Check what's using the ports
+lsof -i :8000
+lsof -i :5432
+lsof -i :27017
+
+# Kill processes if needed
+kill -9 &lt;PID&gt;
+</code></pre>
+<h4 id="2-services-not-starting">2. Services Not Starting</h4>
+<pre><code class="language-bash"># View detailed logs
+docker-compose logs
+
+# Restart all services
+docker-compose down
+docker-compose up -d
+</code></pre>
+<h4 id="3-permission-issues">3. Permission Issues</h4>
+<pre><code class="language-bash"># Fix volume permissions
+sudo chown -R $USER:$USER ./data
+sudo chown -R $USER:$USER ./logs
+
+# Fix Docker permissions
+sudo usermod -aG docker $USER
+</code></pre>
+<h4 id="4-ollama-not-responding">4. Ollama Not Responding</h4>
+<pre><code class="language-bash"># Check if model is downloaded
+docker-compose exec ollama ollama list
+
+# Download model manually
+docker-compose exec ollama ollama pull llama3.2:3b
+
+# Check Ollama logs
+docker-compose logs -f ollama
+</code></pre>
+<h3 id="complete-cleanup">Complete Cleanup</h3>
+<pre><code class="language-bash"># Stop and remove all containers and volumes
+docker-compose down -v
+
+# Remove images
+docker-compose down --rmi all
+
+# Clean unused Docker volumes
+docker volume prune
+
+# Clean unused Docker images
+docker image prune -a
+</code></pre>
+<h2 id="performance-optimization">⚡ Performance Optimization</h2>
+<h3 id="resource-requirements">Resource Requirements</h3>
+<ul>
+<li><strong>RAM</strong>: Minimum 4GB, recommended 8GB+</li>
+<li><strong>CPU</strong>: Minimum 2 cores, recommended 4 cores+</li>
+<li><strong>Storage</strong>: SSD recommended for databases</li>
+<li><strong>Network</strong>: Stable internet connection for GitHub API</li>
+</ul>
+<h3 id="optimization-tips">Optimization Tips</h3>
+<ol>
+<li>
+<p><strong>Database Optimization</strong>
+   <code>bash
+   # Increase PostgreSQL shared buffers
+   POSTGRES_SHARED_BUFFERS=256MB</code></p>
+</li>
+<li>
+<p><strong>Redis Optimization</strong>
+   <code>bash
+   # Configure Redis memory
+   redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru</code></p>
+</li>
+<li>
+<p><strong>Ollama Optimization</strong>
+   <code>bash
+   # Use smaller model for faster inference
+   OLLAMA_MODEL=llama3.2:1b</code></p>
+</li>
+</ol>
+<h3 id="monitoring-commands">Monitoring Commands</h3>
+<pre><code class="language-bash"># Monitor resource usage
+docker stats --format &quot;table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}&quot;
+
+# Check disk usage
+docker system df -v
+
+# Monitor logs in real-time
+docker-compose logs -f --tail=100
+</code></pre>
+<h2 id="updates-and-maintenance">🔄 Updates and Maintenance</h2>
+<h3 id="updating-gitpulse">Updating GitPulse</h3>
+<pre><code class="language-bash"># Stop services
+docker-compose down
+
+# Pull latest changes
+git pull
+
+# Rebuild and restart
+docker-compose up -d --build
+
+# Apply migrations
+docker-compose exec web python manage.py migrate
+
+# Collect static files
+docker-compose exec web python manage.py collectstatic --noinput
+</code></pre>
+<h3 id="regular-maintenance">Regular Maintenance</h3>
+<pre><code class="language-bash"># Clean up unused containers
+docker container prune
+
+# Clean up unused images
+docker image prune
+
+# Clean up unused volumes
+docker volume prune
+
+# Clean up unused networks
+docker network prune
+
+# Full system cleanup
+docker system prune -a
+</code></pre>
+<h2 id="security-considerations">🔐 Security Considerations</h2>
+<h3 id="production-security">Production Security</h3>
+<ol>
+<li>
+<p><strong>Use strong passwords</strong>
+   <code>env
+   POSTGRES_PASSWORD=very-long-random-password
+   SECRET_KEY=very-long-random-secret-key</code></p>
+</li>
+<li>
+<p><strong>Disable debug mode</strong>
+   <code>env
+   DEBUG=False</code></p>
+</li>
+<li>
+<p><strong>Restrict network access</strong>
+   ```yaml
+   # In docker-compose.yml
+   networks:</p>
+<ul>
+<li>internal
+   ```</li>
+</ul>
+</li>
+<li>
+<p><strong>Use secrets management</strong>
+   <code>bash
+   # Use Docker secrets
+   echo "your-secret" | docker secret create db_password -</code></p>
+</li>
+</ol>
+<h3 id="network-security">Network Security</h3>
+<pre><code class="language-yaml"># Example secure network configuration
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  external:
+    driver: bridge
+</code></pre>
+<h2 id="next-steps">📚 Next Steps</h2>
+<ul>
+<li><strong><a href="production.html">Production Deployment</a></strong> - Production deployment guide</li>
+<li><strong><a href="../getting-started/configuration.html">Configuration Guide</a></strong> - Advanced configuration</li>
+<li><strong><a href="../technical/troubleshooting.html">Troubleshooting Guide</a></strong> - Common issues and solutions</li>
+<li><strong><a href="github-pages.html">GitHub Pages Deployment</a></strong> - Deploy documentation to GitHub Pages </li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.expand", "navigation.top", "search.highlight", "search.suggest", "content.code.annotate", "content.tabs.link"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+    
+  <script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(() => { lightbox.reload() });
+</script></body>
+</html>
