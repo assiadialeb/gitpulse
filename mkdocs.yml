@@ -9,9 +9,9 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  logo: null
-  icon:
-    logo: material/pulse
+  logo: assets/logo.svg
+  #icon:
+  #  logo: material/pulse
   language: en
   features:
     - navigation.expand
@@ -37,7 +37,7 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
 extra_css:
-#  - stylesheets/extra.css
+  - stylesheets/extra.css
 # Important: disables pretty URLs for GitHub Pages compatibility
 use_directory_urls: false
 

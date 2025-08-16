@@ -30,6 +30,17 @@
   }
 
   
-  .md-header__topic {
-    display: none !important;
-  }
+
+/* Custom logo size for MkDocs Material theme */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+    width: 2rem !important;
+    height: 2rem !important;
+}
+
+/* Alternative: make it even larger if needed */
+/* .md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+    width: 3rem !important;
+    height: 3rem !important;
+} */
