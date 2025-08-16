@@ -117,12 +117,19 @@
 
         <!-- DORA Section -->
         <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
-            <h2 class="text-2xl font-bold text-dark-gray mb-6">
-                <svg class="w-8 h-8 text-green-500 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M10 9.41721C9.16169 8.57524 8.20668 8 7 8C4.79086 8 3 9.79086 3 12C3 14.2091 4.79086 16 7 16C11.5 16 12.5 8 17 8C19.2091 8 21 9.79086 21 12C21 14.2091 19.2091 16 17 16C15.7933 16 14.8383 15.4248 14 14.5828" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                DevOps Research and Assessment (DORA)
-            </h2>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-dark-gray">
+                    <svg class="w-8 h-8 text-green-500 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M10 9.41721C9.16169 8.57524 8.20668 8 7 8C4.79086 8 3 9.79086 3 12C3 14.2091 4.79086 16 7 16C11.5 16 12.5 8 17 8C19.2091 8 21 9.79086 21 12C21 14.2091 19.2091 16 17 16C15.7933 16 14.8383 15.4248 14 14.5828" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    DevOps Research and Assessment (DORA)
+                </h2>
+                <a href="https://assiadialeb.github.io/gitpulse/user-guide/repositories/dora-metrics.html" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-gray-600 transition-colors duration-200" title="Learn more about DORA metrics">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                    </svg>
+                </a>
+            </div>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Left side: 2x2 grid of tiles -->
                 <div class="lg:col-span-2">
@@ -250,12 +257,19 @@
 
         <!-- Commits Section -->
         <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
-            <h2 class="text-2xl font-bold text-dark-gray mb-6">
-                <svg class="w-8 h-8 text-blue-500 inline mr-2" fill="currentColor" viewBox="0 0 512 512">
-                    <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
-                </svg>
-                Commits
-            </h2>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-dark-gray">
+                    <svg class="w-8 h-8 text-blue-500 inline mr-2" fill="currentColor" viewBox="0 0 512 512">
+                        <path d="M448,224H380a128,128,0,0,0-247.9,0H64a32,32,0,0,0,0,64h68.05A128,128,0,0,0,380,288H448a32,32,0,0,0,0-64ZM256,320a64,64,0,1,1,64-64A64.07,64.07,0,0,1,256,320Z"/>
+                    </svg>
+                    Commits
+                </h2>
+                <a href="https://assiadialeb.github.io/gitpulse/user-guide/repositories/commit-frequency.html" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-gray-600 transition-colors duration-200" title="Learn more about commit frequency and development activity">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                    </svg>
+                </a>
+            </div>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Left side: 2x2 grid of tiles -->
                 <div class="lg:col-span-2">
@@ -364,12 +378,19 @@
 
         <!-- Pull Request Health Section -->
         <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
-            <h2 class="text-2xl font-bold text-dark-gray mb-6">
-                <svg class="w-8 h-8 text-purple-500 inline mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                Pull Request Health
-            </h2>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-dark-gray">
+                    <svg class="w-8 h-8 text-purple-500 inline mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Pull Request Health
+                </h2>
+                <a href="https://assiadialeb.github.io/gitpulse/user-guide/repositories/pull-requests.html" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-gray-600 transition-colors duration-200" title="Learn more about pull request analytics and health metrics">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                    </svg>
+                </a>
+            </div>
             {% if pr_health_metrics.total_prs > 0 %}
             <!-- Summary Cards -->
             <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
