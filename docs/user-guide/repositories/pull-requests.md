@@ -14,7 +14,7 @@ Pull request analytics provide insights into how your team reviews code, collabo
 The average time between pull request creation and merge, measured in hours. This metric shows how efficiently your team processes pull requests.
 
 <figure markdown="span">
-![Pull Request Cycle time](../../images/pr-cycle.png){ width="200" }
+![Pull Request Cycle time](../../images/PR-Cycle.png){ width="200" }
 <figcaption>Pull Request Cycle Time</figcaption>
 </figure>
 
