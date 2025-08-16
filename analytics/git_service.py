@@ -317,8 +317,27 @@ class GitService:
 
     def _sanitize_repo_dir_name(self, repo_full_name: str) -> str:
         """Create a safe directory name from owner/repo."""
-        flattened = repo_full_name.replace('/', '_')
-        return re.sub(r'[^A-Za-z0-9_.-]', '_', flattened)
+        # First, replace directory separators
+        flattened = repo_full_name.replace('/', '_').replace('\\', '_')
+        
+        # Remove any sequences of dots that could be used for path traversal
+        # Replace multiple dots with single underscore
+        flattened = re.sub(r'\.{2,}', '_', flattened)
+        
+        # Replace any remaining unsafe characters
+        sanitized = re.sub(r'[^A-Za-z0-9_.-]', '_', flattened)
+        
+        # Collapse multiple consecutive underscores into single underscore
+        sanitized = re.sub(r'_+', '_', sanitized)
+        
+        # Ensure no leading/trailing dots or underscores
+        sanitized = sanitized.strip('._')
+        
+        # If empty after sanitization, use a default name
+        if not sanitized:
+            sanitized = 'repo'
+            
+        return sanitized
 
     def _build_authenticated_url(self, repo_url: str, github_token: Optional[str]) -> str:
         """Return a URL with embedded token for HTTPS GitHub URLs; otherwise the original URL."""
@@ -355,7 +374,8 @@ class GitService:
                 return repo_dir
         
         # Check if repository exists on disk (even if not in cache)
-        repo_dir = os.path.join(self.temp_dir, f"gitpulse_{repo_full_name.replace('/', '_')}")
+        safe_dir_name = self._sanitize_repo_dir_name(repo_full_name)
+        repo_dir = os.path.join(self.temp_dir, f"gitpulse_{safe_dir_name}")
         if os.path.exists(repo_dir) and os.path.exists(os.path.join(repo_dir, '.git')):
             # Add to cache for future use
             self.cloned_repos[repo_full_name] = repo_dir
