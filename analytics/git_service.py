@@ -263,6 +263,21 @@ class GitService:
         repo_real = os.path.realpath(repo_dir)
         if not repo_real.startswith(temp_root + os.sep):
             raise GitServiceError("Repository directory escapes temp directory")
+        
+        # Additional validation: ensure repo_dir follows expected pattern
+        # repo_dir should be: temp_dir/gitpulse_sanitized_name
+        expected_prefix = os.path.join(self.temp_dir, "gitpulse_")
+        if not repo_dir.startswith(expected_prefix):
+            raise GitServiceError("Repository directory does not follow expected pattern")
+        
+        # Validate that the sanitized part contains only safe characters
+        sanitized_part = repo_dir[len(expected_prefix):]
+        if not sanitized_part or not re.match(r'^[A-Za-z0-9_.-]+$', sanitized_part):
+            raise GitServiceError("Repository directory contains unsafe characters")
+        
+        # Ensure no path traversal attempts
+        if '..' in repo_dir or '\\' in repo_dir:
+            raise GitServiceError("Repository directory contains path traversal characters")
 
     def _build_git_command(self, action: str, clone_url: str, repo_dir: str, extra: Optional[List[str]] = None, disable_lfs: bool = False) -> List[str]:
         """Construct a safe git command with whitelisted args."""
